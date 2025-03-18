@@ -1,20 +1,15 @@
-# BSV WALLET TOOLBOX FOR GO LANG
+# GO BSV Middleware
 
-BSV BLOCKCHAIN | BRC100 Conforming Wallet, Wallet Storage and Wallet Signer Components
+This project aims to build a middleware layer integrating mutual authentication and payment flows into the BSV ecosystem using the go-sdk.
 
-## Objective
+The GO BSV Middleware is based on the following BSV specifications:
+1. [BRC-103: Peer-to-Peer Mutual Authentication and Certificate Exchange Protocol](https://github.com/bitcoin-sv/BRCs/blob/master/peer-to-peer/0103.md)
+2. [BRC-104: HTTP Transport for BRC-103 Mutual Authentication](https://github.com/bitcoin-sv/BRCs/blob/master/peer-to-peer/0104.md)
 
-The BSV Wallet Toolbox builds on the [SDK](https://github.com/bsv-blockchain/go-sdk).
+## Project Roadmap
 
-It aims to support building sophisticated applications and services on the BSV Blockchain technology stack.
-
-By providing interlocking building blocks for persistent storage and protocol based key derivation, it serves as an essential toolbox for developers looking to build on the BSV Blockchain.
-
-## Documentation
-
-[//]: # (TODO: ADD DOCUMENTATION)
-
-The Toolbox is richly documented with code-level annotations. This should show up well within editors like VSCode.
+The project is in development and follows a phased approach, focusing first on transport adapters, followed by authentication and payment middleware, and concluding with integration and documentation.
+You can see the whole roadmap [here](./ROADMAP.md).
 
 ## Contribution Guidelines
 
