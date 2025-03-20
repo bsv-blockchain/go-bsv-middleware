@@ -3,6 +3,7 @@ package mock
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"testing"
 	"time"
 
@@ -55,7 +56,7 @@ func NewPeerSessionsForThisSameIdentityKey(t *testing.T, count int) []shared.Pee
 func randomHex(n uint) (string, error) {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {
-		return "", err
+		return "", fmt.Errorf("error during creating random hex: %w", err)
 	}
 	return hex.EncodeToString(b), nil
 }
