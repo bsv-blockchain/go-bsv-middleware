@@ -45,10 +45,11 @@ func (m *SessionManager) addSessionByIdentityKey(session shared.PeerSession) {
 		// append sessionNonce to existing list
 		// at this point we have at least two concurrent sessions for the same peerIdentityKey
 		m.identityKeyToSessions[*session.PeerIdentityKey] = append(sessionNonces, *session.SessionNonce)
-	} else {
-		// create new list with sessionNonce
-		m.identityKeyToSessions[*session.PeerIdentityKey] = []string{*session.SessionNonce}
+		return
 	}
+
+	// create new list with sessionNonce and assign to peerIdentityKey
+	m.identityKeyToSessions[*session.PeerIdentityKey] = []string{*session.SessionNonce}
 }
 
 // GetSession retrieves a "best" session based on a given identifier, which can be a sessionNonce or a peerIdentityKey.
