@@ -149,7 +149,7 @@ func (m *SessionManager) HasSession(identifier string) bool {
 		return false
 	}
 
-	return nonces != nil && len(nonces) > 0
+	return len(nonces) > 0
 }
 
 // UpdateSession updates a session in the manager.
