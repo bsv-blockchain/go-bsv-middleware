@@ -18,8 +18,8 @@ type GetPublicKeyOptions struct {
 	ForSelf bool `json:"forSelf,omitempty"`
 }
 
-// WalletInterface defines the core functionality needed for authentication
-type WalletInterface interface {
+// Interface defines the core functionality needed for authentication
+type Interface interface {
 	// GetPublicKey returns a public key
 	GetPublicKey(ctx context.Context, options GetPublicKeyOptions) (string, error)
 
