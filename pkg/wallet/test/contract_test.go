@@ -2,10 +2,10 @@ package wallet_test
 
 import (
 	"context"
-	"github.com/4chain-ag/go-bsv-middlewares/pkg/wallet"
-	mock "github.com/4chain-ag/go-bsv-middlewares/testutil/mock/wallet"
 	"testing"
 
+	"github.com/4chain-ag/go-bsv-middlewares/pkg/wallet"
+	mock "github.com/4chain-ag/go-bsv-middlewares/testutil/mock/wallet"
 	"github.com/stretchr/testify/require"
 )
 

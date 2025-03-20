@@ -3,6 +3,7 @@ package mock
 import (
 	"context"
 	"errors"
+
 	"github.com/4chain-ag/go-bsv-middlewares/pkg/wallet"
 )
 
