@@ -96,8 +96,8 @@ func (m *SessionManager) getBestSession(sessionNonces []string) *shared.PeerSess
 			continue
 		}
 
-		// If both sessions are authenticated or neither is authenticated, pick the more recent one
-		if session.LastUpdate.After(bestSession.LastUpdate) {
+		// If both are authenticated or both are not, select the most recent one
+		if session.IsAuthenticated == bestSession.IsAuthenticated && session.LastUpdate.After(bestSession.LastUpdate) {
 			bestSession = &session
 		}
 	}
