@@ -33,12 +33,21 @@ func (m *SessionManager) AddSession(session shared.PeerSession) {
 	}
 
 	if session.PeerIdentityKey != nil {
-		sessionNonces, exists := m.identityKeyToSessions[*session.PeerIdentityKey]
-		if exists {
-			m.identityKeyToSessions[*session.PeerIdentityKey] = append(sessionNonces, *session.SessionNonce)
-		} else {
-			m.identityKeyToSessions[*session.PeerIdentityKey] = []string{*session.SessionNonce}
-		}
+		m.addSessionByIdentityKey(session)
+	}
+}
+
+// addSessionByIdentityKey adds a session nonce to the manager by associating it with its peerIdentityKey.
+// This does NOT overwrite existing sessions for the same peerIdentityKey, allowing multiple concurrent sessions.
+func (m *SessionManager) addSessionByIdentityKey(session shared.PeerSession) {
+	sessionNonces, exists := m.identityKeyToSessions[*session.PeerIdentityKey]
+	if exists {
+		// append sessionNonce to existing list
+		// at this point we have at least two concurrent sessions for the same peerIdentityKey
+		m.identityKeyToSessions[*session.PeerIdentityKey] = append(sessionNonces, *session.SessionNonce)
+	} else {
+		// create new list with sessionNonce
+		m.identityKeyToSessions[*session.PeerIdentityKey] = []string{*session.SessionNonce}
 	}
 }
 
@@ -59,6 +68,14 @@ func (m *SessionManager) GetSession(identifier string) *shared.PeerSession {
 	}
 
 	// get the "best" session
+	bestSession := m.getBestSession(sessionNonces)
+
+	return bestSession
+}
+
+// getBestSession retrieves the "best" session from a list of sessionNonces.
+// The "best" session is the most recent one, or the most recent authenticated one if there are multiple.
+func (m *SessionManager) getBestSession(sessionNonces []string) *shared.PeerSession {
 	var bestSession *shared.PeerSession
 	for _, sessionNonce := range sessionNonces {
 		session, exists := m.sessions[sessionNonce]
@@ -66,18 +83,23 @@ func (m *SessionManager) GetSession(identifier string) *shared.PeerSession {
 			continue
 		}
 
-		// update bestSession if:
-		// - bestSession is nil
-		// - session is authenticated and bestSession is not
-		// - session and bestSession are authenticated but session is more recent than bestSession
-		// - session is more recent than bestSession
-		if bestSession == nil ||
-			session.IsAuthenticated && (!bestSession.IsAuthenticated || session.LastUpdate.After(bestSession.LastUpdate)) ||
-			!bestSession.IsAuthenticated && session.LastUpdate.After(bestSession.LastUpdate) {
+		// If no session is selected yet, set the current session
+		if bestSession == nil {
+			bestSession = &session
+			continue
+		}
+
+		// If the current session is authenticated and the bestSession is not, update bestSession
+		if session.IsAuthenticated && !bestSession.IsAuthenticated {
+			bestSession = &session
+			continue
+		}
+
+		// If both sessions are authenticated or neither is authenticated, pick the more recent one
+		if session.LastUpdate.After(bestSession.LastUpdate) {
 			bestSession = &session
 		}
 	}
-
 	return bestSession
 }
 
