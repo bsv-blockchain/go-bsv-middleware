@@ -118,7 +118,17 @@ func (m *SessionManager) RemoveSession(session shared.PeerSession) {
 		if !exists {
 			return
 		}
-		removeSessionNonce(sessionNonces, *session.SessionNonce)
+
+		updatedNonces := removeSessionNonce(sessionNonces, *session.SessionNonce)
+
+		// if there are no more sessions for the peerIdentityKey, remove the key
+		if len(updatedNonces) == 0 {
+			delete(m.identityKeyToSessions, *session.PeerIdentityKey)
+			return
+		}
+
+		// update the list of sessionNonces for the peerIdentityKey
+		m.identityKeyToSessions[*session.PeerIdentityKey] = updatedNonces
 	}
 }
 
@@ -126,8 +136,20 @@ func (m *SessionManager) RemoveSession(session shared.PeerSession) {
 func (m *SessionManager) HasSession(identifier string) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	// check if session exists by sessionNonce
 	_, exists := m.sessions[identifier]
-	return exists
+	if exists {
+		return true
+	}
+
+	// check if sessions are assigned to peerIdentityKey
+	nonces, exists := m.identityKeyToSessions[identifier]
+	if !exists {
+		return false
+	}
+
+	return nonces != nil && len(nonces) > 0
 }
 
 // UpdateSession updates a session in the manager.
