@@ -53,7 +53,7 @@ func (m *Wallet) GetPublicKey(ctx context.Context, options wallet.GetPublicKeyOp
 }
 
 // CreateSignature returns a mock signature.
-func (m *Wallet) CreateSignature(ctx context.Context, data []byte, protocolID interface{}, keyID string, counterparty string) ([]byte, error) {
+func (m *Wallet) CreateSignature(ctx context.Context, data []byte, protocolID any, keyID string, counterparty string) ([]byte, error) {
 	if ctx.Err() != nil {
 		return nil, fmt.Errorf("ctx err: %w", ctx.Err())
 	}
