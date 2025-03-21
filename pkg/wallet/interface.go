@@ -24,7 +24,7 @@ type Interface interface {
 	GetPublicKey(ctx context.Context, options GetPublicKeyOptions) (string, error)
 
 	// CreateSignature signs data with specific protocol/key IDs
-	CreateSignature(ctx context.Context, data []byte, protocolID interface{}, keyID string, counterparty string) ([]byte, error)
+	CreateSignature(ctx context.Context, data []byte, protocolID any, keyID string, counterparty string) ([]byte, error)
 
 	// VerifySignature verifies a signature
 	VerifySignature(ctx context.Context, data []byte, signature []byte, protocolID interface{}, keyID string, counterparty string) (bool, error)
