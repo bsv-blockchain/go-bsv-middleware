@@ -7,7 +7,7 @@ type GetPublicKeyOptions struct {
 	// IdentityKey is a flag to return the identity key
 	IdentityKey bool `json:"identityKey"`
 	// ProtocolID is the protocol ID for the key
-	ProtocolID interface{} `json:"protocolID,omitempty"`
+	ProtocolID any `json:"protocolID,omitempty"`
 	// KeyID is the key ID for the key
 	KeyID string `json:"keyID,omitempty"`
 	// Counterparty is the counterparty for the key
