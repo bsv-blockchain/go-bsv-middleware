@@ -66,7 +66,7 @@ func (m *Wallet) CreateSignature(ctx context.Context, data []byte, protocolID an
 }
 
 // VerifySignature returns true if the signature matches expected mock data.
-func (m *Wallet) VerifySignature(ctx context.Context, data []byte, signature []byte, protocolID interface{}, keyID string, counterparty string) (bool, error) {
+func (m *Wallet) VerifySignature(ctx context.Context, data []byte, signature []byte, protocolID any, keyID string, counterparty string) (bool, error) {
 	if ctx.Err() != nil {
 		return false, fmt.Errorf("ctx err: %w", ctx.Err())
 	}
