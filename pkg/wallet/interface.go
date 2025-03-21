@@ -55,7 +55,7 @@ type Certificate struct {
 	// RevocationOutpoint is the revocation outpoint of the certificate
 	RevocationOutpoint string `json:"revocationOutpoint"`
 	// Fields is the map representing custom fields of the certificate (payload)
-	Fields map[string]interface{} `json:"fields"`
+	Fields map[string]any `json:"fields"`
 	// Signature is the signature of the certificate
 	Signature string `json:"signature"`
 }
