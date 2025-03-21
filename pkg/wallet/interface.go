@@ -27,7 +27,7 @@ type Interface interface {
 	CreateSignature(ctx context.Context, data []byte, protocolID any, keyID string, counterparty string) ([]byte, error)
 
 	// VerifySignature verifies a signature
-	VerifySignature(ctx context.Context, data []byte, signature []byte, protocolID interface{}, keyID string, counterparty string) (bool, error)
+	VerifySignature(ctx context.Context, data []byte, signature []byte, protocolID any, keyID string, counterparty string) (bool, error)
 
 	// CreateNonce creates a nonce for challenge-response authentication
 	CreateNonce(ctx context.Context) (string, error)
