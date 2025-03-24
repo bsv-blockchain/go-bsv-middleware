@@ -2,9 +2,9 @@ package wallet_test
 
 import (
 	"context"
-	"github.com/4chain-ag/go-bsv-middlewares/pkg/temporary/wallet"
 	"testing"
 
+	"github.com/4chain-ag/go-bsv-middlewares/pkg/temporary/wallet"
 	"github.com/stretchr/testify/require"
 )
 
