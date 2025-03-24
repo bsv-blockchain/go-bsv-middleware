@@ -1,6 +1,8 @@
-package shared
+package sessionmanager
 
-import "time"
+import (
+	"time"
+)
 
 // PeerSession holds the session information for a peer
 type PeerSession struct {

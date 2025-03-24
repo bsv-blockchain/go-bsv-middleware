@@ -1,4 +1,4 @@
-package mock
+package sessionmanager
 
 import (
 	"crypto/rand"
@@ -7,12 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/4chain-ag/go-bsv-middlewares/pkg/middleware/shared"
 	"github.com/stretchr/testify/require"
 )
 
 // NewPeerSession creates a new PeerSession with random values.
-func NewPeerSession(t *testing.T) shared.PeerSession {
+func NewPeerSession(t *testing.T) PeerSession {
 	sNonce, err := randomHex(32)
 	require.NoError(t, err)
 	pNonce, err := randomHex(32)
@@ -20,7 +19,7 @@ func NewPeerSession(t *testing.T) shared.PeerSession {
 	pIdentityKey, err := randomHex(66)
 	require.NoError(t, err)
 
-	return shared.PeerSession{
+	return PeerSession{
 		IsAuthenticated: false,
 		SessionNonce:    &sNonce,
 		PeerNonce:       &pNonce,
@@ -30,18 +29,18 @@ func NewPeerSession(t *testing.T) shared.PeerSession {
 }
 
 // NewPeerSessionsForThisSameIdentityKey creates a slice of PeerSessions with the same PeerIdentityKey.
-func NewPeerSessionsForThisSameIdentityKey(t *testing.T, count int) []shared.PeerSession {
+func NewPeerSessionsForThisSameIdentityKey(t *testing.T, count int) []PeerSession {
 	pIdentityKey, err := randomHex(66)
 	require.NoError(t, err)
 
-	sessions := make([]shared.PeerSession, count)
+	sessions := make([]PeerSession, count)
 	for i := 0; i < count; i++ {
 		sNonce, err := randomHex(32)
 		require.NoError(t, err)
 		pNonce, err := randomHex(32)
 		require.NoError(t, err)
 
-		sessions[i] = shared.PeerSession{
+		sessions[i] = PeerSession{
 			IsAuthenticated: false,
 			SessionNonce:    &sNonce,
 			PeerNonce:       &pNonce,

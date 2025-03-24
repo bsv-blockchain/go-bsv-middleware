@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/4chain-ag/go-bsv-middlewares/pkg/wallet"
-	mock "github.com/4chain-ag/go-bsv-middlewares/testutil/mock/wallet"
+	"github.com/4chain-ag/go-bsv-middlewares/pkg/temporary/wallet"
+	fixtures "github.com/4chain-ag/go-bsv-middlewares/pkg/temporary/wallet/test"
 	"github.com/stretchr/testify/require"
 )
 
@@ -13,14 +13,14 @@ import (
 func TestMockWallet_GetPublicKey_HappyPath(t *testing.T) {
 	// given
 	ctx := context.Background()
-	w := mock.NewMockWallet(mock.WithKeyDeriver)
+	w := wallet.NewMockWallet(fixtures.WithKeyDeriver)
 
 	// when
 	identityKey, err := w.GetPublicKey(ctx, wallet.GetPublicKeyOptions{IdentityKey: true})
 
 	// then
 	require.NoError(t, err)
-	require.Equal(t, mock.IdentityKeyMock, identityKey)
+	require.Equal(t, fixtures.IdentityKeyMock, identityKey)
 
 	// when
 	derivedKey, err := w.GetPublicKey(ctx, wallet.GetPublicKeyOptions{
@@ -31,21 +31,21 @@ func TestMockWallet_GetPublicKey_HappyPath(t *testing.T) {
 
 	// then
 	require.NoError(t, err)
-	require.Equal(t, mock.DerivedKeyMock, derivedKey)
+	require.Equal(t, fixtures.DerivedKeyMock, derivedKey)
 }
 
 // Test GetPublicKey for invalid cases
 func TestMockWallet_GetPublicKey_UnhappyPath(t *testing.T) {
 	// given
 	ctx := context.Background()
-	w := mock.NewMockWallet(mock.WithKeyDeriver)
+	w := wallet.NewMockWallet(fixtures.WithKeyDeriver)
 
 	// when
 	_, err := w.GetPublicKey(ctx, wallet.GetPublicKeyOptions{Privileged: true})
 
 	// then
 	require.Error(t, err)
-	require.Equal(t, mock.ErrorNoPrivilege, err.Error())
+	require.Equal(t, fixtures.ErrorNoPrivilege, err.Error())
 
 	// when
 	_, err = w.GetPublicKey(ctx, wallet.GetPublicKeyOptions{
@@ -55,24 +55,24 @@ func TestMockWallet_GetPublicKey_UnhappyPath(t *testing.T) {
 
 	// then
 	require.Error(t, err)
-	require.Equal(t, mock.ErrorMissingParams, err.Error())
+	require.Equal(t, fixtures.ErrorMissingParams, err.Error())
 
 	// given
-	wNoDeriver := mock.NewMockWallet(mock.WithoutKeyDeriver)
+	wNoDeriver := wallet.NewMockWallet(fixtures.WithoutKeyDeriver)
 
 	// when
 	_, err = wNoDeriver.GetPublicKey(ctx, wallet.GetPublicKeyOptions{IdentityKey: true})
 
 	// then
 	require.Error(t, err)
-	require.Equal(t, mock.ErrorKeyDeriver, err.Error())
+	require.Equal(t, fixtures.ErrorKeyDeriver, err.Error())
 }
 
 // Test CreateSignature and VerifySignature
 func TestMockWallet_CreateAndVerifySignature_HappyPath(t *testing.T) {
 	// given
 	ctx := context.Background()
-	w := mock.NewMockWallet(mock.WithKeyDeriver)
+	w := wallet.NewMockWallet(fixtures.WithKeyDeriver)
 
 	data := []byte("test-data")
 	protocolID := "auth-protocol"
@@ -84,7 +84,7 @@ func TestMockWallet_CreateAndVerifySignature_HappyPath(t *testing.T) {
 
 	// then
 	require.NoError(t, err)
-	require.Equal(t, []byte(mock.MockSignature), signature)
+	require.Equal(t, []byte(fixtures.MockSignature), signature)
 
 	// when
 	isValid, err := w.VerifySignature(ctx, data, signature, protocolID, keyID, counterparty)
@@ -98,14 +98,14 @@ func TestMockWallet_CreateAndVerifySignature_HappyPath(t *testing.T) {
 func TestMockWallet_CreateAndVerifyNonce_HappyPath(t *testing.T) {
 	// given
 	ctx := context.Background()
-	w := mock.NewMockWallet(mock.WithKeyDeriver)
+	w := wallet.NewMockWallet(fixtures.WithKeyDeriver)
 
 	// when
 	nonce, err := w.CreateNonce(ctx)
 
 	// then
 	require.NoError(t, err)
-	require.Equal(t, mock.MockNonce, nonce)
+	require.Equal(t, fixtures.MockNonce, nonce)
 
 	// when
 	isValid, err := w.VerifyNonce(ctx, nonce)
@@ -119,7 +119,7 @@ func TestMockWallet_CreateAndVerifyNonce_HappyPath(t *testing.T) {
 func TestMockWallet_VerifySignature_UnhappyPath(t *testing.T) {
 	// given
 	ctx := context.Background()
-	w := mock.NewMockWallet(mock.WithKeyDeriver)
+	w := wallet.NewMockWallet(fixtures.WithKeyDeriver)
 
 	data := []byte("test-data")
 	protocolID := "auth-protocol"

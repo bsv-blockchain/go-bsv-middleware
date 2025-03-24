@@ -3,16 +3,16 @@ package auth_test
 import (
 	"testing"
 
-	"github.com/4chain-ag/go-bsv-middlewares/testutil/mock"
+	"github.com/4chain-ag/go-bsv-middlewares/pkg/temporary/sessionmanager"
 	"github.com/stretchr/testify/require"
 )
 
 func TestSessionManager_HappyPath(t *testing.T) {
-	sessionManager := mock.NewSessionManager()
+	sessionManager := sessionmanager.NewSessionManager()
 
 	t.Run("Add and get session by both keys", func(t *testing.T) {
 		// given
-		session := mock.NewPeerSession(t)
+		session := sessionmanager.NewPeerSession(t)
 
 		// when
 		sessionManager.AddSession(session)
@@ -29,7 +29,7 @@ func TestSessionManager_HappyPath(t *testing.T) {
 
 	t.Run("Correctly get best session by both keys", func(t *testing.T) {
 		// given
-		sessions := mock.NewPeerSessionsForThisSameIdentityKey(t, 5)
+		sessions := sessionmanager.NewPeerSessionsForThisSameIdentityKey(t, 5)
 		identityKey := *sessions[0].PeerIdentityKey
 
 		// when
@@ -77,7 +77,7 @@ func TestSessionManager_HappyPath(t *testing.T) {
 
 	t.Run("Update session", func(t *testing.T) {
 		// given
-		session := mock.NewPeerSession(t)
+		session := sessionmanager.NewPeerSession(t)
 		sessionManager.AddSession(session)
 
 		// when
@@ -92,7 +92,7 @@ func TestSessionManager_HappyPath(t *testing.T) {
 
 	t.Run("Remove session", func(t *testing.T) {
 		// given
-		session := mock.NewPeerSession(t)
+		session := sessionmanager.NewPeerSession(t)
 		sessionManager.AddSession(session)
 
 		// when
@@ -108,7 +108,7 @@ func TestSessionManager_HappyPath(t *testing.T) {
 }
 
 func TestSessionManager_ErrorPath(t *testing.T) {
-	sessionManager := mock.NewSessionManager()
+	sessionManager := sessionmanager.NewSessionManager()
 
 	t.Run("Get non-existent session", func(t *testing.T) {
 		// given
@@ -123,7 +123,7 @@ func TestSessionManager_ErrorPath(t *testing.T) {
 
 	t.Run("Remove non-existent session", func(t *testing.T) {
 		// given
-		session := mock.NewPeerSession(t)
+		session := sessionmanager.NewPeerSession(t)
 
 		// when
 		sessionManager.RemoveSession(session)
@@ -135,7 +135,7 @@ func TestSessionManager_ErrorPath(t *testing.T) {
 
 	t.Run("Update non-existent session", func(t *testing.T) {
 		// given
-		session := mock.NewPeerSession(t)
+		session := sessionmanager.NewPeerSession(t)
 
 		// when
 		sessionManager.UpdateSession(session)

@@ -1,11 +1,11 @@
-package mock
+package wallet
 
 import (
 	"context"
 	"errors"
 	"fmt"
 
-	"github.com/4chain-ag/go-bsv-middlewares/pkg/wallet"
+	"github.com/4chain-ag/go-bsv-middlewares/pkg/temporary/wallet/test"
 )
 
 // Wallet provides a simple mock implementation of Interface.
@@ -16,40 +16,40 @@ type Wallet struct {
 }
 
 // NewMockWallet creates a new mock wallet with or without keyDeriver.
-func NewMockWallet(enableKeyDeriver bool) wallet.Interface {
+func NewMockWallet(enableKeyDeriver bool) Interface {
 	return &Wallet{
-		identityKey: IdentityKeyMock,
+		identityKey: wallet.IdentityKeyMock,
 		keyDeriver:  enableKeyDeriver,
 		validNonces: make(map[string]bool),
 	}
 }
 
 // GetPublicKey returns a mock public key while validating required parameters.
-func (m *Wallet) GetPublicKey(ctx context.Context, options wallet.GetPublicKeyOptions) (string, error) {
+func (m *Wallet) GetPublicKey(ctx context.Context, options GetPublicKeyOptions) (string, error) {
 	if ctx.Err() != nil {
 		return "", fmt.Errorf("ctx err: %w", ctx.Err())
 	}
 
 	if options.Privileged {
-		return "", errors.New(ErrorNoPrivilege)
+		return "", errors.New(wallet.ErrorNoPrivilege)
 	}
 
 	if options.IdentityKey {
 		if !m.keyDeriver {
-			return "", errors.New(ErrorKeyDeriver)
+			return "", errors.New(wallet.ErrorKeyDeriver)
 		}
 		return m.identityKey, nil
 	}
 
 	if options.ProtocolID == nil || options.KeyID == "" || options.KeyID == " " {
-		return "", errors.New(ErrorMissingParams)
+		return "", errors.New(wallet.ErrorMissingParams)
 	}
 
 	if !m.keyDeriver {
-		return "", errors.New(ErrorKeyDeriver)
+		return "", errors.New(wallet.ErrorKeyDeriver)
 	}
 
-	return DerivedKeyMock, nil
+	return wallet.DerivedKeyMock, nil
 }
 
 // CreateSignature returns a mock signature.
@@ -59,10 +59,10 @@ func (m *Wallet) CreateSignature(ctx context.Context, data []byte, protocolID an
 	}
 
 	if len(data) == 0 || keyID == "" || counterparty == "" {
-		return nil, errors.New(ErrorInvalidInput)
+		return nil, errors.New(wallet.ErrorInvalidInput)
 	}
 
-	return []byte(MockSignature), nil
+	return []byte(wallet.MockSignature), nil
 }
 
 // VerifySignature returns true if the signature matches expected mock data.
@@ -71,7 +71,7 @@ func (m *Wallet) VerifySignature(ctx context.Context, data []byte, signature []b
 		return false, fmt.Errorf("ctx err: %w", ctx.Err())
 	}
 
-	return string(signature) == MockSignature, nil
+	return string(signature) == wallet.MockSignature, nil
 }
 
 // CreateNonce generates a deterministic nonce.
@@ -80,8 +80,8 @@ func (m *Wallet) CreateNonce(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("ctx err: %w", ctx.Err())
 	}
 
-	m.validNonces[MockNonce] = true
-	return MockNonce, nil
+	m.validNonces[wallet.MockNonce] = true
+	return wallet.MockNonce, nil
 }
 
 // VerifyNonce checks if the nonce exists.
@@ -95,16 +95,16 @@ func (m *Wallet) VerifyNonce(ctx context.Context, nonce string) (bool, error) {
 }
 
 // ListCertificates returns an empty list.
-func (m *Wallet) ListCertificates(ctx context.Context, certifiers []string, types []string) ([]wallet.Certificate, error) {
+func (m *Wallet) ListCertificates(ctx context.Context, certifiers []string, types []string) ([]Certificate, error) {
 	if ctx.Err() != nil {
 		return nil, fmt.Errorf("ctx err: %w", ctx.Err())
 	}
 
-	return []wallet.Certificate{}, nil
+	return []Certificate{}, nil
 }
 
 // ProveCertificate returns an empty map.
-func (m *Wallet) ProveCertificate(ctx context.Context, certificate wallet.Certificate, verifier string, fieldsToReveal []string) (map[string]string, error) {
+func (m *Wallet) ProveCertificate(ctx context.Context, certificate Certificate, verifier string, fieldsToReveal []string) (map[string]string, error) {
 	if ctx.Err() != nil {
 		return nil, fmt.Errorf("ctx err: %w", ctx.Err())
 	}
