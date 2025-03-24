@@ -1,11 +1,9 @@
-package mock
+package wallet
 
 import (
 	"context"
 	"errors"
 	"fmt"
-
-	"github.com/4chain-ag/go-bsv-middlewares/pkg/wallet"
 )
 
 // Wallet provides a simple mock implementation of Interface.
@@ -16,7 +14,7 @@ type Wallet struct {
 }
 
 // NewMockWallet creates a new mock wallet with or without keyDeriver.
-func NewMockWallet(enableKeyDeriver bool) wallet.Interface {
+func NewMockWallet(enableKeyDeriver bool) Interface {
 	return &Wallet{
 		identityKey: IdentityKeyMock,
 		keyDeriver:  enableKeyDeriver,
@@ -25,7 +23,7 @@ func NewMockWallet(enableKeyDeriver bool) wallet.Interface {
 }
 
 // GetPublicKey returns a mock public key while validating required parameters.
-func (m *Wallet) GetPublicKey(ctx context.Context, options wallet.GetPublicKeyOptions) (string, error) {
+func (m *Wallet) GetPublicKey(ctx context.Context, options GetPublicKeyOptions) (string, error) {
 	if ctx.Err() != nil {
 		return "", fmt.Errorf("ctx err: %w", ctx.Err())
 	}
@@ -95,16 +93,16 @@ func (m *Wallet) VerifyNonce(ctx context.Context, nonce string) (bool, error) {
 }
 
 // ListCertificates returns an empty list.
-func (m *Wallet) ListCertificates(ctx context.Context, certifiers []string, types []string) ([]wallet.Certificate, error) {
+func (m *Wallet) ListCertificates(ctx context.Context, certifiers []string, types []string) ([]Certificate, error) {
 	if ctx.Err() != nil {
 		return nil, fmt.Errorf("ctx err: %w", ctx.Err())
 	}
 
-	return []wallet.Certificate{}, nil
+	return []Certificate{}, nil
 }
 
 // ProveCertificate returns an empty map.
-func (m *Wallet) ProveCertificate(ctx context.Context, certificate wallet.Certificate, verifier string, fieldsToReveal []string) (map[string]string, error) {
+func (m *Wallet) ProveCertificate(ctx context.Context, certificate Certificate, verifier string, fieldsToReveal []string) (map[string]string, error) {
 	if ctx.Err() != nil {
 		return nil, fmt.Errorf("ctx err: %w", ctx.Err())
 	}

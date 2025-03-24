@@ -1,4 +1,4 @@
-package mock
+package sessionmanager
 
 import (
 	"sync"
