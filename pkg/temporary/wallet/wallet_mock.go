@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	
+
 	"github.com/4chain-ag/go-bsv-middlewares/pkg/temporary/wallet/test"
 )
 
