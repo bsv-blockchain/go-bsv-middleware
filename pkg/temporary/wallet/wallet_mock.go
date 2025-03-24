@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	
+	"github.com/4chain-ag/go-bsv-middlewares/pkg/temporary/wallet/test"
 )
 
 // Wallet provides a simple mock implementation of Interface.
@@ -16,7 +18,7 @@ type Wallet struct {
 // NewMockWallet creates a new mock wallet with or without keyDeriver.
 func NewMockWallet(enableKeyDeriver bool) Interface {
 	return &Wallet{
-		identityKey: IdentityKeyMock,
+		identityKey: wallet.IdentityKeyMock,
 		keyDeriver:  enableKeyDeriver,
 		validNonces: make(map[string]bool),
 	}
@@ -29,25 +31,25 @@ func (m *Wallet) GetPublicKey(ctx context.Context, options GetPublicKeyOptions) 
 	}
 
 	if options.Privileged {
-		return "", errors.New(ErrorNoPrivilege)
+		return "", errors.New(wallet.ErrorNoPrivilege)
 	}
 
 	if options.IdentityKey {
 		if !m.keyDeriver {
-			return "", errors.New(ErrorKeyDeriver)
+			return "", errors.New(wallet.ErrorKeyDeriver)
 		}
 		return m.identityKey, nil
 	}
 
 	if options.ProtocolID == nil || options.KeyID == "" || options.KeyID == " " {
-		return "", errors.New(ErrorMissingParams)
+		return "", errors.New(wallet.ErrorMissingParams)
 	}
 
 	if !m.keyDeriver {
-		return "", errors.New(ErrorKeyDeriver)
+		return "", errors.New(wallet.ErrorKeyDeriver)
 	}
 
-	return DerivedKeyMock, nil
+	return wallet.DerivedKeyMock, nil
 }
 
 // CreateSignature returns a mock signature.
@@ -57,10 +59,10 @@ func (m *Wallet) CreateSignature(ctx context.Context, data []byte, protocolID an
 	}
 
 	if len(data) == 0 || keyID == "" || counterparty == "" {
-		return nil, errors.New(ErrorInvalidInput)
+		return nil, errors.New(wallet.ErrorInvalidInput)
 	}
 
-	return []byte(MockSignature), nil
+	return []byte(wallet.MockSignature), nil
 }
 
 // VerifySignature returns true if the signature matches expected mock data.
@@ -69,7 +71,7 @@ func (m *Wallet) VerifySignature(ctx context.Context, data []byte, signature []b
 		return false, fmt.Errorf("ctx err: %w", ctx.Err())
 	}
 
-	return string(signature) == MockSignature, nil
+	return string(signature) == wallet.MockSignature, nil
 }
 
 // CreateNonce generates a deterministic nonce.
@@ -78,8 +80,8 @@ func (m *Wallet) CreateNonce(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("ctx err: %w", ctx.Err())
 	}
 
-	m.validNonces[MockNonce] = true
-	return MockNonce, nil
+	m.validNonces[wallet.MockNonce] = true
+	return wallet.MockNonce, nil
 }
 
 // VerifyNonce checks if the nonce exists.

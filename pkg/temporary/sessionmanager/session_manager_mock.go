@@ -2,15 +2,13 @@ package sessionmanager
 
 import (
 	"sync"
-
-	"github.com/4chain-ag/go-bsv-middlewares/pkg/middleware/shared"
 )
 
 // SessionManager is a mock implementation of the SessionManager interface.
 type SessionManager struct {
 	mu sync.Mutex
 	// sessions is a map of sessionNonce to a Session
-	sessions map[string]shared.PeerSession
+	sessions map[string]PeerSession
 	// identityKeyToSessions is a map of peerIdentityKey to a list of sessionNonce's
 	identityKeyToSessions map[string][]string
 }
@@ -18,13 +16,13 @@ type SessionManager struct {
 // NewSessionManager creates a new SessionManager.
 func NewSessionManager() *SessionManager {
 	return &SessionManager{
-		sessions:              make(map[string]shared.PeerSession),
+		sessions:              make(map[string]PeerSession),
 		identityKeyToSessions: make(map[string][]string),
 	}
 }
 
 // AddSession adds a session to the manager, associating it with its sessionNonce and also with its peerIdentityKey.
-func (m *SessionManager) AddSession(session shared.PeerSession) {
+func (m *SessionManager) AddSession(session PeerSession) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -39,7 +37,7 @@ func (m *SessionManager) AddSession(session shared.PeerSession) {
 
 // addSessionByIdentityKey adds a session nonce to the manager by associating it with its peerIdentityKey.
 // This does NOT overwrite existing sessions for the same peerIdentityKey, allowing multiple concurrent sessions.
-func (m *SessionManager) addSessionByIdentityKey(session shared.PeerSession) {
+func (m *SessionManager) addSessionByIdentityKey(session PeerSession) {
 	sessionNonces, exists := m.identityKeyToSessions[*session.PeerIdentityKey]
 	if exists {
 		// append sessionNonce to existing list
@@ -53,7 +51,7 @@ func (m *SessionManager) addSessionByIdentityKey(session shared.PeerSession) {
 }
 
 // GetSession retrieves a "best" session based on a given identifier, which can be a sessionNonce or a peerIdentityKey.
-func (m *SessionManager) GetSession(identifier string) *shared.PeerSession {
+func (m *SessionManager) GetSession(identifier string) *PeerSession {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -76,8 +74,8 @@ func (m *SessionManager) GetSession(identifier string) *shared.PeerSession {
 
 // getBestSession retrieves the "best" session from a list of sessionNonces.
 // The "best" session is the most recent one, or the most recent authenticated one if there are multiple.
-func (m *SessionManager) getBestSession(sessionNonces []string) *shared.PeerSession {
-	var bestSession *shared.PeerSession
+func (m *SessionManager) getBestSession(sessionNonces []string) *PeerSession {
+	var bestSession *PeerSession
 	for _, sessionNonce := range sessionNonces {
 		session, exists := m.sessions[sessionNonce]
 		if !exists {
@@ -105,7 +103,7 @@ func (m *SessionManager) getBestSession(sessionNonces []string) *shared.PeerSess
 }
 
 // RemoveSession removes a session from the manager by clearing all associated identifiers.
-func (m *SessionManager) RemoveSession(session shared.PeerSession) {
+func (m *SessionManager) RemoveSession(session PeerSession) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -153,7 +151,7 @@ func (m *SessionManager) HasSession(identifier string) bool {
 }
 
 // UpdateSession updates a session in the manager.
-func (m *SessionManager) UpdateSession(session shared.PeerSession) {
+func (m *SessionManager) UpdateSession(session PeerSession) {
 	m.AddSession(session)
 }
 
