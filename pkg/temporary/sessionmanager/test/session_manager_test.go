@@ -3,7 +3,7 @@ package auth_test
 import (
 	"testing"
 
-	"github.com/4chain-ag/go-bsv-middlewares/pkg/temporary/sessionmanager"
+	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/sessionmanager"
 	"github.com/stretchr/testify/require"
 )
 

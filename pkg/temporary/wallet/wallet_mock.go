@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/4chain-ag/go-bsv-middlewares/pkg/temporary/wallet/test"
+	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
 )
 
 // Wallet provides a simple mock implementation of Interface.
