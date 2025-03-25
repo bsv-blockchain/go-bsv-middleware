@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/4chain-ag/go-bsv-middlewares/pkg/temporary/wallet"
-	fixtures "github.com/4chain-ag/go-bsv-middlewares/pkg/temporary/wallet/test"
+	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
+	fixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
 	"github.com/stretchr/testify/require"
 )
 
