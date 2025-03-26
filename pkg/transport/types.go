@@ -1,8 +1,9 @@
 package transport
 
 import (
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	"net/http"
+
+	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 )
 
 // AuthVersion is the version of the authentication protocol.
