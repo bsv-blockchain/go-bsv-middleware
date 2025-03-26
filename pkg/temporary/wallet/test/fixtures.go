@@ -9,7 +9,7 @@ const (
 	// MockSignature is the expected signature
 	MockSignature = "mocksignaturedata"
 	// MockNonce is the expected nonce
-	MockNonce = "mocknonce12345"
+	MockNonce = "VIKeYfx4YAoDnlEx87/f4/32ytl+R+dN6Qm8oEB6Hw="
 
 	// TODO: be replaced with actual error messages from the wallet package
 
