@@ -15,6 +15,7 @@ import (
 	"github.com/4chain-ag/go-bsv-middleware/examples/utils"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
+	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	"github.com/gin-gonic/gin"
 )
@@ -31,6 +32,7 @@ func main() {
 	opts := auth.Options{
 		AllowUnauthenticated: false,
 		Logger:               logger,
+		Wallet:               wallet.NewMockWallet(true, walletFixtures.DefaultNonces...),
 	}
 
 	ginMiddleware := ginadapter.AuthMiddleware(opts)
@@ -55,7 +57,7 @@ func main() {
 	time.Sleep(1 * time.Second)
 
 	// Create mocked wallet
-	mockedWallet := wallet.NewMockWallet(true)
+	mockedWallet := wallet.NewMockWallet(true, walletFixtures.ClientNonces...)
 
 	// Send initial request
 	response := callInitialRequest(mockedWallet)
