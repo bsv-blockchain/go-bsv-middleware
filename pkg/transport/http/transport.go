@@ -109,6 +109,8 @@ func (t *Transport) HandleGeneralRequest(req *http.Request, w http.ResponseWrite
 
 	t.setupHeaders(w, response, requestID)
 
+	context.WithValue(req.Context(), transport.IdentityKey, requestData.IdentityKey)
+
 	return nil
 }
 
