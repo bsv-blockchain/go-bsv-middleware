@@ -81,16 +81,16 @@ func (t *Transport) HandleNonGeneralRequest(req *http.Request, w http.ResponseWr
 	t.setupContent(w, response)
 }
 
-func (t *Transport) HandleGeneralRequest(req *http.Request, w http.ResponseWriter, _ transport.OnCertificatesReceivedFunc) error {
+func (t *Transport) HandleGeneralRequest(req *http.Request, w http.ResponseWriter, _ transport.OnCertificatesReceivedFunc) (*http.Request, error) {
 	requestID := req.Header.Get(requestIDHeader)
 	if requestID == "" {
 		t.logger.Error("Missing request ID, checking if unauthenticated requests are allowed")
 
 		if t.allowUnauthenticated {
-			return nil
+			return nil, nil
 		}
 
-		return fmt.Errorf("missing request ID")
+		return nil, fmt.Errorf("missing request ID")
 	}
 
 	t.logger.Debug("Received general request", slog.String("requestID", requestID))
@@ -98,20 +98,19 @@ func (t *Transport) HandleGeneralRequest(req *http.Request, w http.ResponseWrite
 	requestData, err := t.buildAuthMessageFromRequest(req)
 	if err != nil {
 		t.logger.Error("Failed to build request data", slog.String("error", err.Error()))
-		return err
+		return nil, err
 	}
 
 	response, err := t.handleIncomingMessage(requestData)
 	if err != nil {
 		t.logger.Error("Failed to process request", slog.String("error", err.Error()))
-		return fmt.Errorf("failed to process request")
+		return nil, fmt.Errorf("failed to process request")
 	}
 
 	t.setupHeaders(w, response, requestID)
+	req = setupContext(req, requestData)
 
-	context.WithValue(req.Context(), transport.IdentityKey, requestData.IdentityKey)
-
-	return nil
+	return req, nil
 }
 
 func (t *Transport) handleIncomingMessage(msg *transport.AuthMessage) (*transport.AuthMessage, error) {
@@ -352,4 +351,10 @@ func createAuthSignature(wallet wallet.Interface, peerNonce, sessionNonce, ident
 		fmt.Sprintf("%s %s", peerNonce, sessionNonce),
 		identityKey,
 	)
+}
+
+func setupContext(req *http.Request, requestData *transport.AuthMessage) *http.Request {
+	ctx := context.WithValue(req.Context(), transport.IdentityKey, requestData.IdentityKey)
+	req = req.WithContext(ctx)
+	return req
 }

@@ -65,7 +65,8 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 			return
 		}
 
-		err := m.transport.HandleGeneralRequest(req, w, nil)
+		var err error
+		req, err = m.transport.HandleGeneralRequest(req, w, nil)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
