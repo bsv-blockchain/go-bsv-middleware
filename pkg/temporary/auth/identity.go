@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 )
 
