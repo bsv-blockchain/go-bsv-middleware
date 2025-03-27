@@ -31,7 +31,7 @@ func New(opts Options) *Middleware {
 
 	// Use mocked wallet if not provided
 	if opts.Wallet == nil {
-		opts.Wallet = wallet.NewMockWallet(true)
+		opts.Wallet = wallet.NewMockWallet(true, nil)
 	}
 
 	if opts.Logger == nil {

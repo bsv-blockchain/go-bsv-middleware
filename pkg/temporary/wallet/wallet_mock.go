@@ -16,10 +16,16 @@ type Wallet struct {
 	nonces      []string
 }
 
-// NewMockWallet creates a new mock wallet with or without keyDeriver and provided nonces (instead of mocked one).
-func NewMockWallet(enableKeyDeriver bool, nonces ...string) Interface {
+// NewMockWallet creates a new mock wallet with the following options:
+// - keyDeriver: Enables or disables key derivation.
+// - identityKey: Uses the provided identity key or a default one if none is given.
+// - nonces: Uses the provided nonces or default one if none are provided.
+func NewMockWallet(enableKeyDeriver bool, identityKey *string, nonces ...string) Interface {
+	if identityKey == nil {
+		identityKey = &wallet.ServerIdentityKey
+	}
 	return &Wallet{
-		identityKey: "mocked_identity_key",
+		identityKey: *identityKey,
 		keyDeriver:  enableKeyDeriver,
 		validNonces: make(map[string]bool),
 		nonces:      append([]string(nil), nonces...),

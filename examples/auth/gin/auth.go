@@ -32,7 +32,7 @@ func main() {
 	opts := auth.Options{
 		AllowUnauthenticated: false,
 		Logger:               logger,
-		Wallet:               wallet.NewMockWallet(true, walletFixtures.DefaultNonces...),
+		Wallet:               wallet.NewMockWallet(true, nil, walletFixtures.DefaultNonces...),
 	}
 
 	ginMiddleware := ginadapter.AuthMiddleware(opts)
@@ -57,7 +57,7 @@ func main() {
 	time.Sleep(1 * time.Second)
 
 	// Create mocked wallet
-	mockedWallet := wallet.NewMockWallet(true, walletFixtures.ClientNonces...)
+	mockedWallet := wallet.NewMockWallet(true, &walletFixtures.ClientIdentityKey, walletFixtures.ClientNonces...)
 
 	// Send initial request
 	response := callInitialRequest(mockedWallet)

@@ -13,7 +13,7 @@ import (
 func TestMockWallet_GetPublicKey_HappyPath(t *testing.T) {
 	// given
 	ctx := context.Background()
-	w := wallet.NewMockWallet(fixtures.WithKeyDeriver)
+	w := wallet.NewMockWallet(fixtures.WithKeyDeriver, nil)
 
 	// when
 	identityKey, err := w.GetPublicKey(ctx, wallet.GetPublicKeyOptions{IdentityKey: true})
@@ -38,7 +38,7 @@ func TestMockWallet_GetPublicKey_HappyPath(t *testing.T) {
 func TestMockWallet_GetPublicKey_UnhappyPath(t *testing.T) {
 	// given
 	ctx := context.Background()
-	w := wallet.NewMockWallet(fixtures.WithKeyDeriver)
+	w := wallet.NewMockWallet(fixtures.WithKeyDeriver, nil)
 
 	// when
 	_, err := w.GetPublicKey(ctx, wallet.GetPublicKeyOptions{Privileged: true})
@@ -58,7 +58,7 @@ func TestMockWallet_GetPublicKey_UnhappyPath(t *testing.T) {
 	require.Equal(t, fixtures.ErrorMissingParams, err.Error())
 
 	// given
-	wNoDeriver := wallet.NewMockWallet(fixtures.WithoutKeyDeriver)
+	wNoDeriver := wallet.NewMockWallet(fixtures.WithoutKeyDeriver, nil)
 
 	// when
 	_, err = wNoDeriver.GetPublicKey(ctx, wallet.GetPublicKeyOptions{IdentityKey: true})
@@ -72,7 +72,7 @@ func TestMockWallet_GetPublicKey_UnhappyPath(t *testing.T) {
 func TestMockWallet_CreateAndVerifySignature_HappyPath(t *testing.T) {
 	// given
 	ctx := context.Background()
-	w := wallet.NewMockWallet(fixtures.WithKeyDeriver)
+	w := wallet.NewMockWallet(fixtures.WithKeyDeriver, nil)
 
 	data := []byte("test-data")
 	protocolID := "auth-protocol"
@@ -98,7 +98,7 @@ func TestMockWallet_CreateAndVerifySignature_HappyPath(t *testing.T) {
 func TestMockWallet_CreateAndVerifyNonce_HappyPath(t *testing.T) {
 	// given
 	ctx := context.Background()
-	w := wallet.NewMockWallet(fixtures.WithKeyDeriver)
+	w := wallet.NewMockWallet(fixtures.WithKeyDeriver, nil)
 
 	// when
 	nonce, err := w.CreateNonce(ctx)
@@ -119,7 +119,7 @@ func TestMockWallet_CreateAndVerifyNonce_HappyPath(t *testing.T) {
 func TestMockWallet_VerifySignature_UnhappyPath(t *testing.T) {
 	// given
 	ctx := context.Background()
-	w := wallet.NewMockWallet(fixtures.WithKeyDeriver)
+	w := wallet.NewMockWallet(fixtures.WithKeyDeriver, nil)
 
 	data := []byte("test-data")
 	protocolID := "auth-protocol"

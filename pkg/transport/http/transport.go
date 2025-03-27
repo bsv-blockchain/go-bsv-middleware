@@ -77,7 +77,7 @@ func (t *Transport) HandleNonGeneralRequest(req *http.Request, w http.ResponseWr
 		return
 	}
 
-	t.setupHeaders(w, response)
+	t.setupHeaders(w, response, requestID)
 	t.setupContent(w, response)
 }
 
@@ -101,13 +101,13 @@ func (t *Transport) HandleGeneralRequest(req *http.Request, w http.ResponseWrite
 		return err
 	}
 
-	_, err = t.handleIncomingMessage(requestData)
+	response, err := t.handleIncomingMessage(requestData)
 	if err != nil {
 		t.logger.Error("Failed to process request", slog.String("error", err.Error()))
 		return fmt.Errorf("failed to process request")
 	}
 
-	t.setupHeaders(w, requestData)
+	t.setupHeaders(w, response, requestID)
 
 	return nil
 }
@@ -121,7 +121,7 @@ func (t *Transport) handleIncomingMessage(msg *transport.AuthMessage) (*transpor
 	case transport.InitialRequest:
 		return t.handleInitialRequest(msg)
 	case transport.General:
-		return msg, t.handleGeneralRequest(msg)
+		return t.handleGeneralRequest(msg)
 	default:
 		return nil, fmt.Errorf("unsupported message type")
 	}
@@ -170,33 +170,52 @@ func (t *Transport) handleInitialRequest(msg *transport.AuthMessage) (*transport
 	return &initialResponseMessage, nil
 }
 
-func (t *Transport) handleGeneralRequest(msg *transport.AuthMessage) error {
+func (t *Transport) handleGeneralRequest(msg *transport.AuthMessage) (*transport.AuthMessage, error) {
 	valid, err := t.wallet.VerifyNonce(context.Background(), *msg.YourNonce)
 	if err != nil || !valid {
-		return fmt.Errorf("unable to verify nonce")
+		return nil, fmt.Errorf("unable to verify nonce")
 	}
 
 	session := t.sessionManager.GetSession(*msg.YourNonce)
 	if session == nil {
-		return fmt.Errorf("session not found")
+		return nil, fmt.Errorf("session not found")
 	}
 
 	valid, err = t.wallet.VerifySignature(context.Background(), *msg.Payload, *msg.Signature, "auth message signature", fmt.Sprintf("%s %s", *msg.Nonce, *msg.YourNonce), *session.PeerIdentityKey)
 	if err != nil || !valid {
-		return fmt.Errorf("unable to verify signature")
+		return nil, fmt.Errorf("unable to verify signature")
 	}
 
 	session.LastUpdate = time.Now()
 	t.sessionManager.UpdateSession(*session)
 
-	return nil
+	nonce, err := t.wallet.CreateNonce(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create nonce")
+	}
+
+	//signature, err := createAuthSignature(t.wallet, msg.InitialNonce, sessionNonce, msg.IdentityKey)
+	//if err != nil {
+	//	return nil, fmt.Errorf("failed to create signature")
+	//}
+
+	response := &transport.AuthMessage{
+		Version:     transport.AuthVersion,
+		MessageType: "general",
+		IdentityKey: *session.PeerIdentityKey,
+		Nonce:       &nonce,
+		YourNonce:   session.PeerNonce,
+	}
+
+	return response, nil
 }
 
-func (t *Transport) setupHeaders(w http.ResponseWriter, response *transport.AuthMessage) {
+func (t *Transport) setupHeaders(w http.ResponseWriter, response *transport.AuthMessage, requestID string) {
 	responseHeaders := map[string]string{
 		versionHeader:     response.Version,
 		messageTypeHeader: response.MessageType.String(),
 		identityKeyHeader: response.IdentityKey,
+		requestIDHeader:   requestID,
 	}
 
 	if response.Nonce != nil {
@@ -209,14 +228,6 @@ func (t *Transport) setupHeaders(w http.ResponseWriter, response *transport.Auth
 
 	if response.Signature != nil {
 		responseHeaders[signatureHeader] = hex.EncodeToString(*response.Signature)
-	}
-
-	if response.Payload != nil {
-		payloadCopy := *response.Payload
-		requestIDBytes := payloadCopy[:32]
-
-		requestID := base64.StdEncoding.EncodeToString(requestIDBytes)
-		responseHeaders[requestIDHeader] = requestID
 	}
 
 	for k, v := range responseHeaders {
@@ -308,14 +319,12 @@ func (t *Transport) buildAuthMessageFromRequest(req *http.Request) (*transport.A
 	}
 
 	if signature := req.Header.Get("x-bsv-auth-signature"); signature != "" {
-		//signatureBytes, _ := base64.StdEncoding.DecodeString(signature)
 		decodedBytes, err := hex.DecodeString(signature)
 		if err != nil {
 			fmt.Println("Error decoding hex:", err)
 			return nil, fmt.Errorf("error decoding hex")
 		}
 
-		//signatureBytes := []byte(signature)
 		authMessage.Signature = &decodedBytes
 	}
 
