@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -25,6 +26,7 @@ type responseRecorder struct {
 	http.ResponseWriter
 	statusCode int
 	body       []byte
+	written    bool
 }
 
 // WriteHeader writes status code
@@ -35,7 +37,11 @@ func (r *responseRecorder) WriteHeader(code int) {
 
 // Write writes response body to internal buffer
 func (r *responseRecorder) Write(b []byte) (int, error) {
+	if r.written {
+		return 0, errors.New("response already written")
+	}
 	r.body = b
+	r.written = true
 	return len(b), nil
 }
 
