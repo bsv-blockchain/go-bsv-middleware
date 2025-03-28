@@ -139,7 +139,7 @@ func (t *Transport) HandleResponse(req *http.Request, res http.ResponseWriter, b
 
 	nonce, err := t.wallet.CreateNonce(req.Context())
 	if err != nil {
-		return fmt.Errorf("failed to create nonce, %s", err)
+		return fmt.Errorf("failed to create nonce, %w", err)
 	}
 
 	peerNonce := ""
@@ -156,7 +156,7 @@ func (t *Transport) HandleResponse(req *http.Request, res http.ResponseWriter, b
 		*session.PeerIdentityKey,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create signature, %s", err)
+		return fmt.Errorf("failed to create signature, %w", err)
 	}
 
 	msg.Signature = &signature
@@ -189,7 +189,7 @@ func (t *Transport) handleInitialRequest(msg *transport.AuthMessage) (*transport
 
 	sessionNonce, err := t.wallet.CreateNonce(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("failed to create session nonce, %s", err)
+		return nil, fmt.Errorf("failed to create session nonce, %w", err)
 	}
 
 	session := sessionmanager.PeerSession{
@@ -203,12 +203,12 @@ func (t *Transport) handleInitialRequest(msg *transport.AuthMessage) (*transport
 
 	signature, err := createNonGeneralAuthSignature(t.wallet, msg.InitialNonce, sessionNonce, msg.IdentityKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create signature, %s", err)
+		return nil, fmt.Errorf("failed to create signature, %w", err)
 	}
 
 	identityKey, err := t.wallet.GetPublicKey(context.Background(), wallet.GetPublicKeyOptions{IdentityKey: true})
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve identity key, %s", err)
+		return nil, fmt.Errorf("failed to retrieve identity key, %w", err)
 	}
 
 	initialResponseMessage := transport.AuthMessage{
@@ -226,7 +226,7 @@ func (t *Transport) handleInitialRequest(msg *transport.AuthMessage) (*transport
 func (t *Transport) handleGeneralRequest(msg *transport.AuthMessage) (*transport.AuthMessage, error) {
 	valid, err := t.wallet.VerifyNonce(context.Background(), *msg.YourNonce)
 	if err != nil || !valid {
-		return nil, fmt.Errorf("unable to verify nonce, %s", err)
+		return nil, fmt.Errorf("unable to verify nonce, %w", err)
 	}
 
 	session := t.sessionManager.GetSession(*msg.YourNonce)
@@ -236,7 +236,7 @@ func (t *Transport) handleGeneralRequest(msg *transport.AuthMessage) (*transport
 
 	valid, err = t.wallet.VerifySignature(context.Background(), *msg.Payload, *msg.Signature, "auth message signature", fmt.Sprintf("%s %s", *msg.Nonce, *msg.YourNonce), *session.PeerIdentityKey)
 	if err != nil || !valid {
-		return nil, fmt.Errorf("unable to verify signature, %s", err)
+		return nil, fmt.Errorf("unable to verify signature, %w", err)
 	}
 
 	session.LastUpdate = time.Now()
@@ -244,7 +244,7 @@ func (t *Transport) handleGeneralRequest(msg *transport.AuthMessage) (*transport
 
 	nonce, err := t.wallet.CreateNonce(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("failed to create nonce, %s", err)
+		return nil, fmt.Errorf("failed to create nonce, %w", err)
 	}
 
 	response := &transport.AuthMessage{
@@ -451,7 +451,7 @@ func createNonGeneralAuthSignature(wallet wallet.WalletInterface, initialNonce, 
 		identityKey,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create signature, %s", err)
+		return nil, fmt.Errorf("failed to create signature, %w", err)
 	}
 
 	return signature, nil
