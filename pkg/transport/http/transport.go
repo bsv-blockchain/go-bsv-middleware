@@ -170,6 +170,8 @@ func (t *Transport) handleIncomingMessage(msg *transport.AuthMessage) (*transpor
 	switch msg.MessageType {
 	case transport.InitialRequest:
 		return t.handleInitialRequest(msg)
+	case transport.InitialResponse, transport.CertificateRequest, transport.CertificateResponse:
+		return nil, fmt.Errorf("not implemented")
 	case transport.General:
 		return t.handleGeneralRequest(msg)
 	default:
