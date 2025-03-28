@@ -1,10 +1,10 @@
 package auth
 
 import (
-	"github.com/4chain-ag/go-bsv-middleware/pkg/internal/logging"
 	"log/slog"
 	"net/http"
 
+	"github.com/4chain-ag/go-bsv-middleware/pkg/internal/logging"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/sessionmanager"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
