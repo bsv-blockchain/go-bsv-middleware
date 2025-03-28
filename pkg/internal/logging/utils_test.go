@@ -1,9 +1,9 @@
 package logging_test
 
 import (
-	"github.com/4chain-ag/go-bsv-middleware/pkg/internal/logging"
 	"testing"
 
+	"github.com/4chain-ag/go-bsv-middleware/pkg/internal/logging"
 	"github.com/stretchr/testify/require"
 )
 
