@@ -4,21 +4,12 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-
-	"github.com/4chain-ag/go-bsv-middleware/pkg/defs"
 )
 
 const (
 	ServiceKey = "service"
 	ErrorKey   = "error"
 )
-
-var strLevelToSlog = map[defs.LogLevel]slog.Level{
-	defs.LogLevelDebug: slog.LevelDebug,
-	defs.LogLevelInfo:  slog.LevelInfo,
-	defs.LogLevelWarn:  slog.LevelWarn,
-	defs.LogLevelError: slog.LevelError,
-}
 
 // Child returns a new logger with the given service name added to the logger attrs.
 func Child(logger *slog.Logger, serviceName string) *slog.Logger {
