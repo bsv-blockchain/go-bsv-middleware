@@ -20,7 +20,7 @@ func TestMockWallet_GetPublicKey_HappyPath(t *testing.T) {
 
 	// then
 	require.NoError(t, err)
-	require.Equal(t, fixtures.IdentityKeyMock, identityKey)
+	require.Equal(t, fixtures.ServerIdentityKey, identityKey)
 
 	// when
 	derivedKey, err := w.GetPublicKey(ctx, wallet.GetPublicKeyOptions{

@@ -152,6 +152,9 @@ func (t *Transport) HandleResponse(req *http.Request, res http.ResponseWriter, b
 		signatureKey,
 		*session.PeerIdentityKey,
 	)
+	if err != nil {
+		return fmt.Errorf("failed to create signature")
+	}
 
 	msg.Signature = &signature
 
@@ -426,7 +429,7 @@ func (t *Transport) buildResponsePayload(
 func parseAuthMessage(req *http.Request) (*transport.AuthMessage, error) {
 	var requestData transport.AuthMessage
 	if err := json.NewDecoder(req.Body).Decode(&requestData); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode request body")
 	}
 	return &requestData, nil
 }
@@ -435,18 +438,23 @@ func createNonGeneralAuthSignature(wallet wallet.WalletInterface, initialNonce, 
 	combined := initialNonce + sessionNonce
 	base64Data := base64.StdEncoding.EncodeToString([]byte(combined))
 
-	return wallet.CreateSignature(
+	signature, err := wallet.CreateSignature(
 		context.Background(),
 		[]byte(base64Data),
 		"auth message signature",
 		fmt.Sprintf("%s %s", initialNonce, sessionNonce),
 		identityKey,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create signature")
+	}
+
+	return signature, nil
 }
 
 func setupContext(req *http.Request, requestData *transport.AuthMessage, requestID string) *http.Request {
-	ctx := context.WithValue(req.Context(), transport.IdentityKey, requestData.IdentityKey)
-	ctx = context.WithValue(ctx, transport.RequestID, requestID)
+	ctx := context.WithValue(req.Context(), transport.IdentityKey, requestData.IdentityKey) //nolint:staticcheck // we want to use the key as a static string
+	ctx = context.WithValue(ctx, transport.RequestID, requestID)                            //nolint:staticcheck // we want to use the key as a static string
 	req = req.WithContext(ctx)
 	return req
 }

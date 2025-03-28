@@ -1,7 +1,7 @@
 package sessionmanager
 
 // SessionManagerInterface is an interface for managing peer sessions.
-type SessionManagerInterface interface {
+type SessionManagerInterface interface { //nolint:revive // This is an interface, so it's fine to use the name "SessionManagerInterface".
 	// AddSession adds a session to the manager, associating it with its sessionNonce,
 	// and also with its peerIdentityKey (if any). This does NOT overwrite existing
 	// sessions for the same peerIdentityKey, allowing multiple concurrent sessions.

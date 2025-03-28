@@ -35,6 +35,7 @@ func main() {
 	middleware := auth.New(opts)
 
 	mux := http.NewServeMux()
+	mux.Handle("/", middleware.Handler(http.HandlerFunc(pingHandler)))
 	mux.Handle("/ping", middleware.Handler(http.HandlerFunc(pingHandler)))
 
 	srv := &http.Server{

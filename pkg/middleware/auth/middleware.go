@@ -22,20 +22,21 @@ type Middleware struct {
 }
 
 // ResponseRecorder is a custom ResponseWriter to capture response body and status
-type ResponseRecorder struct {
+type responseRecorder struct {
 	http.ResponseWriter
 	statusCode int
 	body       []byte
 }
 
-func (r *ResponseRecorder) WriteHeader(code int) {
+// WriteHeader writes status code
+func (r *responseRecorder) WriteHeader(code int) {
 	r.statusCode = code
 	r.ResponseWriter.WriteHeader(code)
 }
 
-func (r *ResponseRecorder) Write(b []byte) (int, error) {
+// Write writes response body to internal buffer
+func (r *responseRecorder) Write(b []byte) (int, error) {
 	r.body = b
-
 	return len(b), nil
 }
 
@@ -77,7 +78,7 @@ func New(opts Options) *Middleware {
 // Handler returns standard http middleware
 func (m *Middleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		recorder := &ResponseRecorder{ResponseWriter: w, statusCode: http.StatusOK}
+		recorder := &responseRecorder{ResponseWriter: w, statusCode: http.StatusOK}
 		if req.Method == http.MethodPost && req.URL.Path == "/.well-known/auth" {
 			m.transport.HandleNonGeneralRequest(req, recorder, nil)
 

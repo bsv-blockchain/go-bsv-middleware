@@ -41,6 +41,7 @@ type AuthMessage struct {
 	RequestedCertificates RequestedCertificateSet `json:"requestedCertificates"`
 }
 
+// RequestedCertificateSet represents the set of certificates requested by a peer.
 type RequestedCertificateSet struct {
 	Certifiers []string            `json:"certifiers"`
 	Types      map[string][]string `json:"types"`
@@ -55,8 +56,10 @@ type OnCertificatesReceivedFunc func(
 	next func(),
 )
 
+// MessageCallback is a callback function for handling messages. Placeholder for now.
 type MessageCallback func(message AuthMessage) error
 
+// MessageTypeFromString returns a MessageType from a string.
 func (m *MessageType) String() string {
 	return string(*m)
 }

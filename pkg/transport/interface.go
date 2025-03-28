@@ -3,7 +3,7 @@ package transport
 import "net/http"
 
 // TransportInterface define mechanism used for sending and receiving messages.
-type TransportInterface interface {
+type TransportInterface interface { //nolint:revive // This is an interface, so it's fine to use the name "SessionManagerInterface".
 	// Send Sends an AuthMessage to the connected Peer.
 	Send(message AuthMessage)
 
