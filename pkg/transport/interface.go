@@ -2,18 +2,21 @@ package transport
 
 import "net/http"
 
-// Interface define mechanism used for sending and receiving messages.
-type Interface interface {
+// TransportInterface define mechanism used for sending and receiving messages.
+type TransportInterface interface {
 	// Send Sends an AuthMessage to the connected Peer.
 	Send(message AuthMessage)
+
 	// OnData Stores the callback bound by a Peer
 	OnData(callback MessageCallback)
-	// HandleNonGeneralRequest Handles an incoming request for the server.
-	// This method processes both general and non-general message types, manages peer-to-peer certificate handling,
+
+	// HandleNonGeneralRequest Handles an incoming request with non-general message types, manages peer-to-peer certificate handling,
 	// and modifies the response object to enable custom behaviors like certificate requests and tailored responses.
 	HandleNonGeneralRequest(req *http.Request, res http.ResponseWriter, onCertificatesReceived OnCertificatesReceivedFunc)
-	HandleGeneralRequest(req *http.Request, res http.ResponseWriter, onCertificatesReceived OnCertificatesReceivedFunc) (*http.Request, error)
-}
 
-//// SetPeer Assign the peer for the transport
-//SetPeer(peer shared.PeerInterface)
+	// HandleGeneralRequest Handles an general incoming request, validates the request, and modifies the response to contain auth headers.
+	HandleGeneralRequest(req *http.Request, res http.ResponseWriter, onCertificatesReceived OnCertificatesReceivedFunc) (*http.Request, *AuthMessage, error)
+
+	// HandleResponse sets up auth headers in the response object and generate signature for whole response.
+	HandleResponse(req *http.Request, res http.ResponseWriter, body []byte, status int, msg *AuthMessage) error
+}

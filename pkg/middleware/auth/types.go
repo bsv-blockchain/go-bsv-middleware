@@ -9,8 +9,8 @@ import (
 
 // Options configures the auth middleware
 type Options struct {
-	Wallet               wallet.Interface
-	SessionManager       sessionmanager.Interface
+	Wallet               wallet.WalletInterface
+	SessionManager       sessionmanager.SessionManagerInterface
 	AllowUnauthenticated bool
 	Logger               *slog.Logger
 }

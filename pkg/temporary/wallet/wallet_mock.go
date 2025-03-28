@@ -8,7 +8,7 @@ import (
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
 )
 
-// Wallet provides a simple mock implementation of Interface.
+// Wallet provides a simple mock implementation of WalletInterface.
 type Wallet struct {
 	identityKey string
 	keyDeriver  bool
@@ -20,7 +20,7 @@ type Wallet struct {
 // - keyDeriver: Enables or disables key derivation.
 // - identityKey: Uses the provided identity key or a default one if none is given.
 // - nonces: Uses the provided nonces or default one if none are provided.
-func NewMockWallet(enableKeyDeriver bool, identityKey *string, nonces ...string) Interface {
+func NewMockWallet(enableKeyDeriver bool, identityKey *string, nonces ...string) WalletInterface {
 	if identityKey == nil {
 		identityKey = &wallet.ServerIdentityKey
 	}

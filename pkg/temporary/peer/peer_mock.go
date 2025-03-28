@@ -7,12 +7,12 @@ import (
 )
 
 type Peer struct {
-	wallet         wallet.Interface
-	transport      transport.Interface
-	sessionManager sessionmanager.Interface
+	wallet         wallet.WalletInterface
+	transport      transport.TransportInterface
+	sessionManager sessionmanager.SessionManagerInterface
 }
 
-func New(wallet wallet.Interface, transport transport.Interface, sessionManager sessionmanager.Interface) Interface {
+func New(wallet wallet.WalletInterface, transport transport.TransportInterface, sessionManager sessionmanager.SessionManagerInterface) PeerInterface {
 	return &Peer{
 		wallet:         wallet,
 		transport:      transport,

@@ -23,7 +23,10 @@ func main() {
 	logHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
 	logger := slog.New(logHandler)
 
-	// Create authentication middleware
+	// Create authentication middleware with:
+	// - authentication enabled
+	// - custom logger
+	// - mocked wallet with predefined nonces
 	opts := auth.Options{
 		AllowUnauthenticated: false,
 		Logger:               logger,
@@ -31,9 +34,7 @@ func main() {
 	}
 	middleware := auth.New(opts)
 
-	// Define HTTP server and handlers
 	mux := http.NewServeMux()
-	mux.Handle("/", middleware.Handler(http.HandlerFunc(helloHandler)))
 	mux.Handle("/ping", middleware.Handler(http.HandlerFunc(pingHandler)))
 
 	srv := &http.Server{
@@ -41,45 +42,33 @@ func main() {
 		Handler: mux,
 	}
 
-	// Start server in a goroutine
 	go func() {
 		logger.Info("Server started", slog.String("addr", srv.Addr))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("Server failed", slog.Any("error", err))
 		}
 	}()
-
-	// Wait briefly to ensure the server is running before sending the request
 	time.Sleep(1 * time.Second)
 
-	// Create mocked wallet
+	// Create mocked client wallet with predefined client nonces and client identity key
 	mockedWallet := wallet.NewMockWallet(true, &walletFixtures.ClientIdentityKey, walletFixtures.ClientNonces...)
 
-	// Send initial request
-	response := callInitialRequest(mockedWallet)
+	// Send initial request to /.well-known/auth endpoint
+	responseData := callInitialRequest(mockedWallet)
 
-	// Call ping endpoint
-	callPingEndpoint(mockedWallet, response)
+	// Call /ping endpoint with set up auth headers
+	callPingEndpoint(mockedWallet, responseData)
 
-	// Block main thread
 	select {}
 }
 
-// Handlers
-func helloHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "Hello, World!")
-}
-
 func pingHandler(w http.ResponseWriter, r *http.Request) {
-	identity := r.Context().Value(transport.IdentityKey).(string)
-	fmt.Println(w, "Authorized!")
-	fmt.Println("[EXAMPLE] Identity key:             ", identity)
+	w.Write([]byte("Pong!"))
 }
 
-// Request functions
-func callInitialRequest(mockedWallet wallet.Interface) *transport.AuthMessage {
-	initialRequest := utils.PrepareInitialRequest(mockedWallet)
-	jsonData, err := json.Marshal(initialRequest)
+func callInitialRequest(mockedWallet wallet.WalletInterface) *transport.AuthMessage {
+	requestData := utils.PrepareInitialRequest(mockedWallet)
+	jsonData, err := json.Marshal(requestData)
 	if err != nil {
 		log.Fatalf("Failed to marshal request: %v", err)
 	}
@@ -103,18 +92,24 @@ func callInitialRequest(mockedWallet wallet.Interface) *transport.AuthMessage {
 		log.Fatalf("Failed to read response: %v", err)
 	}
 
-	log.Printf("Response from server: %s", string(body))
+	log.Printf("Response from server:            %s", string(body))
 
-	var response *transport.AuthMessage
-	if err = json.Unmarshal(body, &response); err != nil {
+	var responseData *transport.AuthMessage
+	if err = json.Unmarshal(body, &responseData); err != nil {
 		log.Fatalf("Failed to unmarshal response: %v", err)
 	}
 
-	fmt.Println("[EXAMPLE] Response signature:", *response.Signature)
-	return response
+	for key, value := range resp.Header {
+		fmt.Println("[EXAMPLE] Header:               ", key, value)
+	}
+
+	fmt.Println()
+	fmt.Println()
+
+	return responseData
 }
 
-func callPingEndpoint(mockedWallet wallet.Interface, response *transport.AuthMessage) {
+func callPingEndpoint(mockedWallet wallet.WalletInterface, response *transport.AuthMessage) {
 	url := "http://localhost:8080/ping"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -135,5 +130,9 @@ func callPingEndpoint(mockedWallet wallet.Interface, response *transport.AuthMes
 		log.Fatalf("Failed to read response: %v", err)
 	}
 
-	log.Printf("Response from server: %s", string(body))
+	log.Printf("Response from server:            %s", string(body))
+
+	for key, value := range resp.Header {
+		fmt.Println("[EXAMPLE] Header:           ", key, value)
+	}
 }

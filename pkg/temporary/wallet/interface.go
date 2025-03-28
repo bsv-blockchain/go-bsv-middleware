@@ -2,8 +2,8 @@ package wallet
 
 import "context"
 
-// Interface defines the core functionality needed for authentication
-type Interface interface {
+// WalletInterface defines the core functionality needed for authentication
+type WalletInterface interface {
 	// GetPublicKey returns a public key
 	GetPublicKey(ctx context.Context, options GetPublicKeyOptions) (string, error)
 

@@ -1,7 +1,7 @@
 package sessionmanager
 
-// Interface is an interface for managing peer sessions.
-type Interface interface {
+// SessionManagerInterface is an interface for managing peer sessions.
+type SessionManagerInterface interface {
 	// AddSession adds a session to the manager, associating it with its sessionNonce,
 	// and also with its peerIdentityKey (if any). This does NOT overwrite existing
 	// sessions for the same peerIdentityKey, allowing multiple concurrent sessions.

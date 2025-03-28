@@ -17,6 +17,7 @@ import (
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport/utils"
 )
 
+// Constants for the auth headers used in the authorization process
 const (
 	authHeaderPrefix  = "x-bsv-auth-"
 	requestIDHeader   = authHeaderPrefix + "request-id"
@@ -28,15 +29,16 @@ const (
 	messageTypeHeader = authHeaderPrefix + "message-type"
 )
 
+// Transport implements the HTTP transport
 type Transport struct {
-	//peer                 shared.PeerInterface
-	wallet               wallet.Interface
-	sessionManager       sessionmanager.Interface
+	wallet               wallet.WalletInterface
+	sessionManager       sessionmanager.SessionManagerInterface
 	allowUnauthenticated bool
 	logger               *slog.Logger
 }
 
-func New(wallet wallet.Interface, sessionManager sessionmanager.Interface, allowUnauthenticated bool, logger *slog.Logger) transport.Interface {
+// New creates a new HTTP transport
+func New(wallet wallet.WalletInterface, sessionManager sessionmanager.SessionManagerInterface, allowUnauthenticated bool, logger *slog.Logger) transport.TransportInterface {
 	transportLogger := logger.With("service", "HTTP TRANSPORT")
 	transportLogger.Info(fmt.Sprintf("Creating HTTP transport with allowUnauthenticated = %t", allowUnauthenticated))
 
@@ -48,12 +50,17 @@ func New(wallet wallet.Interface, sessionManager sessionmanager.Interface, allow
 	}
 }
 
-// OnData implement Transport Interface
-func (t *Transport) OnData(_ transport.MessageCallback) {}
+// OnData implement Transport TransportInterface
+func (t *Transport) OnData(_ transport.MessageCallback) {
+	panic("Not implemented")
+}
 
-// Send implement Transport Interface
-func (t *Transport) Send(_ transport.AuthMessage) {}
+// Send implement Transport TransportInterface
+func (t *Transport) Send(_ transport.AuthMessage) {
+	panic("Not implemented")
+}
 
+// HandleNonGeneralRequest handles incoming non general requests
 func (t *Transport) HandleNonGeneralRequest(req *http.Request, w http.ResponseWriter, _ transport.OnCertificatesReceivedFunc) {
 	requestData, err := parseAuthMessage(req)
 	if err != nil {
@@ -81,16 +88,17 @@ func (t *Transport) HandleNonGeneralRequest(req *http.Request, w http.ResponseWr
 	t.setupContent(w, response)
 }
 
-func (t *Transport) HandleGeneralRequest(req *http.Request, w http.ResponseWriter, _ transport.OnCertificatesReceivedFunc) (*http.Request, error) {
+// HandleGeneralRequest handles incoming general requests
+func (t *Transport) HandleGeneralRequest(req *http.Request, res http.ResponseWriter, _ transport.OnCertificatesReceivedFunc) (*http.Request, *transport.AuthMessage, error) {
 	requestID := req.Header.Get(requestIDHeader)
 	if requestID == "" {
 		t.logger.Error("Missing request ID, checking if unauthenticated requests are allowed")
 
 		if t.allowUnauthenticated {
-			return nil, nil
+			return nil, nil, nil
 		}
 
-		return nil, fmt.Errorf("missing request ID")
+		return nil, nil, fmt.Errorf("missing request ID")
 	}
 
 	t.logger.Debug("Received general request", slog.String("requestID", requestID))
@@ -98,19 +106,57 @@ func (t *Transport) HandleGeneralRequest(req *http.Request, w http.ResponseWrite
 	requestData, err := t.buildAuthMessageFromRequest(req)
 	if err != nil {
 		t.logger.Error("Failed to build request data", slog.String("error", err.Error()))
-		return nil, err
+		return nil, nil, err
 	}
 
 	response, err := t.handleIncomingMessage(requestData)
 	if err != nil {
 		t.logger.Error("Failed to process request", slog.String("error", err.Error()))
-		return nil, fmt.Errorf("failed to process request")
+		return nil, nil, fmt.Errorf("failed to process request")
 	}
 
-	t.setupHeaders(w, response, requestID)
-	req = setupContext(req, requestData)
+	req = setupContext(req, requestData, requestID)
 
-	return req, nil
+	return req, response, nil
+}
+
+// HandleResponse sets up auth headers in the response object and generate signature for whole response
+func (t *Transport) HandleResponse(req *http.Request, res http.ResponseWriter, body []byte, status int, msg *transport.AuthMessage) error {
+	identityKey, requestID, err := getValuesFromContext(req)
+	if err != nil {
+		return fmt.Errorf("failed to get values from context")
+	}
+
+	payload := t.buildResponsePayload(requestID, status, body)
+
+	session := t.sessionManager.GetSession(identityKey)
+	if session == nil {
+		return fmt.Errorf("session not found")
+	}
+
+	nonce, err := t.wallet.CreateNonce(req.Context())
+	if err != nil {
+		return fmt.Errorf("failed to create nonce")
+	}
+
+	peerNonce := ""
+	if session.PeerNonce != nil {
+		peerNonce = *session.PeerNonce
+	}
+	signatureKey := fmt.Sprintf("%s %s", nonce, peerNonce)
+
+	signature, err := t.wallet.CreateSignature(
+		req.Context(),
+		payload,
+		"auth message signature",
+		signatureKey,
+		*session.PeerIdentityKey,
+	)
+
+	msg.Signature = &signature
+
+	t.setupHeaders(res, msg, requestID)
+	return nil
 }
 
 func (t *Transport) handleIncomingMessage(msg *transport.AuthMessage) (*transport.AuthMessage, error) {
@@ -147,7 +193,7 @@ func (t *Transport) handleInitialRequest(msg *transport.AuthMessage) (*transport
 	}
 	t.sessionManager.AddSession(session)
 
-	signature, err := createAuthSignature(t.wallet, msg.InitialNonce, sessionNonce, msg.IdentityKey)
+	signature, err := createNonGeneralAuthSignature(t.wallet, msg.InitialNonce, sessionNonce, msg.IdentityKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create signature")
 	}
@@ -163,9 +209,7 @@ func (t *Transport) handleInitialRequest(msg *transport.AuthMessage) (*transport
 		IdentityKey:  identityKey,
 		InitialNonce: sessionNonce,
 		YourNonce:    &msg.InitialNonce,
-		//Certificates:          certificatesToInclude,
-		//RequestedCertificates: certificatesToRequest,
-		Signature: &signature,
+		Signature:    &signature,
 	}
 
 	return &initialResponseMessage, nil
@@ -194,11 +238,6 @@ func (t *Transport) handleGeneralRequest(msg *transport.AuthMessage) (*transport
 	if err != nil {
 		return nil, fmt.Errorf("failed to create nonce")
 	}
-
-	//signature, err := createAuthSignature(t.wallet, msg.InitialNonce, sessionNonce, msg.IdentityKey)
-	//if err != nil {
-	//	return nil, fmt.Errorf("failed to create signature")
-	//}
 
 	response := &transport.AuthMessage{
 		Version:     transport.AuthVersion,
@@ -235,12 +274,10 @@ func (t *Transport) setupHeaders(w http.ResponseWriter, response *transport.Auth
 		w.Header().Set(k, v)
 	}
 
-	t.logger.Debug(fmt.Sprintf("Sending response: %+v", slog.Any("response", map[string]interface{}{
+	t.logger.Debug(fmt.Sprintf("Sending response: %+v", slog.Any("response", map[string]any{
 		"status":          200,
 		"responseHeaders": responseHeaders,
 	})))
-
-	w.WriteHeader(http.StatusOK)
 }
 
 func (t *Transport) setupContent(w http.ResponseWriter, response *transport.AuthMessage) {
@@ -248,18 +285,18 @@ func (t *Transport) setupContent(w http.ResponseWriter, response *transport.Auth
 
 	b, err := json.Marshal(response)
 	if err != nil {
-		t.logger.Error("Failed to marshal response", slog.String("error", err.Error()))
 		http.Error(w, "failed to marshal response", http.StatusInternalServerError)
 		return
 	}
 
 	_, err = w.Write(b)
 	if err != nil {
-		t.logger.Error("Failed to write response", slog.String("error", err.Error()))
+		http.Error(w, "failed to write response", http.StatusInternalServerError)
+		return
 	}
 
-	t.logger.Debug(fmt.Sprintf("Sending response with content: %+v", slog.Any("response", map[string]interface{}{
-		"messagePayload": response,
+	t.logger.Debug(fmt.Sprintf("Sending response with content: %+v", slog.Any("response", map[string]any{
+		"messagePayload": *response,
 	})))
 }
 
@@ -283,7 +320,7 @@ func (t *Transport) buildAuthMessageFromRequest(req *http.Request) (*transport.A
 	utils.WriteVarIntNum(&writer, len(req.URL.Path))
 	writer.Write([]byte(req.URL.Path))
 
-	// TODO: handle query params
+	// TODO #19: handle query params
 
 	// handle headers
 	includedHeaders := utils.ExtractHeaders(req.Header)
@@ -322,7 +359,6 @@ func (t *Transport) buildAuthMessageFromRequest(req *http.Request) (*transport.A
 	if signature := req.Header.Get("x-bsv-auth-signature"); signature != "" {
 		decodedBytes, err := hex.DecodeString(signature)
 		if err != nil {
-			fmt.Println("Error decoding hex:", err)
 			return nil, fmt.Errorf("error decoding hex")
 		}
 
@@ -330,6 +366,61 @@ func (t *Transport) buildAuthMessageFromRequest(req *http.Request) (*transport.A
 	}
 
 	return authMessage, nil
+}
+
+// buildResponsePayload constructs the response payload for signing
+// The payload is constructed as follows:
+// - Request ID (Base64)
+// - Response status
+// - Number of headers
+// - Headers (key length, key, value length, value)
+// - Body length and content
+func (t *Transport) buildResponsePayload(
+	requestID string,
+	responseStatus int,
+	responseBody []byte,
+) []byte {
+	t.logger.Debug("Building response payload",
+		slog.String("requestID", requestID), slog.Int("responseStatus", responseStatus), slog.Int("responseBodyLength", len(responseBody)))
+
+	var writer bytes.Buffer
+
+	// Encode and write request ID (Base64)
+	requestIDBytes, err := base64.StdEncoding.DecodeString(requestID)
+	if err != nil {
+		return nil
+	}
+	writer.Write(requestIDBytes)
+
+	// Write response status
+	utils.WriteVarIntNum(&writer, responseStatus)
+
+	// TODO: #14 - Collect and sort headers
+	includedHeaders := make([][]string, 0)
+	//includedHeaders := utils.FilterAndSortHeaders(responseHeaders)
+
+	// Write number of headers
+	utils.WriteVarIntNum(&writer, len(includedHeaders))
+
+	// Write headers
+	for _, header := range includedHeaders {
+		// Write header key and value length and content
+		utils.WriteVarIntNum(&writer, len(header[0]))
+		writer.WriteString(header[0])
+
+		utils.WriteVarIntNum(&writer, len(header[1]))
+		writer.WriteString(header[1])
+	}
+
+	// Write body length and content
+	if len(responseBody) > 0 {
+		utils.WriteVarIntNum(&writer, len(responseBody))
+		writer.Write(responseBody)
+	} else {
+		utils.WriteVarIntNum(&writer, -1)
+	}
+
+	return writer.Bytes()
 }
 
 func parseAuthMessage(req *http.Request) (*transport.AuthMessage, error) {
@@ -340,21 +431,37 @@ func parseAuthMessage(req *http.Request) (*transport.AuthMessage, error) {
 	return &requestData, nil
 }
 
-func createAuthSignature(wallet wallet.Interface, peerNonce, sessionNonce, identityKey string) ([]byte, error) {
-	combined := peerNonce + sessionNonce
+func createNonGeneralAuthSignature(wallet wallet.WalletInterface, initialNonce, sessionNonce, identityKey string) ([]byte, error) {
+	combined := initialNonce + sessionNonce
 	base64Data := base64.StdEncoding.EncodeToString([]byte(combined))
 
 	return wallet.CreateSignature(
 		context.Background(),
 		[]byte(base64Data),
 		"auth message signature",
-		fmt.Sprintf("%s %s", peerNonce, sessionNonce),
+		fmt.Sprintf("%s %s", initialNonce, sessionNonce),
 		identityKey,
 	)
 }
 
-func setupContext(req *http.Request, requestData *transport.AuthMessage) *http.Request {
+func setupContext(req *http.Request, requestData *transport.AuthMessage, requestID string) *http.Request {
 	ctx := context.WithValue(req.Context(), transport.IdentityKey, requestData.IdentityKey)
+	ctx = context.WithValue(ctx, transport.RequestID, requestID)
 	req = req.WithContext(ctx)
 	return req
+}
+
+// getValuesFromContext extracts identity key and request ID from the request context
+func getValuesFromContext(req *http.Request) (string, string, error) {
+	identityKey, ok := req.Context().Value(transport.IdentityKey).(string)
+	if !ok {
+		return "", "", fmt.Errorf("identity key not found in context")
+	}
+
+	requestID, ok := req.Context().Value(transport.RequestID).(string)
+	if !ok {
+		return "", "", fmt.Errorf("request ID not found in context")
+	}
+
+	return identityKey, requestID, nil
 }

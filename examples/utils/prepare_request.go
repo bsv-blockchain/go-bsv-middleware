@@ -14,11 +14,12 @@ import (
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 )
 
-func PrepareInitialRequest(mockedWallet wallet.Interface) transport.AuthMessage {
-	fmt.Println("[EXAMPLE]  <---------        Preparing initial request")
+func PrepareInitialRequest(mockedWallet wallet.WalletInterface) *transport.AuthMessage {
+	fmt.Println()
+	fmt.Println()
+	fmt.Println("[EXAMPLE]  <---------               Preparing initial request")
 
 	opts := wallet.GetPublicKeyOptions{IdentityKey: true}
-
 	clientIdentityKey, err := mockedWallet.GetPublicKey(context.Background(), opts)
 	if err != nil {
 		panic(err)
@@ -26,7 +27,6 @@ func PrepareInitialRequest(mockedWallet wallet.Interface) transport.AuthMessage 
 
 	fmt.Println("[EXAMPLE]  Client identity key:    ", clientIdentityKey)
 
-	// Generate initial nonce
 	initialNonce, err := mockedWallet.CreateNonce(context.Background())
 	if err != nil {
 		panic(err)
@@ -34,7 +34,7 @@ func PrepareInitialRequest(mockedWallet wallet.Interface) transport.AuthMessage 
 
 	fmt.Println("[EXAMPLE]  Initial nonce:          ", initialNonce)
 
-	initialRequest := transport.AuthMessage{
+	initialRequest := &transport.AuthMessage{
 		Version:      "0.1",
 		MessageType:  "initialRequest",
 		IdentityKey:  clientIdentityKey,
@@ -46,7 +46,7 @@ func PrepareInitialRequest(mockedWallet wallet.Interface) transport.AuthMessage 
 	return initialRequest
 }
 
-func PreparePingRequest(req *http.Request, mockedWallet wallet.Interface, res *transport.AuthMessage) {
+func PreparePingRequest(req *http.Request, mockedWallet wallet.WalletInterface, res *transport.AuthMessage) {
 	fmt.Println("[EXAMPLE]  <---------               Preparing ping request")
 
 	serverIdentityKey := res.IdentityKey
@@ -54,6 +54,14 @@ func PreparePingRequest(req *http.Request, mockedWallet wallet.Interface, res *t
 
 	fmt.Println("[EXAMPLE]  Server identity key:    ", serverIdentityKey)
 	fmt.Println("[EXAMPLE]  Server nonce:           ", serverNonce)
+
+	opts := wallet.GetPublicKeyOptions{IdentityKey: true}
+	clientIdentityKey, err := mockedWallet.GetPublicKey(context.Background(), opts)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("[EXAMPLE]  Client identity key:    ", clientIdentityKey)
 
 	requestID := generateRandom()
 	encodedRequestID := base64.StdEncoding.EncodeToString(requestID)
@@ -69,11 +77,14 @@ func PreparePingRequest(req *http.Request, mockedWallet wallet.Interface, res *t
 
 	var writer bytes.Buffer
 
+	// Write the request ID
 	writer.Write(requestID)
 
+	// Write the method and path
 	writeVarIntNum(&writer, int64(len("GET")))
 	writer.Write([]byte("GET"))
 
+	// Write the path
 	writeVarIntNum(&writer, int64(len("/ping")))
 	writer.Write([]byte("/ping"))
 
@@ -105,7 +116,7 @@ func PreparePingRequest(req *http.Request, mockedWallet wallet.Interface, res *t
 
 	headers := map[string]string{
 		"x-bsv-auth-version":      "0.1",
-		"x-bsv-auth-identity-key": res.IdentityKey,
+		"x-bsv-auth-identity-key": clientIdentityKey,
 		"x-bsv-auth-nonce":        newNonce,
 		"x-bsv-auth-your-nonce":   serverNonce,
 		"x-bsv-auth-signature":    hex.EncodeToString(signature),

@@ -11,6 +11,8 @@ const (
 	AuthVersion = "0.1"
 	// IdentityKey is the key used to store the identity key in the context.
 	IdentityKey = "identityKey"
+	// RequestID is the key used to store the request ID in the context.
+	RequestID = "requestID"
 )
 
 // Definition of the Message Types used in the authentication process.
@@ -47,7 +49,6 @@ type RequestedCertificateSet struct {
 // OnCertificatesReceivedFunc callback type for handling received certificates
 type OnCertificatesReceivedFunc func(
 	senderPublicKey string,
-	// TODO: update type
 	certs []any,
 	req *http.Request,
 	res http.ResponseWriter,
