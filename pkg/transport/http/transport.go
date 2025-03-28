@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/4chain-ag/go-bsv-middleware/pkg/internal/logging"
 	"log/slog"
 	"net/http"
 	"time"
@@ -39,7 +40,7 @@ type Transport struct {
 
 // New creates a new HTTP transport
 func New(wallet wallet.WalletInterface, sessionManager sessionmanager.SessionManagerInterface, allowUnauthenticated bool, logger *slog.Logger) transport.TransportInterface {
-	transportLogger := logger.With("service", "HTTP TRANSPORT")
+	transportLogger := logging.Child(logger, "http-transport")
 	transportLogger.Info(fmt.Sprintf("Creating HTTP transport with allowUnauthenticated = %t", allowUnauthenticated))
 
 	return &Transport{

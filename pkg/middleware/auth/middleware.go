@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"github.com/4chain-ag/go-bsv-middleware/pkg/internal/logging"
 	"log/slog"
 	"net/http"
 
@@ -9,8 +10,6 @@ import (
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport/http"
 )
-
-const logHeader = "AUTH MIDDLEWARE"
 
 // Middleware implements BRC-103/104 authentication
 type Middleware struct {
@@ -57,7 +56,7 @@ func New(opts Options) *Middleware {
 		opts.Logger = slog.New(slog.DiscardHandler)
 	}
 
-	middlewareLogger := opts.Logger.With("service", logHeader)
+	middlewareLogger := logging.Child(opts.Logger, "auth-middleware")
 
 	middlewareLogger.Debug(" Creating new auth middleware")
 
@@ -66,10 +65,9 @@ func New(opts Options) *Middleware {
 	middlewareLogger.Debug(" transport created")
 
 	return &Middleware{
-		wallet:         opts.Wallet,
-		sessionManager: opts.SessionManager,
-		transport:      t,
-		//peer:                 p,
+		wallet:               opts.Wallet,
+		sessionManager:       opts.SessionManager,
+		transport:            t,
 		allowUnauthenticated: opts.AllowUnauthenticated,
 		logger:               middlewareLogger,
 	}
