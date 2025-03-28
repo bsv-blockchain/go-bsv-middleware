@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/internal/logging"
 	"log/slog"
@@ -93,13 +94,14 @@ func (t *Transport) HandleNonGeneralRequest(req *http.Request, w http.ResponseWr
 func (t *Transport) HandleGeneralRequest(req *http.Request, res http.ResponseWriter, _ transport.OnCertificatesReceivedFunc) (*http.Request, *transport.AuthMessage, error) {
 	requestID := req.Header.Get(requestIDHeader)
 	if requestID == "" {
-		t.logger.Error("Missing request ID, checking if unauthenticated requests are allowed")
+		t.logger.Debug("Missing request ID, checking if unauthenticated requests are allowed")
 
 		if t.allowUnauthenticated {
+			t.logger.Debug("Unauthenticated requests are allowed, skipping auth")
 			return nil, nil, nil
 		}
 
-		return nil, nil, fmt.Errorf("missing request ID")
+		return nil, nil, errors.New("missing request ID")
 	}
 
 	t.logger.Debug("Received general request", slog.String("requestID", requestID))
@@ -113,7 +115,7 @@ func (t *Transport) HandleGeneralRequest(req *http.Request, res http.ResponseWri
 	response, err := t.handleIncomingMessage(requestData)
 	if err != nil {
 		t.logger.Error("Failed to process request", slog.String("error", err.Error()))
-		return nil, nil, fmt.Errorf("failed to process request")
+		return nil, nil, err
 	}
 
 	req = setupContext(req, requestData, requestID)
@@ -125,19 +127,19 @@ func (t *Transport) HandleGeneralRequest(req *http.Request, res http.ResponseWri
 func (t *Transport) HandleResponse(req *http.Request, res http.ResponseWriter, body []byte, status int, msg *transport.AuthMessage) error {
 	identityKey, requestID, err := getValuesFromContext(req)
 	if err != nil {
-		return fmt.Errorf("failed to get values from context")
+		return err
 	}
 
 	payload := t.buildResponsePayload(requestID, status, body)
 
 	session := t.sessionManager.GetSession(identityKey)
 	if session == nil {
-		return fmt.Errorf("session not found")
+		return errors.New("session not found")
 	}
 
 	nonce, err := t.wallet.CreateNonce(req.Context())
 	if err != nil {
-		return fmt.Errorf("failed to create nonce")
+		return fmt.Errorf("failed to create nonce, %s", err)
 	}
 
 	peerNonce := ""
@@ -154,7 +156,7 @@ func (t *Transport) HandleResponse(req *http.Request, res http.ResponseWriter, b
 		*session.PeerIdentityKey,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create signature")
+		return fmt.Errorf("failed to create signature, %s", err)
 	}
 
 	msg.Signature = &signature
@@ -172,22 +174,22 @@ func (t *Transport) handleIncomingMessage(msg *transport.AuthMessage) (*transpor
 	case transport.InitialRequest:
 		return t.handleInitialRequest(msg)
 	case transport.InitialResponse, transport.CertificateRequest, transport.CertificateResponse:
-		return nil, fmt.Errorf("not implemented")
+		return nil, errors.New("not implemented")
 	case transport.General:
 		return t.handleGeneralRequest(msg)
 	default:
-		return nil, fmt.Errorf("unsupported message type")
+		return nil, errors.New("unsupported message type")
 	}
 }
 
 func (t *Transport) handleInitialRequest(msg *transport.AuthMessage) (*transport.AuthMessage, error) {
 	if msg.IdentityKey == "" && msg.InitialNonce == "" {
-		return nil, fmt.Errorf("missing required fields in initial request")
+		return nil, errors.New("missing required fields in initial request")
 	}
 
 	sessionNonce, err := t.wallet.CreateNonce(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("failed to create session nonce")
+		return nil, fmt.Errorf("failed to create session nonce, %s", err)
 	}
 
 	session := sessionmanager.PeerSession{
@@ -201,12 +203,12 @@ func (t *Transport) handleInitialRequest(msg *transport.AuthMessage) (*transport
 
 	signature, err := createNonGeneralAuthSignature(t.wallet, msg.InitialNonce, sessionNonce, msg.IdentityKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create signature")
+		return nil, fmt.Errorf("failed to create signature, %s", err)
 	}
 
 	identityKey, err := t.wallet.GetPublicKey(context.Background(), wallet.GetPublicKeyOptions{IdentityKey: true})
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve identity key")
+		return nil, fmt.Errorf("failed to retrieve identity key, %s", err)
 	}
 
 	initialResponseMessage := transport.AuthMessage{
@@ -224,17 +226,17 @@ func (t *Transport) handleInitialRequest(msg *transport.AuthMessage) (*transport
 func (t *Transport) handleGeneralRequest(msg *transport.AuthMessage) (*transport.AuthMessage, error) {
 	valid, err := t.wallet.VerifyNonce(context.Background(), *msg.YourNonce)
 	if err != nil || !valid {
-		return nil, fmt.Errorf("unable to verify nonce")
+		return nil, fmt.Errorf("unable to verify nonce, %s", err)
 	}
 
 	session := t.sessionManager.GetSession(*msg.YourNonce)
 	if session == nil {
-		return nil, fmt.Errorf("session not found")
+		return nil, errors.New("session not found")
 	}
 
 	valid, err = t.wallet.VerifySignature(context.Background(), *msg.Payload, *msg.Signature, "auth message signature", fmt.Sprintf("%s %s", *msg.Nonce, *msg.YourNonce), *session.PeerIdentityKey)
 	if err != nil || !valid {
-		return nil, fmt.Errorf("unable to verify signature")
+		return nil, fmt.Errorf("unable to verify signature, %s", err)
 	}
 
 	session.LastUpdate = time.Now()
@@ -242,7 +244,7 @@ func (t *Transport) handleGeneralRequest(msg *transport.AuthMessage) (*transport
 
 	nonce, err := t.wallet.CreateNonce(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("failed to create nonce")
+		return nil, fmt.Errorf("failed to create nonce, %s", err)
 	}
 
 	response := &transport.AuthMessage{
@@ -365,7 +367,7 @@ func (t *Transport) buildAuthMessageFromRequest(req *http.Request) (*transport.A
 	if signature := req.Header.Get("x-bsv-auth-signature"); signature != "" {
 		decodedBytes, err := hex.DecodeString(signature)
 		if err != nil {
-			return nil, fmt.Errorf("error decoding hex")
+			return nil, errors.New("error decoding signature")
 		}
 
 		authMessage.Signature = &decodedBytes
@@ -432,7 +434,7 @@ func (t *Transport) buildResponsePayload(
 func parseAuthMessage(req *http.Request) (*transport.AuthMessage, error) {
 	var requestData transport.AuthMessage
 	if err := json.NewDecoder(req.Body).Decode(&requestData); err != nil {
-		return nil, fmt.Errorf("failed to decode request body")
+		return nil, errors.New("failed to decode request body")
 	}
 	return &requestData, nil
 }
@@ -449,7 +451,7 @@ func createNonGeneralAuthSignature(wallet wallet.WalletInterface, initialNonce, 
 		identityKey,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create signature")
+		return nil, fmt.Errorf("failed to create signature, %s", err)
 	}
 
 	return signature, nil
@@ -466,12 +468,12 @@ func setupContext(req *http.Request, requestData *transport.AuthMessage, request
 func getValuesFromContext(req *http.Request) (string, string, error) {
 	identityKey, ok := req.Context().Value(transport.IdentityKey).(string)
 	if !ok {
-		return "", "", fmt.Errorf("identity key not found in context")
+		return "", "", errors.New("identity key not found in context")
 	}
 
 	requestID, ok := req.Context().Value(transport.RequestID).(string)
 	if !ok {
-		return "", "", fmt.Errorf("request ID not found in context")
+		return "", "", errors.New("request ID not found in context")
 	}
 
 	return identityKey, requestID, nil
