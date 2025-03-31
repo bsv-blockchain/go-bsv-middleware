@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	fixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
+	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
