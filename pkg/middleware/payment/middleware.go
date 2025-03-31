@@ -3,14 +3,15 @@ package payment
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
 	"net/http"
 
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/auth"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 )
 
-// Middleware is the payment middleware handler
+// Middleware is the payment middleware handler that implements Direct Payment Protocol (DPP) for HTTP-based micropayments
 type Middleware struct {
 	wallet                wallet.PaymentInterface
 	calculateRequestPrice func(r *http.Request) (int, error)
@@ -32,7 +33,7 @@ func New(opts Options) (*Middleware, error) {
 	}, nil
 }
 
-// Handler returns a middleware handler function
+// Handler returns a middleware handler function that processes payments
 func (m *Middleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		identityKey, ok := auth.GetIdentityFromContext(r.Context())
@@ -45,84 +46,132 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		price, err := m.calculateRequestPrice(r)
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, ErrCodePaymentInternal,
-				"Error calculating request price")
+				fmt.Sprintf("Error calculating request price: %s", err.Error()))
 			return
 		}
 
 		if price == 0 {
-			ctx := context.WithValue(r.Context(), PaymentKey, &PaymentInfo{SatoshisPaid: 0})
-			next.ServeHTTP(w, r.WithContext(ctx))
+			proceedWithoutPayment(w, r, next)
 			return
 		}
 
-		paymentHeader := r.Header.Get("X-BSV-Payment")
-		if paymentHeader == "" {
-			derivationPrefix, err := m.wallet.CreateNonce(r.Context())
-			if err != nil {
-				respondWithError(w, http.StatusInternalServerError, ErrCodePaymentInternal,
-					fmt.Sprintf("Error creating nonce: %s", err.Error()))
-				return
-			}
-
-			w.Header().Set("X-BSV-Payment-Version", PaymentVersion)
-			w.Header().Set("X-BSV-Payment-Satoshis-Required", fmt.Sprintf("%d", price))
-			w.Header().Set("X-BSV-Payment-Derivation-Prefix", derivationPrefix)
-
-			respondWithError(w, http.StatusPaymentRequired, ErrCodePaymentRequired,
-				"A BSV payment is required to complete this request.",
-				map[string]any{"satoshisRequired": price})
+		paymentData, err := extractPaymentData(r)
+		if err != nil {
+			respondWithError(w, http.StatusBadRequest, ErrCodeMalformedPayment, err.Error())
 			return
 		}
 
-		var payment Payment
-		if err := json.Unmarshal([]byte(paymentHeader), &payment); err != nil {
-			respondWithError(w, http.StatusBadRequest, ErrCodeMalformedPayment,
-				"Invalid payment data format")
+		if paymentData == nil {
+			requestPayment(w, r, m.wallet, price)
 			return
 		}
 
-		valid, err := m.wallet.VerifyNonce(r.Context(), payment.DerivationPrefix)
-		if err != nil || !valid {
-			respondWithError(w, http.StatusBadRequest, ErrCodeInvalidPrefix,
-				"Invalid derivation prefix")
-			return
-		}
-
-		result, err := m.wallet.InternalizeAction(r.Context(), wallet.InternalizeActionArgs{
-			Tx: payment.Transaction,
-			Outputs: []wallet.InternalizeOutput{
-				{
-					OutputIndex: 0,
-					Protocol:    "wallet payment",
-					PaymentRemittance: &wallet.PaymentRemittance{
-						DerivationPrefix:  payment.DerivationPrefix,
-						DerivationSuffix:  payment.DerivationSuffix,
-						SenderIdentityKey: identityKey,
-					},
-				},
-			},
-			Description: "Payment for request",
-		})
-
+		paymentInfo, err := processPayment(r.Context(), m.wallet, paymentData, identityKey, price)
 		if err != nil {
 			respondWithError(w, http.StatusBadRequest, ErrCodePaymentFailed,
 				fmt.Sprintf("Payment failed: %s", err.Error()))
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), PaymentKey, &PaymentInfo{
-			SatoshisPaid: price,
-			Accepted:     result.Accepted,
-			Tx:           payment.Transaction,
-		})
-
-		w.Header().Set("X-BSV-Payment-Satoshis-Paid", fmt.Sprintf("%d", price))
-
-		next.ServeHTTP(w, r.WithContext(ctx))
+		proceedWithSuccessfulPayment(w, r, next, paymentInfo)
 	})
 }
 
-// respondWithError creates a standardized error response
+func proceedWithoutPayment(w http.ResponseWriter, r *http.Request, next http.Handler) {
+	ctx := context.WithValue(r.Context(), PaymentKey, &PaymentInfo{SatoshisPaid: 0})
+	next.ServeHTTP(w, r.WithContext(ctx))
+}
+
+func proceedWithSuccessfulPayment(w http.ResponseWriter, r *http.Request, next http.Handler, paymentInfo *PaymentInfo) {
+	ctx := context.WithValue(r.Context(), PaymentKey, paymentInfo)
+	sendPaymentAcknowledgment(w, paymentInfo)
+	next.ServeHTTP(w, r.WithContext(ctx))
+}
+
+func extractPaymentData(r *http.Request) (*Payment, error) {
+	paymentHeader := r.Header.Get(HeaderPayment)
+	if paymentHeader == "" {
+		return nil, nil
+	}
+
+	var payment Payment
+	if err := json.Unmarshal([]byte(paymentHeader), &payment); err != nil {
+		return nil, fmt.Errorf("invalid payment data format: %w", err)
+	}
+
+	return &payment, nil
+}
+
+func requestPayment(w http.ResponseWriter, r *http.Request, walletInstance wallet.PaymentInterface, price int) {
+	derivationPrefix, err := walletInstance.CreateNonce(r.Context())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, ErrCodePaymentInternal,
+			fmt.Sprintf("Error creating nonce: %s", err.Error()))
+		return
+	}
+
+	terms := NewPaymentTerms(price, derivationPrefix, r.URL.String())
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusPaymentRequired)
+	json.NewEncoder(w).Encode(terms)
+}
+
+func processPayment(
+	ctx context.Context,
+	walletInstance wallet.PaymentInterface,
+	paymentData *Payment,
+	identityKey string,
+	price int,
+) (*PaymentInfo, error) {
+	valid, err := walletInstance.VerifyNonce(ctx, paymentData.DerivationPrefix)
+	if err != nil {
+		return nil, fmt.Errorf("error verifying nonce: %w", err)
+	}
+
+	if !valid {
+		return nil, errors.New("invalid derivation prefix")
+	}
+
+	result, err := walletInstance.InternalizeAction(ctx, wallet.InternalizeActionArgs{
+		Tx: paymentData.Transaction,
+		Outputs: []wallet.InternalizeOutput{
+			{
+				OutputIndex: 0,
+				Protocol:    "wallet payment",
+				PaymentRemittance: &wallet.PaymentRemittance{
+					DerivationPrefix:  paymentData.DerivationPrefix,
+					DerivationSuffix:  paymentData.DerivationSuffix,
+					SenderIdentityKey: identityKey,
+				},
+			},
+		},
+		Description: "Payment for request",
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("payment processing failed: %w", err)
+	}
+
+	var txid string
+	if len(paymentData.Transaction) >= 4 {
+		txid = fmt.Sprintf("tx-%x", paymentData.Transaction[:4])
+	} else {
+		txid = fmt.Sprintf("tx-%x", paymentData.Transaction)
+	}
+
+	return &PaymentInfo{
+		SatoshisPaid:  price,
+		Accepted:      result.Accepted,
+		Tx:            paymentData.Transaction,
+		TransactionID: txid,
+	}, nil
+}
+
+func sendPaymentAcknowledgment(w http.ResponseWriter, paymentInfo *PaymentInfo) {
+	w.Header().Set(HeaderSatoshisPaid, fmt.Sprintf("%d", paymentInfo.SatoshisPaid))
+}
+
 func respondWithError(w http.ResponseWriter, status int, code, message string, extraData ...map[string]any) {
 	resp := map[string]any{
 		"status":      "error",
