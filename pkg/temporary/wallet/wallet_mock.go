@@ -18,8 +18,8 @@ type Wallet struct {
 
 // NewMockWallet creates a new mock wallet with the following options:
 // - keyDeriver: Enables or disables key derivation.
-// - identityKey: Uses the provided identity key or a basic one if none is given.
-// - nonces: Uses the provided nonces or basic one if none are provided.
+// - identityKey: Uses the provided identity key or a default one if none is given.
+// - nonces: Uses the provided nonces or default one if none are provided.
 func NewMockWallet(enableKeyDeriver bool, identityKey *string, nonces ...string) WalletInterface {
 	if identityKey == nil {
 		identityKey = &wallet.ServerIdentityKey
