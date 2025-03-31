@@ -8,19 +8,27 @@ import (
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
 )
 
-// Wallet provides a simple mock implementation of Interface.
+// Wallet provides a simple mock implementation of WalletInterface.
 type Wallet struct {
 	identityKey string
 	keyDeriver  bool
 	validNonces map[string]bool
+	nonces      []string
 }
 
-// NewMockWallet creates a new mock wallet with or without keyDeriver.
-func NewMockWallet(enableKeyDeriver bool) Interface {
+// NewMockWallet creates a new mock wallet with the following options:
+// - keyDeriver: Enables or disables key derivation.
+// - identityKey: Uses the provided identity key or a default one if none is given.
+// - nonces: Uses the provided nonces or default one if none are provided.
+func NewMockWallet(enableKeyDeriver bool, identityKey *string, nonces ...string) WalletInterface {
+	if identityKey == nil {
+		identityKey = &wallet.ServerIdentityKey
+	}
 	return &Wallet{
-		identityKey: wallet.IdentityKeyMock,
+		identityKey: *identityKey,
 		keyDeriver:  enableKeyDeriver,
 		validNonces: make(map[string]bool),
+		nonces:      append([]string(nil), nonces...),
 	}
 }
 
@@ -80,8 +88,19 @@ func (m *Wallet) CreateNonce(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("ctx err: %w", ctx.Err())
 	}
 
-	m.validNonces[wallet.MockNonce] = true
-	return wallet.MockNonce, nil
+	newNonce := wallet.MockNonce
+
+	if len(m.nonces) != 0 {
+		newNonce = m.nonces[0]
+		m.nonces = m.nonces[1:]
+
+		if len(m.nonces) == 0 {
+			m.nonces = append([]string(nil), wallet.DefaultNonces...)
+		}
+	}
+
+	m.validNonces[newNonce] = true
+	return newNonce, nil
 }
 
 // VerifyNonce checks if the nonce exists.
