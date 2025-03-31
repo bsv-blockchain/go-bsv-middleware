@@ -16,7 +16,8 @@ import (
 )
 
 func addIdentityToContext(r *http.Request, identityKey string) *http.Request {
-	ctx := context.WithValue(r.Context(), transport.IdentityKey, identityKey) //nolint:staticcheck // intentionally using a string as context key
+	//nolint:staticcheck // intentionally using a string as context key
+	ctx := context.WithValue(r.Context(), transport.IdentityKey, identityKey)
 	return r.WithContext(ctx)
 }
 
