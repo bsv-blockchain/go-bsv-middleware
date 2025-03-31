@@ -10,13 +10,12 @@ import (
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	fixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func addIdentityToContext(r *http.Request, identityKey string) *http.Request {
-	ctx := context.WithValue(r.Context(), transport.IdentityKey, identityKey)
+	ctx := context.WithValue(r.Context(), "identityKey", identityKey)
 	return r.WithContext(ctx)
 }
 

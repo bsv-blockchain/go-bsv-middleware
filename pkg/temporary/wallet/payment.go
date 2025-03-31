@@ -3,8 +3,6 @@ package wallet
 import "context"
 
 // PaymentInterface extends the basic wallet interface with payment-specific methods
-//
-
 type PaymentInterface interface { //nolint:revive PaymentInterface will be adopted from GO-SDK in the future.
 	WalletInterface
 
