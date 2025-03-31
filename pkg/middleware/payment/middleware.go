@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/4chain-ag/go-bsv-middleware/pkg/internal/logging"
 	"log/slog"
 	"net/http"
 
@@ -14,7 +15,7 @@ import (
 
 // Middleware is the payment middleware handler that implements Direct Payment Protocol (DPP) for HTTP-based micropayments
 type Middleware struct {
-	logger                slog.Logger
+	logger                *slog.Logger
 	wallet                wallet.PaymentInterface
 	calculateRequestPrice func(r *http.Request) (int, error)
 }
@@ -29,7 +30,10 @@ func New(opts Options) (*Middleware, error) {
 		opts.CalculateRequestPrice = DefaultPriceFunc
 	}
 
+	logger := logging.Child(nil, "payment-middleware")
+
 	return &Middleware{
+		logger:                logger,
 		wallet:                opts.Wallet,
 		calculateRequestPrice: opts.CalculateRequestPrice,
 	}, nil
@@ -47,6 +51,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 
 		price, err := m.calculateRequestPrice(r)
 		if err != nil {
+			m.logger.Error("Error calculating request price", slog.String("error", err.Error()))
 			respondWithError(w, http.StatusInternalServerError, ErrCodePaymentInternal,
 				fmt.Sprintf("Error calculating request price: %s", err.Error()))
 			return
@@ -59,6 +64,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 
 		paymentData, err := extractPaymentData(r)
 		if err != nil {
+			m.logger.Error("Error extracting payment data", slog.String("error", err.Error()))
 			respondWithError(w, http.StatusBadRequest, ErrCodeMalformedPayment, err.Error())
 			return
 		}
@@ -70,6 +76,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 
 		paymentInfo, err := processPayment(r.Context(), m.wallet, paymentData, identityKey, price)
 		if err != nil {
+			m.logger.Error("Error processing payment", slog.String("error", err.Error()))
 			respondWithError(w, http.StatusBadRequest, ErrCodePaymentFailed,
 				fmt.Sprintf("Payment failed: %s", err.Error()))
 			return

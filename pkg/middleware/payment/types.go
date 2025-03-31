@@ -6,7 +6,7 @@ import (
 )
 
 // PaymentMode represents a payment method option in the DPP protocol
-type PaymentMode struct {
+type PaymentMode struct { //nolint: revive // Ignore that struct starts with package name
 	// ModeID is the identifier for the payment mode
 	ModeID string `json:"modeId"`
 	// Description provides a human-readable description of the payment mode
