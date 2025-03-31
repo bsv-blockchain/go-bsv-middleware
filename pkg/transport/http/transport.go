@@ -73,7 +73,6 @@ func (t *Transport) HandleNonGeneralRequest(req *http.Request, w http.ResponseWr
 
 	t.logger.Debug("Received non general request request", slog.Any("data", requestData))
 
-	// Get request ID or set it to initial nonce
 	requestID := req.Header.Get(requestIDHeader)
 	if requestID == "" {
 		requestID = requestData.InitialNonce
@@ -311,7 +310,6 @@ func (t *Transport) setupContent(w http.ResponseWriter, response *transport.Auth
 func (t *Transport) buildAuthMessageFromRequest(req *http.Request) (*transport.AuthMessage, error) {
 	var writer bytes.Buffer
 
-	// handle request ID
 	requestNonce := req.Header.Get(requestIDHeader)
 	var requestNonceBytes []byte
 	if requestNonce != "" {
@@ -320,17 +318,14 @@ func (t *Transport) buildAuthMessageFromRequest(req *http.Request) (*transport.A
 
 	writer.Write(requestNonceBytes)
 
-	// handle method
 	utils.WriteVarIntNum(&writer, len(req.Method))
 	writer.Write([]byte(req.Method))
 
-	// handle path
 	utils.WriteVarIntNum(&writer, len(req.URL.Path))
 	writer.Write([]byte(req.URL.Path))
 
 	// TODO #19: handle query params
 
-	// handle headers
 	includedHeaders := utils.ExtractHeaders(req.Header)
 	utils.WriteVarIntNum(&writer, len(includedHeaders))
 
@@ -344,12 +339,10 @@ func (t *Transport) buildAuthMessageFromRequest(req *http.Request) (*transport.A
 		writer.Write(headerValueBytes)
 	}
 
-	// handle body
 	utils.WriteBodyToBuffer(req, &writer)
 
 	payloadBytes := writer.Bytes()
 
-	// Construct AuthMessage
 	authMessage := &transport.AuthMessage{
 		MessageType: "general",
 		Version:     req.Header.Get(versionHeader),
@@ -393,26 +386,21 @@ func (t *Transport) buildResponsePayload(
 
 	var writer bytes.Buffer
 
-	// Encode and write request ID (Base64)
 	requestIDBytes, err := base64.StdEncoding.DecodeString(requestID)
 	if err != nil {
 		return nil
 	}
 	writer.Write(requestIDBytes)
 
-	// Write response status
 	utils.WriteVarIntNum(&writer, responseStatus)
 
 	// TODO: #14 - Collect and sort headers
 	includedHeaders := make([][]string, 0)
 	//includedHeaders := utils.FilterAndSortHeaders(responseHeaders)
 
-	// Write number of headers
 	utils.WriteVarIntNum(&writer, len(includedHeaders))
 
-	// Write headers
 	for _, header := range includedHeaders {
-		// Write header key and value length and content
 		utils.WriteVarIntNum(&writer, len(header[0]))
 		writer.WriteString(header[0])
 
@@ -420,7 +408,6 @@ func (t *Transport) buildResponsePayload(
 		writer.WriteString(header[1])
 	}
 
-	// Write body length and content
 	if len(responseBody) > 0 {
 		utils.WriteVarIntNum(&writer, len(responseBody))
 		writer.Write(responseBody)
@@ -464,7 +451,6 @@ func setupContext(req *http.Request, requestData *transport.AuthMessage, request
 	return req
 }
 
-// getValuesFromContext extracts identity key and request ID from the request context
 func getValuesFromContext(req *http.Request) (string, string, error) {
 	identityKey, ok := req.Context().Value(transport.IdentityKey).(string)
 	if !ok {

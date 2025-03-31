@@ -17,11 +17,16 @@ const (
 
 // Definition of the Message Types used in the authentication process.
 const (
-	InitialRequest      MessageType = "initialRequest"
-	InitialResponse     MessageType = "initialResponse"
-	CertificateRequest  MessageType = "certificateRequest"
+	// InitialRequest is the first message sent by the client to the server.
+	InitialRequest MessageType = "initialRequest"
+	// InitialResponse is the response to the initial request.
+	InitialResponse MessageType = "initialResponse"
+	// CertificateRequest is the message sent by the server to request certificates from the client.
+	CertificateRequest MessageType = "certificateRequest"
+	// CertificateResponse is the response to the certificate request.
 	CertificateResponse MessageType = "certificateResponse"
-	General             MessageType = "general"
+	// General is a normal endpoint authorized by middleware.
+	General MessageType = "general"
 )
 
 // MessageType represents the type of message sent between peers during the authentication process.
@@ -59,7 +64,7 @@ type OnCertificatesReceivedFunc func(
 // MessageCallback is a callback function for handling messages. Placeholder for now.
 type MessageCallback func(message AuthMessage) error
 
-// MessageTypeFromString returns a MessageType from a string.
+// String returns a string from a MessageType.
 func (m *MessageType) String() string {
 	return string(*m)
 }
