@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,7 +16,7 @@ import (
 )
 
 func addIdentityToContext(r *http.Request, identityKey string) *http.Request {
-	ctx := context.WithValue(r.Context(), "identityKey", identityKey)
+	ctx := context.WithValue(r.Context(), transport.IdentityKey, identityKey)
 	return r.WithContext(ctx)
 }
 
