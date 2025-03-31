@@ -28,8 +28,7 @@ type Merchant struct {
 }
 
 // PaymentTerms represents the DPP PaymentTerms message sent to the client when payment is required
-// nolint: revive // Ignore that struct starts with package name
-type PaymentTerms struct {
+type PaymentTerms struct { //nolint: revive // Ignore that struct starts with package name
 	// Network is the network identifier (e.g., Bitcoin SV)
 	Network string `json:"network"`
 	// Version is the version of the DPP protocol
@@ -65,8 +64,7 @@ type Payment struct {
 }
 
 // PaymentACK represents the payment acknowledgment sent back to the client
-// nolint: revive // Ignore that struct starts with package name
-type PaymentACK struct {
+type PaymentACK struct { //nolint: revive // Ignore that struct starts with package name
 	// ModeID is the identifier for the payment mode
 	ModeID string `json:"modeId"`
 	// Accepted indicates whether the payment was accepted
@@ -78,8 +76,7 @@ type PaymentACK struct {
 }
 
 // PaymentInfo holds information about a processed payment stored in the request context
-// nolint: revive // Ignore that struct starts with package name
-type PaymentInfo struct {
+type PaymentInfo struct { //nolint: revive // Ignore that struct starts with package name
 	// SatoshisPaid is the amount paid in satoshis
 	SatoshisPaid int
 	// Accepted indicates whether the payment was accepted

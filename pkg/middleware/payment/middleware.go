@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
@@ -13,6 +14,7 @@ import (
 
 // Middleware is the payment middleware handler that implements Direct Payment Protocol (DPP) for HTTP-based micropayments
 type Middleware struct {
+	logger                slog.Logger
 	wallet                wallet.PaymentInterface
 	calculateRequestPrice func(r *http.Request) (int, error)
 }
@@ -114,7 +116,10 @@ func requestPayment(w http.ResponseWriter, r *http.Request, walletInstance walle
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusPaymentRequired)
-	json.NewEncoder(w).Encode(terms)
+	err = json.NewEncoder(w).Encode(terms)
+	if err != nil {
+		return
+	}
 }
 
 func processPayment(
