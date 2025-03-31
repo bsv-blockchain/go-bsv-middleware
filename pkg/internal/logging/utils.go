@@ -28,7 +28,7 @@ func Fatalf(logger *slog.Logger, err error, format string, args ...any) {
 	os.Exit(1)
 }
 
-// DefaultIfNil returns the default logger if the given logger is nil.
+// DefaultIfNil returns the basic logger if the given logger is nil.
 func DefaultIfNil(logger *slog.Logger) *slog.Logger {
 	if logger == nil {
 		return slog.Default()

@@ -3,7 +3,9 @@ package wallet
 import "context"
 
 // WalletInterface defines the core functionality needed for authentication
-type WalletInterface interface { //nolint:revive // This is an interface, so it's fine to use the name "WalletInterface".
+//
+//nolint:revive WalletInterface will be adopted from GO-SDK in the future.
+type WalletInterface interface {
 	// GetPublicKey returns a public key
 	GetPublicKey(ctx context.Context, options GetPublicKeyOptions) (string, error)
 
