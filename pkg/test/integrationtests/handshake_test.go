@@ -1,9 +1,9 @@
 package integrationtests
 
 import (
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	"testing"
 
+	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/test/assert"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/test/mocks"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
