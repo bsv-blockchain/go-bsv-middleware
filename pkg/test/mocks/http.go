@@ -3,13 +3,12 @@ package mocks
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"log/slog"
 	"net/http"
-	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
@@ -18,7 +17,7 @@ import (
 
 type MockHTTPServer struct {
 	mux                  *http.ServeMux
-	server               *httptest.Server
+	server               *http.Server
 	allowUnauthenticated bool
 }
 
@@ -41,13 +40,25 @@ func (s *MockHTTPServer) WithMiddleware() *MockHTTPServer {
 
 	handlerWithMiddleware := middleware.Handler(s.mux)
 
-	s.server = httptest.NewServer(handlerWithMiddleware)
+	s.server = &http.Server{Addr: ":8080", Handler: handlerWithMiddleware}
+
+	go func() {
+		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		}
+	}()
+	time.Sleep(1 * time.Second)
 
 	return s
 }
 
 func (s *MockHTTPServer) WithoutMiddleware() *MockHTTPServer {
-	s.server = httptest.NewServer(s.mux)
+	//s.server = httptest.NewServer(s.mux)
+	s.server = &http.Server{Handler: s.mux}
+	go func() {
+		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		}
+	}()
+	time.Sleep(1 * time.Second)
 	return s
 }
 
@@ -61,11 +72,12 @@ func (s *MockHTTPServer) Close() {
 }
 
 func (s *MockHTTPServer) URL() string {
-	return s.server.URL
+	return s.server.Addr
 }
 
 func (s *MockHTTPServer) SendNonGeneralRequest(t *testing.T, msg *transport.AuthMessage) (*http.Response, *transport.AuthMessage, error) {
-	authURL := s.server.URL + "/.well-known/auth"
+	//authURL := s.server.Addr + "/.well-known/auth"
+	authURL := "http://localhost:8080/.well-known/auth"
 	authMethod := "POST"
 
 	dataBytes, err := json.Marshal(msg)
@@ -78,7 +90,8 @@ func (s *MockHTTPServer) SendNonGeneralRequest(t *testing.T, msg *transport.Auth
 }
 
 func (s *MockHTTPServer) SendGeneralRequest(t *testing.T, method, path string, headers map[string]string, body any) (*http.Response, error) {
-	url := s.server.URL + path
+	//url := s.server.Addr + path
+	url := "http://localhost:8080" + path
 
 	var dataBytes []byte
 	var err error
@@ -88,9 +101,6 @@ func (s *MockHTTPServer) SendGeneralRequest(t *testing.T, method, path string, h
 	}
 
 	response := prepareAndCallRequest(t, method, url, headers, dataBytes)
-
-	fmt.Println("Response in test: ", response)
-	fmt.Println("Response headers: ", response.Header)
 
 	return response, nil
 }

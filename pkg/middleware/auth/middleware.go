@@ -1,8 +1,9 @@
 package auth
 
 import (
+	"bytes"
 	"errors"
-	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 
@@ -26,14 +27,21 @@ type Middleware struct {
 type responseRecorder struct {
 	http.ResponseWriter
 	statusCode int
-	body       []byte
+	body       *bytes.Buffer
 	written    bool
+}
+
+func newResponseRecorder(w http.ResponseWriter) *responseRecorder {
+	return &responseRecorder{
+		ResponseWriter: w,
+		body:           &bytes.Buffer{},
+		statusCode:     http.StatusOK,
+	}
 }
 
 // WriteHeader writes status code
 func (r *responseRecorder) WriteHeader(code int) {
 	r.statusCode = code
-	r.ResponseWriter.WriteHeader(code)
 }
 
 // Write writes response body to internal buffer
@@ -41,9 +49,25 @@ func (r *responseRecorder) Write(b []byte) (int, error) {
 	if r.written {
 		return 0, errors.New("response already written")
 	}
-	r.body = b
+
+	n, err := r.body.Write(b)
+	if err != nil {
+		return 0, err
+	}
+
 	r.written = true
-	return len(b), nil
+	return n, nil
+}
+
+// Finalize writes the captured headers and body
+func (r *responseRecorder) Finalize() error {
+	r.ResponseWriter.WriteHeader(r.statusCode)
+	_, err := io.Copy(r.ResponseWriter, r.body)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // New creates a new auth middleware
@@ -80,11 +104,11 @@ func New(opts Options) *Middleware {
 // Handler returns standard http middleware
 func (m *Middleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		recorder := &responseRecorder{ResponseWriter: w, statusCode: http.StatusOK}
+		recorder := newResponseRecorder(w)
 		if req.Method == http.MethodPost && req.URL.Path == "/.well-known/auth" {
 			m.transport.HandleNonGeneralRequest(req, recorder, nil)
 
-			_, err := recorder.ResponseWriter.Write(recorder.body)
+			err := recorder.Finalize()
 			if err != nil {
 				http.Error(recorder, err.Error(), http.StatusInternalServerError)
 				return
@@ -100,17 +124,16 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 
 		next.ServeHTTP(recorder, req)
 
-		err = m.transport.HandleResponse(req, recorder, recorder.body, recorder.statusCode, authMsg)
+		err = m.transport.HandleResponse(req, recorder, recorder.body.Bytes(), recorder.statusCode, authMsg)
 		if err != nil {
 			http.Error(recorder, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		_, err = recorder.ResponseWriter.Write(recorder.body)
+		err = recorder.Finalize()
 		if err != nil {
 			http.Error(recorder, err.Error(), http.StatusInternalServerError)
+			return
 		}
-
-		fmt.Println("Headers after middleware:  ", w.Header())
 	})
 }

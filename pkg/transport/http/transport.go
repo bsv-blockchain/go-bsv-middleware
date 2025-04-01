@@ -246,10 +246,15 @@ func (t *Transport) handleGeneralRequest(msg *transport.AuthMessage) (*transport
 		return nil, fmt.Errorf("failed to create nonce, %w", err)
 	}
 
+	identityKey, err := t.wallet.GetPublicKey(context.Background(), wallet.GetPublicKeyOptions{IdentityKey: true})
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve identity key, %w", err)
+	}
+
 	response := &transport.AuthMessage{
 		Version:     transport.AuthVersion,
 		MessageType: "general",
-		IdentityKey: *session.PeerIdentityKey,
+		IdentityKey: identityKey,
 		Nonce:       &nonce,
 		YourNonce:   session.PeerNonce,
 	}
