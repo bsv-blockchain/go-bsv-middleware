@@ -11,10 +11,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/4chain-ag/go-bsv-middleware/examples/utils"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
+	"github.com/4chain-ag/go-bsv-middleware/pkg/test/mocks"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 )
 
@@ -66,7 +66,15 @@ func pingHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func callInitialRequest(mockedWallet wallet.WalletInterface) *transport.AuthMessage {
-	requestData := utils.PrepareInitialRequest(mockedWallet)
+	fmt.Println()
+	fmt.Println()
+	fmt.Println("[EXAMPLE]  <---------               Preparing initial request")
+	requestData := mocks.PrepareInitialRequestBody(mockedWallet)
+	fmt.Println("[EXAMPLE]  Version:                ", requestData.Version)
+	fmt.Println("[EXAMPLE]  Message Type:           ", requestData.MessageType)
+	fmt.Println("[EXAMPLE]  Client identity key:    ", requestData.IdentityKey)
+	fmt.Println("[EXAMPLE]  Initial nonce:          ", requestData.InitialNonce)
+
 	jsonData, err := json.Marshal(requestData)
 	if err != nil {
 		log.Fatalf("Failed to marshal request: %v", err)
@@ -99,31 +107,40 @@ func callInitialRequest(mockedWallet wallet.WalletInterface) *transport.AuthMess
 	}
 
 	for key, value := range resp.Header {
-		fmt.Println("[EXAMPLE] Header:               ", key, value)
+		fmt.Println("[EXAMPLE] Header:                  ", key, value)
 	}
-
-	fmt.Println()
-	fmt.Println()
 
 	return responseData
 }
 
 func callPingEndpoint(mockedWallet wallet.WalletInterface, response *transport.AuthMessage) {
+	fmt.Println()
+	fmt.Println()
+	fmt.Println("[EXAMPLE]  <---------               Preparing general request")
+
 	url := "http://localhost:8080/ping"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		log.Fatalf("Failed to create request: %v", err)
 	}
 
-	utils.PreparePingRequest(req, mockedWallet, response)
+	headers, err := mocks.PrepareGeneralRequestHeaders(mockedWallet, response)
+	if err != nil {
+		panic(err)
+	}
+
+	for key, value := range headers {
+		fmt.Println("[EXAMPLE] Header:                  ", key, value)
+		req.Header.Set(key, value)
+	}
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Fatalf("Request failed: %v", err)
 	}
-	defer resp.Body.Close()
 
+	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Fatalf("Failed to read response: %v", err)
@@ -132,6 +149,6 @@ func callPingEndpoint(mockedWallet wallet.WalletInterface, response *transport.A
 	log.Printf("Response from server:            %s", string(body))
 
 	for key, value := range resp.Header {
-		fmt.Println("[EXAMPLE] Header:           ", key, value)
+		fmt.Println("[EXAMPLE] Header:                  ", key, value)
 	}
 }

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -109,5 +110,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		if err != nil {
 			http.Error(recorder, err.Error(), http.StatusInternalServerError)
 		}
+
+		fmt.Println("Headers after middleware:  ", w.Header())
 	})
 }

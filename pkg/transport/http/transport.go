@@ -262,7 +262,10 @@ func (t *Transport) setupHeaders(w http.ResponseWriter, response *transport.Auth
 		versionHeader:     response.Version,
 		messageTypeHeader: response.MessageType.String(),
 		identityKeyHeader: response.IdentityKey,
-		requestIDHeader:   requestID,
+	}
+
+	if response.MessageType == transport.General {
+		responseHeaders[requestIDHeader] = requestID
 	}
 
 	if response.Nonce != nil {
@@ -325,6 +328,14 @@ func (t *Transport) buildAuthMessageFromRequest(req *http.Request) (*transport.A
 	writer.Write([]byte(req.URL.Path))
 
 	// TODO #19: handle query params
+	query := req.URL.RawQuery
+	if len(query) > 0 {
+		searchAsArray := []byte(query) // Convert query string to byte array
+		utils.WriteVarIntNum(&writer, len(searchAsArray))
+		writer.Write([]byte(query))
+	} else {
+		utils.WriteVarIntNum(&writer, -1)
+	}
 
 	includedHeaders := utils.ExtractHeaders(req.Header)
 	utils.WriteVarIntNum(&writer, len(includedHeaders))
