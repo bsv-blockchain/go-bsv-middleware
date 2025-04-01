@@ -1,10 +1,11 @@
 package assert
 
 import (
-	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func ResponseOK(t *testing.T, res *http.Response) {
