@@ -147,7 +147,11 @@ func prepareAndCallRequest(t *testing.T, method, authURL string, headers map[str
 
 // MapBodyToAuthMessage maps the response body to an AuthMessage
 func MapBodyToAuthMessage(t *testing.T, response *http.Response) (*transport.AuthMessage, error) {
-	defer response.Body.Close()
+	defer func() {
+		err := response.Body.Close()
+		require.NoError(t, err)
+	}()
+	
 	body, err := io.ReadAll(response.Body)
 	require.Nil(t, err)
 
