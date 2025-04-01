@@ -151,7 +151,7 @@ func MapBodyToAuthMessage(t *testing.T, response *http.Response) (*transport.Aut
 		err := response.Body.Close()
 		require.NoError(t, err)
 	}()
-	
+
 	body, err := io.ReadAll(response.Body)
 	require.Nil(t, err)
 
