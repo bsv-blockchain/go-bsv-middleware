@@ -19,19 +19,20 @@ This example includes:
 ### 1. Start the Server
 
 ```bash
-go run server.go
+cd server && go run server.go
 ```
 
 This starts a server on port 8080 with two endpoints:
+
 - `/info` - Free endpoint (authentication only)
-- `/weather` - Paid endpoint (10 satoshis)
+- `/premium` - Paid endpoint (10 satoshis)
 
 ### 2. Run the Client
 
 In a separate terminal:
 
 ```bash
-go run client.go
+cd client && go run client.go
 ```
 
 ## Complete Payment Flow
@@ -40,9 +41,9 @@ The client walks through the complete DPP payment flow:
 
 1. **Authentication**: Client authenticates with the server using BRC-103/104
 2. **Free Endpoint**: Client accesses the free endpoint that only requires authentication
-3. **Initial Paid Request**: Client requests weather data, receives a 402 Payment Required response
+3. **Initial Paid Request**: Client requests `/premium`, receives a 402 Payment Required response
 4. **Payment Preparation**: Client processes the payment terms and creates a payment transaction
-5. **Payment Submission**: Client submits the payment and retrieves the weather data
+5. **Payment Submission**: Client submits the payment and retrieves the premium content
 
 ## Flow Diagram
 
@@ -55,11 +56,11 @@ Client                                Server
   |---------- Request /info ----------->|
   |<-------- Free Info Response --------|
   |                                     |
-  |-------- Request /weather ---------->|
+  |-------- Request /premium ---------->|
   |<-- 402 Payment Required + Terms ----|
   |                                     |
   |--- Request with Payment Header ---->|
-  |<------ Weather Data Response -------|
+  |<------ Premium Data Response -------|
 ```
 
 ## Key DPP Concepts Demonstrated
@@ -68,6 +69,6 @@ Client                                Server
 2. **Payment Terms**: Structured JSON object containing payment requirements
 3. **Payment Modes**: Using the "bsv-direct" payment mode
 4. **Derivation Prefix/Suffix**: Used to securely generate payment addresses
-5. **Standard Headers**: Using X-BSV-Payment headers for payment data
+5. **Standard Headers**: Using `X-BSV-Payment` headers for payment data
 6. **Payment Verification**: Server verifies the payment before providing access to resources
 7. **Free Endpoints**: Mix of paid and free endpoints in the same API
