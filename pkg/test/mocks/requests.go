@@ -13,7 +13,50 @@ import (
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport/utils"
 )
 
-func PrepareInitialRequestBody(mockedWallet wallet.WalletInterface) *transport.AuthMessage {
+type Headers map[string]string
+type RequestBody transport.AuthMessage
+
+func (h Headers) WithWrongVersion() {
+	h["x-bsv-auth-version"] = "0.2"
+}
+
+func (h Headers) WithWrongSignature() {
+	h["x-bsv-auth-signature"] = "wrong_signature"
+}
+
+func (h Headers) WithWrongSignatureInHex() {
+	h["x-bsv-auth-signature"] = hex.EncodeToString([]byte("wrong_signature"))
+}
+
+func (h Headers) WithWrongYourNonce() {
+	h["x-bsv-auth-your-nonce"] = "wrong_your_nonce"
+}
+
+func (h Headers) WithWrongNonce() {
+	h["x-bsv-auth-nonce"] = "wrong_nonce"
+}
+
+func (rb *RequestBody) WithWrongVersion() *RequestBody {
+	rb.Version = "0.2"
+	return rb
+}
+
+func (rb *RequestBody) WithoutIdentityKeyAndNonce() *RequestBody {
+	rb.IdentityKey = ""
+	rb.InitialNonce = ""
+	return rb
+}
+
+func (rb *RequestBody) AuthMessage() *transport.AuthMessage {
+	return (*transport.AuthMessage)(rb)
+}
+
+func NewRequestBody(msg transport.AuthMessage) *RequestBody {
+	rb := RequestBody(msg)
+	return &rb
+}
+
+func PrepareInitialRequestBody(mockedWallet wallet.WalletInterface) *RequestBody {
 	opts := wallet.GetPublicKeyOptions{IdentityKey: true}
 	clientIdentityKey, err := mockedWallet.GetPublicKey(context.Background(), opts)
 	if err != nil {
@@ -25,17 +68,17 @@ func PrepareInitialRequestBody(mockedWallet wallet.WalletInterface) *transport.A
 		panic(err)
 	}
 
-	initialRequest := &transport.AuthMessage{
+	initialRequest := transport.AuthMessage{
 		Version:      "0.1",
 		MessageType:  "initialRequest",
 		IdentityKey:  clientIdentityKey,
 		InitialNonce: initialNonce,
 	}
 
-	return initialRequest
+	return NewRequestBody(initialRequest)
 }
 
-func PrepareGeneralRequestHeaders(mockedWallet wallet.WalletInterface, previousResponse *transport.AuthMessage) (map[string]string, error) {
+func PrepareGeneralRequestHeaders(mockedWallet wallet.WalletInterface, previousResponse *transport.AuthMessage) (Headers, error) {
 	serverIdentityKey := previousResponse.IdentityKey
 	serverNonce := previousResponse.InitialNonce
 

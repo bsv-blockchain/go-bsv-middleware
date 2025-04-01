@@ -63,12 +63,11 @@ func (t *Transport) Send(_ transport.AuthMessage) {
 }
 
 // HandleNonGeneralRequest handles incoming non general requests
-func (t *Transport) HandleNonGeneralRequest(req *http.Request, w http.ResponseWriter, _ transport.OnCertificatesReceivedFunc) {
+func (t *Transport) HandleNonGeneralRequest(req *http.Request, w http.ResponseWriter, _ transport.OnCertificatesReceivedFunc) error {
 	requestData, err := parseAuthMessage(req)
 	if err != nil {
 		t.logger.Error("Invalid request body", slog.String("error", err.Error()))
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
+		return err
 	}
 
 	t.logger.Debug("Received non general request request", slog.Any("data", requestData))
@@ -81,24 +80,24 @@ func (t *Transport) HandleNonGeneralRequest(req *http.Request, w http.ResponseWr
 	response, err := t.handleIncomingMessage(requestData)
 	if err != nil {
 		t.logger.Error("Failed to process request", slog.String("error", err.Error()))
-		http.Error(w, "failed to process request", http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	t.setupHeaders(w, response, requestID)
 	t.setupContent(w, response)
+
+	return nil
 }
 
 // HandleGeneralRequest handles incoming general requests
 func (t *Transport) HandleGeneralRequest(req *http.Request, res http.ResponseWriter, _ transport.OnCertificatesReceivedFunc) (*http.Request, *transport.AuthMessage, error) {
 	requestID := req.Header.Get(requestIDHeader)
 	if requestID == "" {
-		t.logger.Debug("Missing request ID, checking if unauthenticated requests are allowed")
-
 		if t.allowUnauthenticated {
 			t.logger.Debug("Unauthenticated requests are allowed, skipping auth")
 			return nil, nil, nil
 		}
+		t.logger.Debug("Missing request ID and unauthenticated requests are not allowed")
 
 		return nil, nil, errors.New("missing request ID")
 	}
@@ -166,7 +165,7 @@ func (t *Transport) HandleResponse(req *http.Request, res http.ResponseWriter, b
 
 func (t *Transport) handleIncomingMessage(msg *transport.AuthMessage) (*transport.AuthMessage, error) {
 	if msg.Version != transport.AuthVersion {
-		return nil, fmt.Errorf("unsupported version")
+		return nil, errors.New("unsupported version")
 	}
 
 	switch msg.MessageType {
@@ -369,6 +368,7 @@ func (t *Transport) buildAuthMessageFromRequest(req *http.Request) (*transport.A
 	if nonce := req.Header.Get("x-bsv-auth-nonce"); nonce != "" {
 		authMessage.Nonce = &nonce
 	}
+
 	if yourNonce := req.Header.Get("x-bsv-auth-your-nonce"); yourNonce != "" {
 		authMessage.YourNonce = &yourNonce
 	}

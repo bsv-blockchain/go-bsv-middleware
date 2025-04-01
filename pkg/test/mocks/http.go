@@ -3,14 +3,16 @@ package mocks
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
-	"log"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/4chain-ag/go-bsv-middleware/pkg/internal/logging"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	"github.com/stretchr/testify/require"
@@ -20,6 +22,7 @@ type MockHTTPServer struct {
 	mux                  *http.ServeMux
 	server               *httptest.Server
 	allowUnauthenticated bool
+	logger               *slog.Logger
 }
 
 func CreateMockHTTPServer() *MockHTTPServer {
@@ -30,11 +33,13 @@ func CreateMockHTTPServer() *MockHTTPServer {
 }
 
 func (s *MockHTTPServer) WithMiddleware() *MockHTTPServer {
-	logger := slog.New(slog.DiscardHandler)
+	if s.logger == nil {
+		s.logger = slog.New(slog.DiscardHandler)
+	}
 
 	opts := auth.Options{
 		AllowUnauthenticated: s.allowUnauthenticated,
-		Logger:               logger,
+		Logger:               s.logger,
 		Wallet:               CreateServerMockWallet(),
 	}
 	middleware := auth.New(opts)
@@ -57,6 +62,13 @@ func (s *MockHTTPServer) WithAllowUnauthenticated() *MockHTTPServer {
 	return s
 }
 
+func (s *MockHTTPServer) WithLogger() *MockHTTPServer {
+	logHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
+	logger := slog.New(logHandler)
+	s.logger = logging.Child(logger, "tests")
+	return s
+}
+
 func (s *MockHTTPServer) Close() {
 	s.server.Close()
 }
@@ -65,7 +77,7 @@ func (s *MockHTTPServer) URL() string {
 	return s.server.URL
 }
 
-func (s *MockHTTPServer) SendNonGeneralRequest(t *testing.T, msg *transport.AuthMessage) (*http.Response, *transport.AuthMessage, error) {
+func (s *MockHTTPServer) SendNonGeneralRequest(t *testing.T, msg *transport.AuthMessage) (*http.Response, error) {
 	authURL := s.URL() + "/.well-known/auth"
 	authMethod := "POST"
 
@@ -73,9 +85,8 @@ func (s *MockHTTPServer) SendNonGeneralRequest(t *testing.T, msg *transport.Auth
 	require.Nil(t, err)
 
 	response := prepareAndCallRequest(t, authMethod, authURL, nil, dataBytes)
-	responseAuthMsg := mapResponseToAuthMessage(t, response)
 
-	return response, responseAuthMsg, nil
+	return response, nil
 }
 
 func (s *MockHTTPServer) SendGeneralRequest(t *testing.T, method, path string, headers map[string]string, body any) (*http.Response, error) {
@@ -121,15 +132,15 @@ func prepareAndCallRequest(t *testing.T, method, authURL string, headers map[str
 	return response
 }
 
-func mapResponseToAuthMessage(t *testing.T, response *http.Response) *transport.AuthMessage {
+func MapBodyToAuthMessage(t *testing.T, response *http.Response) (*transport.AuthMessage, error) {
 	defer response.Body.Close()
 	body, err := io.ReadAll(response.Body)
 	require.Nil(t, err)
 
-	var responseData *transport.AuthMessage
-	if err = json.Unmarshal(body, &responseData); err != nil {
-		log.Fatalf("Failed to unmarshal response: %v", err)
+	var authMessage *transport.AuthMessage
+	if err = json.Unmarshal(body, &authMessage); err != nil {
+		return nil, errors.New("failed to unmarshal response")
 	}
 
-	return responseData
+	return authMessage, nil
 }

@@ -3,9 +3,9 @@ package auth
 import (
 	"bytes"
 	"errors"
-	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/internal/logging"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/sessionmanager"
@@ -62,7 +62,8 @@ func (r *responseRecorder) Write(b []byte) (int, error) {
 // Finalize writes the captured headers and body
 func (r *responseRecorder) Finalize() error {
 	r.ResponseWriter.WriteHeader(r.statusCode)
-	_, err := io.Copy(r.ResponseWriter, r.body)
+	body := strings.TrimSpace(r.body.String())
+	_, err := r.ResponseWriter.Write([]byte(body))
 	if err != nil {
 		return err
 	}
@@ -106,19 +107,18 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		recorder := newResponseRecorder(w)
 		if req.Method == http.MethodPost && req.URL.Path == "/.well-known/auth" {
-			m.transport.HandleNonGeneralRequest(req, recorder, nil)
-
-			err := recorder.Finalize()
+			err := m.transport.HandleNonGeneralRequest(req, recorder, nil)
 			if err != nil {
-				http.Error(recorder, err.Error(), http.StatusInternalServerError)
-				return
+				http.Error(recorder, err.Error(), http.StatusUnauthorized)
 			}
+			createResponse(recorder)
 			return
 		}
 
 		req, authMsg, err := m.transport.HandleGeneralRequest(req, recorder, nil)
 		if err != nil {
 			http.Error(recorder, err.Error(), http.StatusUnauthorized)
+			createResponse(recorder)
 			return
 		}
 
@@ -127,13 +127,22 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		err = m.transport.HandleResponse(req, recorder, recorder.body.Bytes(), recorder.statusCode, authMsg)
 		if err != nil {
 			http.Error(recorder, err.Error(), http.StatusInternalServerError)
+			createResponse(recorder)
 			return
 		}
 
 		err = recorder.Finalize()
 		if err != nil {
 			http.Error(recorder, err.Error(), http.StatusInternalServerError)
-			return
+			createResponse(recorder)
 		}
 	})
+}
+
+func createResponse(recorder *responseRecorder) {
+	err := recorder.Finalize()
+	if err != nil {
+		http.Error(recorder, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
