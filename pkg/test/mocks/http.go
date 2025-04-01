@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
-	"github.com/stretchr/testify/require"
 	"io"
 	"log"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
+	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
+	"github.com/stretchr/testify/require"
 )
 
 type MockHTTPServer struct {

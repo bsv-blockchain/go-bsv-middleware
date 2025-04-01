@@ -1,10 +1,11 @@
 package assert
 
 import (
+	"testing"
+
 	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 var (

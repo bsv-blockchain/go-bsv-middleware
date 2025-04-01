@@ -1,11 +1,12 @@
 package integrationtests
 
 import (
+	"testing"
+
 	"github.com/4chain-ag/go-bsv-middleware/pkg/test/assert"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/test/mocks"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestAuthMiddleware_Handshake_HappyPath(t *testing.T) {
