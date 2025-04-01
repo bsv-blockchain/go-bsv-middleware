@@ -20,6 +20,7 @@ var (
 	}
 )
 
+// InitialResponseAuthMessage asserts that the given AuthMessage is equal to the expected initial response AuthMessage.
 func InitialResponseAuthMessage(t *testing.T, msg *transport.AuthMessage) {
 	compareAuthMessage(t, &initialResponseAuthMessage, msg)
 }

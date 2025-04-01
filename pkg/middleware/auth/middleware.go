@@ -52,7 +52,7 @@ func (r *responseRecorder) Write(b []byte) (int, error) {
 
 	n, err := r.body.Write(b)
 	if err != nil {
-		return 0, err
+		return 0, errors.New("failed to write response")
 	}
 
 	r.written = true
@@ -65,7 +65,7 @@ func (r *responseRecorder) Finalize() error {
 	body := strings.TrimSpace(r.body.String())
 	_, err := r.ResponseWriter.Write([]byte(body))
 	if err != nil {
-		return err
+		return errors.New("failed to write response")
 	}
 
 	return nil

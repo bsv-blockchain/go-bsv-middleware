@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// MockHTTPServer is a mock HTTP server used in tests
 type MockHTTPServer struct {
 	mux                  *http.ServeMux
 	server               *httptest.Server
@@ -25,6 +27,7 @@ type MockHTTPServer struct {
 	logger               *slog.Logger
 }
 
+// CreateMockHTTPServer creates a new mock HTTP server
 func CreateMockHTTPServer() *MockHTTPServer {
 	mux := http.NewServeMux()
 	mux.Handle("/", indexHandler())
@@ -32,6 +35,7 @@ func CreateMockHTTPServer() *MockHTTPServer {
 	return &MockHTTPServer{mux: mux}
 }
 
+// WithMiddleware adds middleware to the server
 func (s *MockHTTPServer) WithMiddleware() *MockHTTPServer {
 	if s.logger == nil {
 		s.logger = slog.New(slog.DiscardHandler)
@@ -52,16 +56,19 @@ func (s *MockHTTPServer) WithMiddleware() *MockHTTPServer {
 	return s
 }
 
+// WithoutMiddleware runs server without middleware
 func (s *MockHTTPServer) WithoutMiddleware() *MockHTTPServer {
 	s.server = httptest.NewServer(s.mux)
 	return s
 }
 
+// WithAllowUnauthenticated sets allowUnauthenticated flag to true
 func (s *MockHTTPServer) WithAllowUnauthenticated() *MockHTTPServer {
 	s.allowUnauthenticated = true
 	return s
 }
 
+// WithLogger sets up logger for the server
 func (s *MockHTTPServer) WithLogger() *MockHTTPServer {
 	logHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
 	logger := slog.New(logHandler)
@@ -69,14 +76,17 @@ func (s *MockHTTPServer) WithLogger() *MockHTTPServer {
 	return s
 }
 
+// Close closes the server
 func (s *MockHTTPServer) Close() {
 	s.server.Close()
 }
 
+// URL returns the server URL
 func (s *MockHTTPServer) URL() string {
 	return s.server.URL
 }
 
+// SendNonGeneralRequest sends a non-general request to the server
 func (s *MockHTTPServer) SendNonGeneralRequest(t *testing.T, msg *transport.AuthMessage) (*http.Response, error) {
 	authURL := s.URL() + "/.well-known/auth"
 	authMethod := "POST"
@@ -89,6 +99,7 @@ func (s *MockHTTPServer) SendNonGeneralRequest(t *testing.T, msg *transport.Auth
 	return response, nil
 }
 
+// SendGeneralRequest sends a general request to the server
 func (s *MockHTTPServer) SendGeneralRequest(t *testing.T, method, path string, headers map[string]string, body any) (*http.Response, error) {
 	url := s.URL() + path
 
@@ -113,7 +124,9 @@ func indexHandler() http.Handler {
 func pingHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Pong!"))
+		if _, err := w.Write([]byte("Pong!")); err != nil {
+			fmt.Println("Failed to write response")
+		}
 	})
 }
 
@@ -132,6 +145,7 @@ func prepareAndCallRequest(t *testing.T, method, authURL string, headers map[str
 	return response
 }
 
+// MapBodyToAuthMessage maps the response body to an AuthMessage
 func MapBodyToAuthMessage(t *testing.T, response *http.Response) (*transport.AuthMessage, error) {
 	defer response.Body.Close()
 	body, err := io.ReadAll(response.Body)

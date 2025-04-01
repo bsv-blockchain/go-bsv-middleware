@@ -27,12 +27,14 @@ var (
 	}
 )
 
+// InitialResponseHeaders checks if the response headers are correct for the initial response.
 func InitialResponseHeaders(t *testing.T, response *http.Response) {
 	for key, value := range initialResponseHeaders {
 		require.Equal(t, value, response.Header.Get(key))
 	}
 }
 
+// GeneralResponseHeaders checks if the response headers are correct for the general response.
 func GeneralResponseHeaders(t *testing.T, response *http.Response) {
 	for key, value := range generalResponseHeaders {
 		require.Equal(t, value, response.Header.Get(key))
