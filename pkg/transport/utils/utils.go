@@ -11,17 +11,17 @@ import (
 )
 
 // WriteVarIntNum writes a variable-length integer to a buffer
-// integer is converted to fixed size int32
+// integer is converted to fixed size int64
 func WriteVarIntNum(writer *bytes.Buffer, num int) {
-	err := binary.Write(writer, binary.LittleEndian, int32(num))
+	err := binary.Write(writer, binary.LittleEndian, int64(num))
 	if err != nil {
 		fmt.Println("Error writing number:", err)
 	}
 }
 
 // ReadVarIntNum reads a variable-length integer from a buffer
-func ReadVarIntNum(reader *bytes.Reader) (int32, error) {
-	var intByte int32
+func ReadVarIntNum(reader *bytes.Reader) (int64, error) {
+	var intByte int64
 	err := binary.Read(reader, binary.LittleEndian, &intByte)
 
 	if err != nil {

@@ -160,20 +160,20 @@ func TestBuildResponsePayload(t *testing.T) {
 
 			responseStatus, err := utils.ReadVarIntNum(reader)
 			require.NoError(t, err)
-			assert.Equal(t, int32(tc.responseStatus), responseStatus, "Response status mismatch")
+			assert.Equal(t, int64(tc.responseStatus), responseStatus, "Response status mismatch")
 
 			headerCount, err := utils.ReadVarIntNum(reader)
 			require.NoError(t, err)
 
-			assert.Equal(t, int32(-1), headerCount, "Expected headers count to be -1")
+			assert.Equal(t, int64(-1), headerCount, "Expected headers count to be -1")
 
 			bodyLength, err := utils.ReadVarIntNum(reader)
 			require.NoError(t, err)
 
 			if len(tc.responseBody) == 0 {
-				assert.Equal(t, int32(-1), bodyLength, "Empty response body should be encoded as -1")
+				assert.Equal(t, int64(-1), bodyLength, "Empty response body should be encoded as -1")
 			} else {
-				assert.Equal(t, int32(len(tc.responseBody)), bodyLength, "Response body length mismatch")
+				assert.Equal(t, int64(len(tc.responseBody)), bodyLength, "Response body length mismatch")
 
 				actualBody := make([]byte, bodyLength)
 				_, err := reader.Read(actualBody)
