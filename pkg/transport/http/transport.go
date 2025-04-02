@@ -188,7 +188,7 @@ func (t *Transport) handleIncomingMessage(msg *transport.AuthMessage) (*transpor
 }
 
 func (t *Transport) handleCertificateResponse(msg *transport.AuthMessage) (*transport.AuthMessage, error) {
-	if msg.Certificates == nil || msg.Certificates.IsEmpty() {
+	if msg.Certificate == nil {
 		return nil, fmt.Errorf("certificate response missing certificates")
 	}
 
@@ -197,7 +197,7 @@ func (t *Transport) handleCertificateResponse(msg *transport.AuthMessage) (*tran
 		return nil, fmt.Errorf("no session found for identity key")
 	}
 
-	if validation := t.certificateManager.VerifyCertificate(msg.Certificates); validation != nil {
+	if validation := t.certificateManager.VerifyCertificate(msg.Certificate); validation != nil {
 		return nil, fmt.Errorf("certificate verification failed")
 	}
 

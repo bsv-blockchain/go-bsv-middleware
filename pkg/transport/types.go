@@ -42,7 +42,8 @@ type AuthMessage struct {
 	YourNonce             *string                       `json:"yourNonce,omitempty"`
 	Payload               *[]byte                       `json:"payload,omitempty"`
 	Signature             *[]byte                       `json:"signature,omitempty"`
-	RequestedCertificates RequestedCertificateSet       `json:"requestedCertificates"`
+	Certificate           *wallet.VerifiableCertificate `json:"certificate,omitempty"`
+	RequestedCertificates *RequestedCertificateSet      `json:"requestedCertificates"`
 }
 
 // RequestedCertificateSet represents the set of certificates requested by a peer.
@@ -70,15 +71,11 @@ func (m *MessageType) String() string {
 
 // Empty checks if the RequestedCertificateSet is empty.
 func (rc *RequestedCertificateSet) Empty() bool {
-	if rc.Certifiers != nil || len(rc.Certifiers) > 0 {
-		return false
+	if rc == nil {
+		return true
 	}
 
-	if rc.Types != nil || len(rc.Types) > 0 {
-		return false
-	}
-
-	return true
+	return false
 }
 
 // String returns a string representation of the RequestedCertificateSet.

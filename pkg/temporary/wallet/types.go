@@ -46,8 +46,3 @@ type MasterCertificate struct {
 	Certificate
 	MasterKeyring map[string]string `json:"masterKeyring"`
 }
-
-// IsEmpty checks if the certificate is empty
-func (vc *VerifiableCertificate) IsEmpty() bool {
-	return len(vc.Certificate.Fields) == 0
-}

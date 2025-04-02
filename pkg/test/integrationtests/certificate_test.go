@@ -145,7 +145,7 @@ func sendCertificate(t *testing.T, serverURL string, clientWallet wallet.WalletI
 		Nonce:       &nonce,
 		YourNonce:   authResponse.Nonce,
 		// TODO: move certificates to body after signing POST request introduction
-		Certificates: &wallet.VerifiableCertificate{
+		Certificate: &wallet.VerifiableCertificate{
 			Certificate: wallet.Certificate{
 				Type:         "age-verification",
 				SerialNumber: "12345",
