@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -26,6 +27,7 @@ type responseRecorder struct {
 	http.ResponseWriter
 	statusCode int
 	body       []byte
+	written    bool
 }
 
 // WriteHeader writes status code
@@ -36,23 +38,24 @@ func (r *responseRecorder) WriteHeader(code int) {
 
 // Write writes response body to internal buffer
 func (r *responseRecorder) Write(b []byte) (int, error) {
+	if r.written {
+		return 0, errors.New("response already written")
+	}
 	r.body = b
+	r.written = true
 	return len(b), nil
 }
 
 // New creates a new auth middleware
 func New(opts Options) *Middleware {
-	// Use mocked session manager if not provided
 	if opts.SessionManager == nil {
 		opts.SessionManager = sessionmanager.NewSessionManager()
 	}
 
-	// Use mocked wallet if not provided
 	if opts.Wallet == nil {
 		opts.Wallet = wallet.NewMockWallet(true, nil)
 	}
 
-	// Use default logger if not provided
 	if opts.Logger == nil {
 		opts.Logger = slog.New(slog.DiscardHandler)
 	}
@@ -62,7 +65,6 @@ func New(opts Options) *Middleware {
 	middlewareLogger.Debug(" Creating new auth middleware")
 
 	t := httptransport.New(opts.Wallet, opts.SessionManager, opts.AllowUnauthenticated, opts.Logger, opts.CertificatesToRequest)
-
 	middlewareLogger.Debug(" transport created")
 
 	return &Middleware{

@@ -59,8 +59,6 @@ func main() {
 
 	// Call /ping endpoint with set up auth headers
 	callPingEndpoint(mockedWallet, responseData)
-
-	select {}
 }
 
 func pingHandler(w http.ResponseWriter, r *http.Request) {
