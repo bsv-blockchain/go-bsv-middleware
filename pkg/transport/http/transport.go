@@ -337,7 +337,7 @@ func (t *Transport) setupHeaders(w http.ResponseWriter, response *transport.Auth
 		responseHeaders[signatureHeader] = hex.EncodeToString(*response.Signature)
 	}
 
-	if !response.RequestedCertificates.Empty() {
+	if response.RequestedCertificates != nil {
 		reqCert, err := json.Marshal(response.RequestedCertificates)
 		if err != nil {
 			http.Error(w, "failed to marshal requested certificates", http.StatusInternalServerError)

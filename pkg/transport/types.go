@@ -69,20 +69,3 @@ func (m *MessageType) String() string {
 	return string(*m)
 }
 
-// Empty checks if the RequestedCertificateSet is empty.
-func (rc *RequestedCertificateSet) Empty() bool {
-	if rc == nil {
-		return true
-	}
-
-	return false
-}
-
-// String returns a string representation of the RequestedCertificateSet.
-func (rc *RequestedCertificateSet) String() string {
-	if rc.Empty() {
-		return ""
-	}
-
-	return rc.String()
-}
