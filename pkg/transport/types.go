@@ -68,4 +68,3 @@ type MessageCallback func(message AuthMessage) error
 func (m *MessageType) String() string {
 	return string(*m)
 }
-
