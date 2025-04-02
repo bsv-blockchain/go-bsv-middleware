@@ -20,14 +20,15 @@ import (
 
 // Constants for the auth headers used in the authorization process
 const (
-	authHeaderPrefix  = "x-bsv-auth-"
-	requestIDHeader   = authHeaderPrefix + "request-id"
-	versionHeader     = authHeaderPrefix + "version"
-	identityKeyHeader = authHeaderPrefix + "identity-key"
-	nonceHeader       = authHeaderPrefix + "nonce"
-	yourNonceHeader   = authHeaderPrefix + "your-nonce"
-	signatureHeader   = authHeaderPrefix + "signature"
-	messageTypeHeader = authHeaderPrefix + "message-type"
+	authHeaderPrefix    = "x-bsv-auth-"
+	requestIDHeader     = authHeaderPrefix + "request-id"
+	versionHeader       = authHeaderPrefix + "version"
+	identityKeyHeader   = authHeaderPrefix + "identity-key"
+	nonceHeader         = authHeaderPrefix + "nonce"
+	yourNonceHeader     = authHeaderPrefix + "your-nonce"
+	signatureHeader     = authHeaderPrefix + "signature"
+	messageTypeHeader   = authHeaderPrefix + "message-type"
+	requestedCertHeader = authHeaderPrefix + "requested-certificates"
 )
 
 // Transport implements the HTTP transport
@@ -36,10 +37,11 @@ type Transport struct {
 	sessionManager       sessionmanager.SessionManagerInterface
 	allowUnauthenticated bool
 	logger               *slog.Logger
+	certificateManager   *CertificateVerifier
 }
 
 // New creates a new HTTP transport
-func New(wallet wallet.WalletInterface, sessionManager sessionmanager.SessionManagerInterface, allowUnauthenticated bool, logger *slog.Logger) transport.TransportInterface {
+func New(wallet wallet.WalletInterface, sessionManager sessionmanager.SessionManagerInterface, allowUnauthenticated bool, logger *slog.Logger, certMan *transport.RequestedCertificateSet) transport.TransportInterface {
 	transportLogger := logging.Child(logger, "http-transport")
 	transportLogger.Info(fmt.Sprintf("Creating HTTP transport with allowUnauthenticated = %t", allowUnauthenticated))
 
@@ -48,6 +50,7 @@ func New(wallet wallet.WalletInterface, sessionManager sessionmanager.SessionMan
 		sessionManager:       sessionManager,
 		allowUnauthenticated: allowUnauthenticated,
 		logger:               transportLogger,
+		certificateManager:   NewCertificateVerifier(transportLogger, certMan, nil),
 	}
 }
 
@@ -116,6 +119,7 @@ func (t *Transport) HandleGeneralRequest(req *http.Request, res http.ResponseWri
 		return nil, nil, fmt.Errorf("failed to process request")
 	}
 
+	t.setupHeaders(res, requestData, requestID)
 	req = setupContext(req, requestData, requestID)
 
 	return req, response, nil
@@ -171,13 +175,60 @@ func (t *Transport) handleIncomingMessage(msg *transport.AuthMessage) (*transpor
 	switch msg.MessageType {
 	case transport.InitialRequest:
 		return t.handleInitialRequest(msg)
-	case transport.InitialResponse, transport.CertificateRequest, transport.CertificateResponse:
+	case transport.CertificateResponse:
+		return t.handleCertificateResponse(msg)
+	case transport.InitialResponse, transport.CertificateRequest:
 		return nil, fmt.Errorf("not implemented")
 	case transport.General:
 		return t.handleGeneralRequest(msg)
 	default:
 		return nil, fmt.Errorf("unsupported message type")
 	}
+}
+
+func (t *Transport) handleCertificateResponse(msg *transport.AuthMessage) (*transport.AuthMessage, error) {
+	if msg.Certificates == nil || msg.Certificates.IsEmpty() {
+		return nil, fmt.Errorf("certificate response missing certificates")
+	}
+
+	session := t.sessionManager.GetSession(msg.IdentityKey)
+	if session == nil {
+		return nil, fmt.Errorf("no session found for identity key")
+	}
+
+	if validation := t.certificateManager.VerifyCertificate(msg.Certificates); validation != nil {
+		return nil, fmt.Errorf("certificate verification failed")
+	}
+
+	session.IsAuthenticated = true
+	session.LastUpdate = time.Now()
+	t.sessionManager.UpdateSession(*session)
+
+	nonce, err := t.wallet.CreateNonce(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create nonce")
+	}
+
+	signature, err := createNonGeneralAuthSignature(t.wallet, *session.PeerNonce, nonce, msg.IdentityKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create signature")
+	}
+
+	identityKey, err := t.wallet.GetPublicKey(context.Background(), wallet.GetPublicKeyOptions{IdentityKey: true})
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve identity key")
+	}
+
+	response := &transport.AuthMessage{
+		Version:     transport.AuthVersion,
+		MessageType: transport.CertificateResponse,
+		IdentityKey: identityKey,
+		Nonce:       &nonce,
+		YourNonce:   session.PeerNonce,
+		Signature:   &signature,
+	}
+
+	return response, nil
 }
 
 func (t *Transport) handleInitialRequest(msg *transport.AuthMessage) (*transport.AuthMessage, error) {
@@ -191,7 +242,7 @@ func (t *Transport) handleInitialRequest(msg *transport.AuthMessage) (*transport
 	}
 
 	session := sessionmanager.PeerSession{
-		IsAuthenticated: true,
+		IsAuthenticated: false,
 		SessionNonce:    &sessionNonce,
 		PeerNonce:       &msg.InitialNonce,
 		PeerIdentityKey: &msg.IdentityKey,
@@ -230,6 +281,15 @@ func (t *Transport) handleGeneralRequest(msg *transport.AuthMessage) (*transport
 	session := t.sessionManager.GetSession(*msg.YourNonce)
 	if session == nil {
 		return nil, fmt.Errorf("session not found")
+	}
+
+	if !session.IsAuthenticated {
+		if t.certificateManager.HasRequirements() {
+			t.logger.Debug("Certificate requirements found")
+			return nil, fmt.Errorf("certificate requirements found")
+		}
+		t.logger.Debug("Session is not authenticated")
+		return nil, fmt.Errorf("session is not authenticated")
 	}
 
 	valid, err = t.wallet.VerifySignature(context.Background(), *msg.Payload, *msg.Signature, "auth message signature", fmt.Sprintf("%s %s", *msg.Nonce, *msg.YourNonce), *session.PeerIdentityKey)
@@ -274,6 +334,15 @@ func (t *Transport) setupHeaders(w http.ResponseWriter, response *transport.Auth
 
 	if response.Signature != nil {
 		responseHeaders[signatureHeader] = hex.EncodeToString(*response.Signature)
+	}
+
+	if !response.RequestedCertificates.Empty() {
+		reqCert, err := json.Marshal(response.RequestedCertificates)
+		if err != nil {
+			http.Error(w, "failed to marshal requested certificates", http.StatusInternalServerError)
+			return
+		}
+		responseHeaders[requestedCertHeader] = hex.EncodeToString(reqCert)
 	}
 
 	for k, v := range responseHeaders {

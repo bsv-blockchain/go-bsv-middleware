@@ -29,16 +29,16 @@ type MessageType string
 
 // AuthMessage represents a type message sent between peers during the authentication process.
 type AuthMessage struct {
-	Version               string                  `json:"version"`
-	MessageType           MessageType             `json:"messageType"`
-	IdentityKey           string                  `json:"identityKey"`
-	Nonce                 *string                 `json:"nonce,omitempty"`
-	InitialNonce          string                  `json:"initialNonce"`
-	YourNonce             *string                 `json:"yourNonce,omitempty"`
-	Payload               *[]byte                 `json:"payload,omitempty"`
-	Signature             *[]byte                 `json:"signature,omitempty"`
-	Certificates          *[]wallet.Certificate   `json:"certificates"`
-	RequestedCertificates RequestedCertificateSet `json:"requestedCertificates"`
+	Version               string                        `json:"version"`
+	MessageType           MessageType                   `json:"messageType"`
+	IdentityKey           string                        `json:"identityKey"`
+	Nonce                 *string                       `json:"nonce,omitempty"`
+	InitialNonce          string                        `json:"initialNonce"`
+	YourNonce             *string                       `json:"yourNonce,omitempty"`
+	Payload               *[]byte                       `json:"payload,omitempty"`
+	Signature             *[]byte                       `json:"signature,omitempty"`
+	Certificates          *wallet.VerifiableCertificate `json:"certificates"`
+	RequestedCertificates RequestedCertificateSet       `json:"requestedCertificates"`
 }
 
 // RequestedCertificateSet represents the set of certificates requested by a peer.
@@ -62,4 +62,26 @@ type MessageCallback func(message AuthMessage) error
 // MessageTypeFromString returns a MessageType from a string.
 func (m *MessageType) String() string {
 	return string(*m)
+}
+
+// Empty checks if the RequestedCertificateSet is empty.
+func (rc *RequestedCertificateSet) Empty() bool {
+	if rc.Certifiers != nil || len(rc.Certifiers) > 0 {
+		return false
+	}
+
+	if rc.Types != nil || len(rc.Types) > 0 {
+		return false
+	}
+
+	return true
+}
+
+// String returns a string representation of the RequestedCertificateSet.
+func (rc *RequestedCertificateSet) String() string {
+	if rc.Empty() {
+		return ""
+	}
+
+	return rc.String()
 }
