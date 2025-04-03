@@ -284,31 +284,44 @@ func buildResponsePayload(
 	}
 	writer.Write(requestIDBytes)
 
-	utils.WriteVarIntNum(&writer, responseStatus)
+	err = utils.WriteVarIntNum(&writer, responseStatus)
+	if err != nil {
+		return nil, errors.New("failed to write response status")
+	}
 
 	// TODO: #14 - Collect and sort headers
 	includedHeaders := make([][]string, 0)
 	//includedHeaders := utils.FilterAndSortHeaders(responseHeaders)
 
 	if len(includedHeaders) > 0 {
-		utils.WriteVarIntNum(&writer, len(includedHeaders))
+		err = utils.WriteVarIntNum(&writer, len(includedHeaders))
+		if err != nil {
+			return nil, errors.New("failed to write headers length")
+		}
 
 		for _, header := range includedHeaders {
-			utils.WriteVarIntNum(&writer, len(header[0]))
+			err = utils.WriteVarIntNum(&writer, len(header[0]))
+			if err != nil {
+				return nil, errors.New("failed to write header key length")
+			}
 			writer.WriteString(header[0])
 
-			utils.WriteVarIntNum(&writer, len(header[1]))
+			err = utils.WriteVarIntNum(&writer, len(header[1]))
+			if err != nil {
+				return nil, errors.New("failed to write header value length")
+			}
 			writer.WriteString(header[1])
 		}
 	} else {
-		utils.WriteVarIntNum(&writer, -1)
+		err = utils.WriteVarIntNum(&writer, -1)
+		if err != nil {
+			return nil, errors.New("failed to write -1 as headers length")
+		}
 	}
 
-	if len(responseBody) > 0 {
-		utils.WriteVarIntNum(&writer, len(responseBody))
-		writer.Write(responseBody)
-	} else {
-		utils.WriteVarIntNum(&writer, -1)
+	err = utils.WriteBodyToBuffer(nil, &writer)
+	if err != nil {
+		return nil, errors.New("failed to write request body")
 	}
 
 	return writer.Bytes(), nil

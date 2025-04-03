@@ -55,7 +55,6 @@ func WriteBodyToBuffer(req *http.Request, buf *bytes.Buffer) error {
 
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
-		//WriteVarIntNum(buf, -1)
 		return errors.New("failed to read request body")
 	}
 
