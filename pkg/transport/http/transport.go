@@ -128,7 +128,10 @@ func (t *Transport) HandleResponse(req *http.Request, res http.ResponseWriter, b
 		return err
 	}
 
-	payload := buildResponsePayload(requestID, status, body)
+	payload, err := buildResponsePayload(requestID, status, body)
+	if err != nil {
+		return err
+	}
 
 	session := t.sessionManager.GetSession(identityKey)
 	if session == nil {
@@ -272,12 +275,12 @@ func buildResponsePayload(
 	requestID string,
 	responseStatus int,
 	responseBody []byte,
-) []byte {
+) ([]byte, error) {
 	var writer bytes.Buffer
 
 	requestIDBytes, err := base64.StdEncoding.DecodeString(requestID)
 	if err != nil {
-		return nil
+		return nil, errors.New("failed to decode request ID")
 	}
 	writer.Write(requestIDBytes)
 
@@ -286,8 +289,6 @@ func buildResponsePayload(
 	// TODO: #14 - Collect and sort headers
 	includedHeaders := make([][]string, 0)
 	//includedHeaders := utils.FilterAndSortHeaders(responseHeaders)
-
-	fmt.Println(len(includedHeaders))
 
 	if len(includedHeaders) > 0 {
 		utils.WriteVarIntNum(&writer, len(includedHeaders))
@@ -310,7 +311,7 @@ func buildResponsePayload(
 		utils.WriteVarIntNum(&writer, -1)
 	}
 
-	return writer.Bytes()
+	return writer.Bytes(), nil
 }
 
 func setupHeaders(w http.ResponseWriter, response *transport.AuthMessage, requestID string) {
@@ -409,17 +410,14 @@ func buildAuthMessageFromRequest(req *http.Request) (*transport.AuthMessage, err
 	}
 
 	if nonce := req.Header.Get(nonceHeader); nonce != "" {
-		fmt.Println("nonce", nonce)
 		authMessage.Nonce = &nonce
 	}
 
 	if yourNonce := req.Header.Get(yourNonceHeader); yourNonce != "" {
-		fmt.Println("yourNonce", yourNonce)
 		authMessage.YourNonce = &yourNonce
 	}
 
 	if signature := req.Header.Get(signatureHeader); signature != "" {
-		fmt.Println("signature", signature)
 		decodedBytes, err := hex.DecodeString(signature)
 		if err != nil {
 			return nil, errors.New("error decoding signature")

@@ -131,11 +131,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 			return
 		}
 
-		err = recorder.Finalize()
-		if err != nil {
-			http.Error(recorder, err.Error(), http.StatusInternalServerError)
-			createResponse(recorder)
-		}
+		createResponse(recorder)
 	})
 }
 

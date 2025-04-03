@@ -124,7 +124,7 @@ func callPingEndpoint(mockedWallet wallet.WalletInterface, response *transport.A
 		log.Fatalf("Failed to create request: %v", err)
 	}
 
-	headers, err := mocks.PrepareGeneralRequestHeaders(mockedWallet, response)
+	headers, err := mocks.PrepareGeneralRequestHeaders(mockedWallet, response, "/ping", "GET")
 	if err != nil {
 		panic(err)
 	}

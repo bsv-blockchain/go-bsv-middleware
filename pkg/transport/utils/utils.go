@@ -3,7 +3,7 @@ package utils
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -12,24 +12,20 @@ import (
 
 // WriteVarIntNum writes a variable-length integer to a buffer
 // integer is converted to fixed size int64
-func WriteVarIntNum(writer *bytes.Buffer, num int) {
+func WriteVarIntNum(writer *bytes.Buffer, num int) error {
 	err := binary.Write(writer, binary.LittleEndian, int64(num))
 	if err != nil {
-		fmt.Println("Error writing number:", err)
+		return errors.New("failed to write varint number")
 	}
+	return nil
 }
 
 // ReadVarIntNum reads a variable-length integer from a buffer
 func ReadVarIntNum(reader *bytes.Reader) (int64, error) {
 	var intByte int64
 	err := binary.Read(reader, binary.LittleEndian, &intByte)
-
 	if err != nil {
-		return 0, fmt.Errorf("error reading intByte: %w", err)
-	}
-
-	if intByte == -1 {
-		return -1, nil
+		return 0, errors.New("failed to read varint number")
 	}
 
 	return intByte, nil

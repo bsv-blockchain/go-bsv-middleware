@@ -93,7 +93,7 @@ func PrepareInitialRequestBody(mockedWallet wallet.WalletInterface) *RequestBody
 }
 
 // PrepareGeneralRequestHeaders prepares the general request headers
-func PrepareGeneralRequestHeaders(mockedWallet wallet.WalletInterface, previousResponse *transport.AuthMessage) (Headers, error) {
+func PrepareGeneralRequestHeaders(mockedWallet wallet.WalletInterface, previousResponse *transport.AuthMessage, path, method string) (Headers, error) {
 	serverIdentityKey := previousResponse.IdentityKey
 	serverNonce := previousResponse.InitialNonce
 
@@ -117,21 +117,36 @@ func PrepareGeneralRequestHeaders(mockedWallet wallet.WalletInterface, previousR
 	writer.Write(requestID)
 
 	// Write the method and path
-	utils.WriteVarIntNum(&writer, len("GET"))
-	writer.Write([]byte("GET"))
+	err = utils.WriteVarIntNum(&writer, len(method))
+	if err != nil {
+		return nil, errors.New("failed to write method length")
+	}
+	writer.Write([]byte(method))
 
 	// Write the path
-	utils.WriteVarIntNum(&writer, len("/ping"))
-	writer.Write([]byte("/ping"))
+	err = utils.WriteVarIntNum(&writer, len(path))
+	if err != nil {
+		return nil, errors.New("failed to write path length")
+	}
+	writer.Write([]byte(path))
 
 	// Write -1 (no query parameters)
-	utils.WriteVarIntNum(&writer, -1)
+	err = utils.WriteVarIntNum(&writer, -1)
+	if err != nil {
+		return nil, errors.New("failed to write query parameters length")
+	}
 
 	// Write 0 (no headers)
-	utils.WriteVarIntNum(&writer, 0)
+	err = utils.WriteVarIntNum(&writer, 0)
+	if err != nil {
+		return nil, errors.New("failed to write headers length")
+	}
 
 	// Write -1 (no body)
-	utils.WriteVarIntNum(&writer, -1)
+	err = utils.WriteVarIntNum(&writer, -1)
+	if err != nil {
+		return nil, errors.New("failed to write body length")
+	}
 
 	signature, err := mockedWallet.CreateSignature(
 		context.Background(),

@@ -42,7 +42,7 @@ func TestAuthMiddleware_Handshake_HappyPath(t *testing.T) {
 
 	t.Run("check authorization", func(t *testing.T) {
 		// given
-		headers, err := mocks.PrepareGeneralRequestHeaders(clientWallet, testState.rAuthMessage)
+		headers, err := mocks.PrepareGeneralRequestHeaders(clientWallet, testState.rAuthMessage, "/ping", "GET")
 		require.NoError(t, err)
 
 		// when
@@ -100,6 +100,9 @@ func TestAuthMiddleware_GeneralRequest_ErrorPath(t *testing.T) {
 		rAuthMessage *transport.AuthMessage
 	}
 
+	path := "/ping"
+	method := "GET"
+
 	t.Run("no auth headers", func(t *testing.T) {
 		// when
 		response, err := server.SendGeneralRequest(t, "GET", "/ping", nil, nil)
@@ -115,7 +118,7 @@ func TestAuthMiddleware_GeneralRequest_ErrorPath(t *testing.T) {
 		rAuthMessage := prepareSession(t, clientWallet, server)
 		testState.rAuthMessage = rAuthMessage
 
-		headers, err := mocks.PrepareGeneralRequestHeaders(clientWallet, rAuthMessage)
+		headers, err := mocks.PrepareGeneralRequestHeaders(clientWallet, rAuthMessage, path, method)
 		headers.WithWrongSignature()
 		require.NoError(t, err)
 
@@ -130,7 +133,7 @@ func TestAuthMiddleware_GeneralRequest_ErrorPath(t *testing.T) {
 
 	t.Run("wrong version", func(t *testing.T) {
 		// given
-		headers, err := mocks.PrepareGeneralRequestHeaders(clientWallet, testState.rAuthMessage)
+		headers, err := mocks.PrepareGeneralRequestHeaders(clientWallet, testState.rAuthMessage, path, method)
 		headers.WithWrongVersion()
 		require.NoError(t, err)
 
@@ -145,7 +148,7 @@ func TestAuthMiddleware_GeneralRequest_ErrorPath(t *testing.T) {
 
 	t.Run("wrong your nonce", func(t *testing.T) {
 		// given
-		headers, err := mocks.PrepareGeneralRequestHeaders(clientWallet, testState.rAuthMessage)
+		headers, err := mocks.PrepareGeneralRequestHeaders(clientWallet, testState.rAuthMessage, path, method)
 		headers.WithWrongYourNonce()
 		require.NoError(t, err)
 
@@ -160,7 +163,7 @@ func TestAuthMiddleware_GeneralRequest_ErrorPath(t *testing.T) {
 
 	t.Run("wrong signature - unable to decode", func(t *testing.T) {
 		// given
-		headers, err := mocks.PrepareGeneralRequestHeaders(clientWallet, testState.rAuthMessage)
+		headers, err := mocks.PrepareGeneralRequestHeaders(clientWallet, testState.rAuthMessage, path, method)
 		headers.WithWrongSignatureInHex()
 		require.NoError(t, err)
 
@@ -175,7 +178,7 @@ func TestAuthMiddleware_GeneralRequest_ErrorPath(t *testing.T) {
 
 	t.Run("wrong signature - unable to decode", func(t *testing.T) {
 		// given
-		headers, err := mocks.PrepareGeneralRequestHeaders(clientWallet, testState.rAuthMessage)
+		headers, err := mocks.PrepareGeneralRequestHeaders(clientWallet, testState.rAuthMessage, path, method)
 		headers.WithWrongSignatureInHex()
 		require.NoError(t, err)
 

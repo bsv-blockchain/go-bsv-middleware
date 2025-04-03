@@ -112,39 +112,39 @@ func TestBuildResponsePayload(t *testing.T) {
 		requestID      string
 		responseStatus int
 		responseBody   []byte
-		expectNil      bool
+		expectErr      bool
 	}{
 		{
 			name:           "Valid request ID and response body",
 			requestID:      base64.StdEncoding.EncodeToString([]byte("test-request-id")),
 			responseStatus: 200,
 			responseBody:   []byte("response-data"),
-			expectNil:      false,
+			expectErr:      false,
 		},
 		{
 			name:           "Invalid Base64 request ID",
 			requestID:      "invalid_base64_!@#",
 			responseStatus: 200,
 			responseBody:   []byte("data"),
-			expectNil:      true,
+			expectErr:      true,
 		},
 		{
 			name:           "Empty response body",
 			requestID:      base64.StdEncoding.EncodeToString([]byte("empty-body-test")),
 			responseStatus: 404,
 			responseBody:   []byte{},
-			expectNil:      false,
+			expectErr:      false,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			// when
-			payload := buildResponsePayload(tc.requestID, tc.responseStatus, tc.responseBody)
+			payload, err := buildResponsePayload(tc.requestID, tc.responseStatus, tc.responseBody)
 
 			// then
-			if tc.expectNil {
-				assert.Nil(t, payload)
+			if tc.expectErr {
+				require.Error(t, err)
 				return
 			}
 
@@ -152,9 +152,10 @@ func TestBuildResponsePayload(t *testing.T) {
 
 			reader := bytes.NewReader(payload)
 
-			expectedRequestIDBytes, _ := base64.StdEncoding.DecodeString(tc.requestID)
+			expectedRequestIDBytes, err := base64.StdEncoding.DecodeString(tc.requestID)
+			require.NoError(t, err)
 			actualRequestID := make([]byte, len(expectedRequestIDBytes))
-			_, err := reader.Read(actualRequestID)
+			_, err = reader.Read(actualRequestID)
 			require.NoError(t, err)
 			assert.Equal(t, expectedRequestIDBytes, actualRequestID, "Request ID mismatch")
 
@@ -213,7 +214,8 @@ func TestTransport_BuildAuthMessageFromRequest(t *testing.T) {
 	yourNonce := "your-test-nonce"
 	signatureHex := hex.EncodeToString([]byte("test_signature"))
 
-	req, _ := http.NewRequest("POST", "http://example.com/path?param1=value1&param2=value", nil)
+	req, err := http.NewRequest("POST", "http://example.com/path?param1=value1&param2=value", nil)
+	require.NoError(t, err)
 	req.Header.Set("X-Bsv-Auth-Nonce", nonce)
 	req.Header.Set("X-Bsv-Auth-Your-Nonce", yourNonce)
 	req.Header.Set("X-Bsv-Auth-Signature", signatureHex)
@@ -232,7 +234,8 @@ func TestTransport_BuildAuthMessageFromRequest(t *testing.T) {
 	assert.Equal(t, identityKey, authMsg.IdentityKey)
 	assert.Equal(t, nonce, *authMsg.Nonce)
 	assert.Equal(t, yourNonce, *authMsg.YourNonce)
-	expectedSignature, _ := hex.DecodeString(signatureHex)
+	expectedSignature, err := hex.DecodeString(signatureHex)
+	assert.NoError(t, err)
 	assert.Equal(t, expectedSignature, *authMsg.Signature)
 	assert.NotEmpty(t, authMsg.Payload)
 }
