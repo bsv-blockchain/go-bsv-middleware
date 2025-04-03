@@ -27,6 +27,7 @@ type MockHTTPServer struct {
 	authMiddleware       *auth.Middleware
 }
 
+// MockHTTPHandler is a mock HTTP handler used in tests
 type MockHTTPHandler struct {
 	useAuthMiddleware    bool
 	usePaymentMiddleware bool
@@ -130,6 +131,7 @@ func (h *MockHTTPHandler) WithPaymentMiddleware() *MockHTTPHandler {
 	return h
 }
 
+// IndexHandler is a mock HTTP handler for the index route
 func IndexHandler() *MockHTTPHandler {
 	return &MockHTTPHandler{
 		h: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -138,6 +140,7 @@ func IndexHandler() *MockHTTPHandler {
 	}
 }
 
+// PingHandler is a mock HTTP handler for the ping route
 func PingHandler() *MockHTTPHandler {
 	return &MockHTTPHandler{
 		h: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
