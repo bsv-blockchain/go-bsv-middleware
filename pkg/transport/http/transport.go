@@ -319,9 +319,17 @@ func buildResponsePayload(
 		}
 	}
 
-	err = utils.WriteBodyToBuffer(nil, &writer)
-	if err != nil {
-		return nil, errors.New("failed to write request body")
+	if len(responseBody) > 0 {
+		err = utils.WriteVarIntNum(&writer, len(responseBody))
+		if err != nil {
+			return nil, errors.New("failed to write body length")
+		}
+		writer.Write(responseBody)
+	} else {
+		err = utils.WriteVarIntNum(&writer, -1)
+		if err != nil {
+			return nil, errors.New("failed to write -1 as body length")
+		}
 	}
 
 	return writer.Bytes(), nil
