@@ -2,10 +2,10 @@ package mocks
 
 import (
 	"encoding/hex"
-	globalutils "github.com/4chain-ag/go-bsv-middleware/pkg/utils"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
+	globalutils "github.com/4chain-ag/go-bsv-middleware/pkg/utils"
 )
 
 // Headers is a map of headers
