@@ -369,36 +369,60 @@ func buildAuthMessageFromRequest(req *http.Request) (*transport.AuthMessage, err
 
 	writer.Write(requestNonceBytes)
 
-	utils.WriteVarIntNum(&writer, len(req.Method))
+	err := utils.WriteVarIntNum(&writer, len(req.Method))
+	if err != nil {
+		return nil, errors.New("failed to write method length")
+	}
 	writer.Write([]byte(req.Method))
 
-	utils.WriteVarIntNum(&writer, len(req.URL.Path))
+	err = utils.WriteVarIntNum(&writer, len(req.URL.Path))
+	if err != nil {
+		return nil, errors.New("failed to write path length")
+	}
 	writer.Write([]byte(req.URL.Path))
 
 	// TODO #19: handle query params
 	query := req.URL.RawQuery
 	if len(query) > 0 {
-		searchAsArray := []byte(query) // Convert query string to byte array
-		utils.WriteVarIntNum(&writer, len(searchAsArray))
+		searchAsArray := []byte(query)
+		err = utils.WriteVarIntNum(&writer, len(searchAsArray))
+		if err != nil {
+			return nil, errors.New("failed to write query length")
+		}
 		writer.Write([]byte(query))
 	} else {
-		utils.WriteVarIntNum(&writer, -1)
+		err = utils.WriteVarIntNum(&writer, -1)
+		if err != nil {
+			return nil, errors.New("failed to write -1 as query length")
+		}
 	}
 
 	includedHeaders := utils.ExtractHeaders(req.Header)
-	utils.WriteVarIntNum(&writer, len(includedHeaders))
+	err = utils.WriteVarIntNum(&writer, len(includedHeaders))
+	if err != nil {
+		return nil, errors.New("failed to write headers length")
+	}
 
 	for _, header := range includedHeaders {
 		headerKeyBytes := []byte(header[0])
-		utils.WriteVarIntNum(&writer, len(headerKeyBytes))
+		err = utils.WriteVarIntNum(&writer, len(headerKeyBytes))
+		if err != nil {
+			return nil, errors.New("failed to write header key length")
+		}
 		writer.Write(headerKeyBytes)
 
 		headerValueBytes := []byte(header[1])
-		utils.WriteVarIntNum(&writer, len(headerValueBytes))
+		err = utils.WriteVarIntNum(&writer, len(headerValueBytes))
+		if err != nil {
+			return nil, errors.New("failed to write header value length")
+		}
 		writer.Write(headerValueBytes)
 	}
 
-	utils.WriteBodyToBuffer(req, &writer)
+	err = utils.WriteBodyToBuffer(req, &writer)
+	if err != nil {
+		return nil, errors.New("failed to write request body")
+	}
 
 	payloadBytes := writer.Bytes()
 

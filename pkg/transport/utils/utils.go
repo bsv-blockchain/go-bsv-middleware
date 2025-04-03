@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 )
@@ -45,23 +44,33 @@ func ExtractHeaders(headers http.Header) [][]string {
 }
 
 // WriteBodyToBuffer writes the request body into a buffer
-func WriteBodyToBuffer(req *http.Request, buf *bytes.Buffer) {
+func WriteBodyToBuffer(req *http.Request, buf *bytes.Buffer) error {
 	if req.Body == nil {
-		WriteVarIntNum(buf, -1)
-		return
+		err := WriteVarIntNum(buf, -1)
+		if err != nil {
+			return errors.New("failed to write -1 for empty body")
+		}
+		return nil
 	}
 
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
-		log.Printf("Failed to read request body: %v", err)
-		WriteVarIntNum(buf, -1)
-		return
+		//WriteVarIntNum(buf, -1)
+		return errors.New("failed to read request body")
 	}
 
 	if len(body) > 0 {
-		WriteVarIntNum(buf, len(body))
+		err = WriteVarIntNum(buf, len(body))
+		if err != nil {
+			return errors.New("failed to write body length")
+		}
 		buf.Write(body)
-	} else {
-		WriteVarIntNum(buf, -1)
+		return nil
 	}
+
+	err = WriteVarIntNum(buf, -1)
+	if err != nil {
+		return errors.New("failed to write -1 for empty body")
+	}
+	return nil
 }
