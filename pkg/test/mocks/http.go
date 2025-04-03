@@ -11,7 +11,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/internal/logging"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
@@ -25,54 +24,45 @@ type MockHTTPServer struct {
 	server               *httptest.Server
 	allowUnauthenticated bool
 	logger               *slog.Logger
+	authMiddleware       *auth.Middleware
+}
+
+type MockHTTPHandler struct {
+	useAuthMiddleware    bool
+	usePaymentMiddleware bool
+	h                    http.Handler
 }
 
 // CreateMockHTTPServer creates a new mock HTTP server
-func CreateMockHTTPServer() *MockHTTPServer {
+func CreateMockHTTPServer(opts ...func(s *MockHTTPServer) *MockHTTPServer) *MockHTTPServer {
 	mux := http.NewServeMux()
-	mux.Handle("/", indexHandler())
-	mux.Handle("/ping", pingHandler())
-	return &MockHTTPServer{mux: mux}
-}
+	mockServer := &MockHTTPServer{mux: mux}
 
-// WithMiddleware adds middleware to the server
-func (s *MockHTTPServer) WithMiddleware() *MockHTTPServer {
-	if s.logger == nil {
-		s.logger = slog.New(slog.DiscardHandler)
+	for _, opt := range opts {
+		opt(mockServer)
 	}
 
-	opts := auth.Options{
-		AllowUnauthenticated: s.allowUnauthenticated,
-		Logger:               s.logger,
-		Wallet:               CreateServerMockWallet(),
+	mockServer.createMiddleware()
+
+	s := httptest.NewServer(mux)
+	mockServer.server = s
+
+	return mockServer
+}
+
+// WithHandler adds a custom handler to the server
+func (s *MockHTTPServer) WithHandler(path string, handler *MockHTTPHandler) *MockHTTPServer {
+	// TODO: uncomment when payment middleware implemented
+	//if handler.usePaymentMiddleware {
+	//	handler.h = s.paymentMiddleware.Handler(handler.h)
+	//}
+
+	if handler.useAuthMiddleware {
+		handler.h = s.authMiddleware.Handler(handler.h)
 	}
-	middleware := auth.New(opts)
 
-	handlerWithMiddleware := middleware.Handler(s.mux)
+	s.mux.Handle(path, handler.h)
 
-	s.server = httptest.NewServer(handlerWithMiddleware)
-	time.Sleep(1 * time.Second)
-
-	return s
-}
-
-// WithoutMiddleware runs server without middleware
-func (s *MockHTTPServer) WithoutMiddleware() *MockHTTPServer {
-	s.server = httptest.NewServer(s.mux)
-	return s
-}
-
-// WithAllowUnauthenticated sets allowUnauthenticated flag to true
-func (s *MockHTTPServer) WithAllowUnauthenticated() *MockHTTPServer {
-	s.allowUnauthenticated = true
-	return s
-}
-
-// WithLogger sets up logger for the server
-func (s *MockHTTPServer) WithLogger() *MockHTTPServer {
-	logHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
-	logger := slog.New(logHandler)
-	s.logger = logging.Child(logger, "tests")
 	return s
 }
 
@@ -115,19 +105,62 @@ func (s *MockHTTPServer) SendGeneralRequest(t *testing.T, method, path string, h
 	return response, nil
 }
 
-func indexHandler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
+func (s *MockHTTPServer) createMiddleware() {
+	if s.logger == nil {
+		s.logger = slog.New(slog.DiscardHandler)
+	}
+
+	opts := auth.Options{
+		AllowUnauthenticated: s.allowUnauthenticated,
+		Logger:               s.logger,
+		Wallet:               CreateServerMockWallet(),
+	}
+	s.authMiddleware = auth.New(opts)
 }
 
-func pingHandler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte("Pong!")); err != nil {
-			fmt.Println("Failed to write response")
-		}
-	})
+// WithAuthMiddleware adds auth middleware to the server
+func (h *MockHTTPHandler) WithAuthMiddleware() *MockHTTPHandler {
+	h.useAuthMiddleware = true
+	return h
+}
+
+// WithPaymentMiddleware adds payment middleware to the server
+func (h *MockHTTPHandler) WithPaymentMiddleware() *MockHTTPHandler {
+	h.usePaymentMiddleware = true
+	return h
+}
+
+func IndexHandler() *MockHTTPHandler {
+	return &MockHTTPHandler{
+		h: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}),
+	}
+}
+
+func PingHandler() *MockHTTPHandler {
+	return &MockHTTPHandler{
+		h: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			if _, err := w.Write([]byte("Pong!")); err != nil {
+				fmt.Println("Failed to write response")
+			}
+		}),
+	}
+}
+
+// WithAllowUnauthenticated is a MockHTTPServer optional setting which sets allowUnauthenticated flag to true
+func WithAllowUnauthenticated(s *MockHTTPServer) *MockHTTPServer {
+	s.allowUnauthenticated = true
+	return s
+}
+
+// WithLogger is a MockHTTPServer optional setting which  sets up logger for the server
+func WithLogger(s *MockHTTPServer) *MockHTTPServer {
+	logHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
+	logger := slog.New(logHandler)
+	s.logger = logging.Child(logger, "tests")
+	return s
 }
 
 func prepareAndCallRequest(t *testing.T, method, authURL string, headers map[string]string, jsonData []byte) *http.Response {

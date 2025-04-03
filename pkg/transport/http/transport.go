@@ -123,6 +123,10 @@ func (t *Transport) HandleGeneralRequest(req *http.Request, res http.ResponseWri
 
 // HandleResponse sets up auth headers in the response object and generate signature for whole response
 func (t *Transport) HandleResponse(req *http.Request, res http.ResponseWriter, body []byte, status int, msg *transport.AuthMessage) error {
+	if t.allowUnauthenticated {
+		return nil
+	}
+
 	identityKey, requestID, err := getValuesFromContext(req)
 	if err != nil {
 		return err

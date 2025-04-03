@@ -12,7 +12,9 @@ import (
 
 func TestAuthMiddleware_Handshake_HappyPath(t *testing.T) {
 	// given
-	server := mocks.CreateMockHTTPServer().WithMiddleware()
+	server := mocks.CreateMockHTTPServer(mocks.WithLogger).
+		WithHandler("/", mocks.PingHandler().WithAuthMiddleware()).
+		WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
 	defer server.Close()
 
 	clientWallet := mocks.CreateClientMockWallet()
@@ -57,7 +59,9 @@ func TestAuthMiddleware_Handshake_HappyPath(t *testing.T) {
 
 func TestAuthMiddleware_NonGeneralRequest_ErrorPath(t *testing.T) {
 	// given
-	server := mocks.CreateMockHTTPServer().WithLogger().WithMiddleware()
+	server := mocks.CreateMockHTTPServer(mocks.WithLogger).
+		WithHandler("/", mocks.PingHandler().WithAuthMiddleware()).
+		WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
 	defer server.Close()
 
 	clientWallet := mocks.CreateClientMockWallet()
@@ -91,7 +95,9 @@ func TestAuthMiddleware_NonGeneralRequest_ErrorPath(t *testing.T) {
 
 func TestAuthMiddleware_GeneralRequest_ErrorPath(t *testing.T) {
 	// given
-	server := mocks.CreateMockHTTPServer().WithLogger().WithMiddleware()
+	server := mocks.CreateMockHTTPServer(mocks.WithLogger).
+		WithHandler("/", mocks.PingHandler().WithAuthMiddleware()).
+		WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
 	defer server.Close()
 
 	clientWallet := mocks.CreateClientMockWallet()
@@ -194,7 +200,9 @@ func TestAuthMiddleware_GeneralRequest_ErrorPath(t *testing.T) {
 
 func TestAuthMiddleware_WithAllowUnauthenticated_HappyPath(t *testing.T) {
 	// given
-	server := mocks.CreateMockHTTPServer().WithoutMiddleware().WithAllowUnauthenticated()
+	server := mocks.CreateMockHTTPServer(mocks.WithLogger, mocks.WithAllowUnauthenticated).
+		WithHandler("/", mocks.PingHandler().WithAuthMiddleware()).
+		WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
 	defer server.Close()
 
 	t.Run("without headers", func(t *testing.T) {
