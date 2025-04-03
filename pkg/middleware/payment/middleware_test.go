@@ -282,7 +282,8 @@ func TestMiddleware_Handler_ProcessPayment(t *testing.T) {
 			DerivationSuffix: "test-suffix",
 			Transaction:      []byte{1, 2, 3, 4},
 		}
-		paymentJSON, _ := json.Marshal(paymentData)
+		paymentJSON, err := json.Marshal(paymentData)
+		require.NoError(t, err)
 
 		req := httptest.NewRequest("GET", "/", nil)
 		req = addIdentityToContext(req, "test-identity-key")
