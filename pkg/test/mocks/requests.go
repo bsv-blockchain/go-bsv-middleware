@@ -2,6 +2,7 @@ package mocks
 
 import (
 	"encoding/hex"
+	"errors"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
@@ -74,7 +75,7 @@ func PrepareInitialRequestBody(mockedWallet wallet.WalletInterface) *RequestBody
 func PrepareGeneralRequestHeaders(mockedWallet wallet.WalletInterface, previousResponse *transport.AuthMessage, path, method string) (Headers, error) {
 	headers, err := globalutils.PrepareGeneralRequestHeaders(mockedWallet, previousResponse, path, method)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("failed to prepare general request headers")
 	}
 
 	return headers, nil
