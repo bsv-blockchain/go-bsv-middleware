@@ -12,7 +12,7 @@ type TransportInterface interface { //nolint:revive // This is an interface, so 
 
 	// HandleNonGeneralRequest Handles an incoming request with non-general message types, manages peer-to-peer certificate handling,
 	// and modifies the response object to enable custom behaviors like certificate requests and tailored responses.
-	HandleNonGeneralRequest(req *http.Request, res http.ResponseWriter, onCertificatesReceived OnCertificatesReceivedFunc)
+	HandleNonGeneralRequest(req *http.Request, res http.ResponseWriter, onCertificatesReceived OnCertificatesReceivedFunc) error
 
 	// HandleGeneralRequest Handles an general incoming request, validates the request, and modifies the response to contain auth headers.
 	HandleGeneralRequest(req *http.Request, res http.ResponseWriter, onCertificatesReceived OnCertificatesReceivedFunc) (*http.Request, *AuthMessage, error)
