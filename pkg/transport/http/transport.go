@@ -63,12 +63,11 @@ func (t *Transport) Send(_ transport.AuthMessage) {
 }
 
 // HandleNonGeneralRequest handles incoming non general requests
-func (t *Transport) HandleNonGeneralRequest(req *http.Request, w http.ResponseWriter, _ transport.OnCertificatesReceivedFunc) {
+func (t *Transport) HandleNonGeneralRequest(req *http.Request, w http.ResponseWriter, _ transport.OnCertificatesReceivedFunc) error {
 	requestData, err := parseAuthMessage(req)
 	if err != nil {
 		t.logger.Error("Invalid request body", slog.String("error", err.Error()))
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
+		return err
 	}
 
 	t.logger.Debug("Received non general request request", slog.Any("data", requestData))
@@ -81,31 +80,31 @@ func (t *Transport) HandleNonGeneralRequest(req *http.Request, w http.ResponseWr
 	response, err := t.handleIncomingMessage(requestData)
 	if err != nil {
 		t.logger.Error("Failed to process request", slog.String("error", err.Error()))
-		http.Error(w, "failed to process request", http.StatusInternalServerError)
-		return
+		return err
 	}
 
-	t.setupHeaders(w, response, requestID)
-	t.setupContent(w, response)
+	setupHeaders(w, response, requestID)
+	setupContent(w, response)
+
+	return nil
 }
 
 // HandleGeneralRequest handles incoming general requests
 func (t *Transport) HandleGeneralRequest(req *http.Request, res http.ResponseWriter, _ transport.OnCertificatesReceivedFunc) (*http.Request, *transport.AuthMessage, error) {
 	requestID := req.Header.Get(requestIDHeader)
 	if requestID == "" {
-		t.logger.Debug("Missing request ID, checking if unauthenticated requests are allowed")
-
 		if t.allowUnauthenticated {
 			t.logger.Debug("Unauthenticated requests are allowed, skipping auth")
 			return nil, nil, nil
 		}
+		t.logger.Debug("Missing request ID and unauthenticated requests are not allowed")
 
 		return nil, nil, errors.New("missing request ID")
 	}
 
 	t.logger.Debug("Received general request", slog.String("requestID", requestID))
 
-	requestData, err := t.buildAuthMessageFromRequest(req)
+	requestData, err := buildAuthMessageFromRequest(req)
 	if err != nil {
 		t.logger.Error("Failed to build request data", slog.String("error", err.Error()))
 		return nil, nil, err
@@ -124,12 +123,19 @@ func (t *Transport) HandleGeneralRequest(req *http.Request, res http.ResponseWri
 
 // HandleResponse sets up auth headers in the response object and generate signature for whole response
 func (t *Transport) HandleResponse(req *http.Request, res http.ResponseWriter, body []byte, status int, msg *transport.AuthMessage) error {
+	if t.allowUnauthenticated {
+		return nil
+	}
+
 	identityKey, requestID, err := getValuesFromContext(req)
 	if err != nil {
 		return err
 	}
 
-	payload := t.buildResponsePayload(requestID, status, body)
+	payload, err := buildResponsePayload(requestID, status, body)
+	if err != nil {
+		return err
+	}
 
 	session := t.sessionManager.GetSession(identityKey)
 	if session == nil {
@@ -160,13 +166,13 @@ func (t *Transport) HandleResponse(req *http.Request, res http.ResponseWriter, b
 
 	msg.Signature = &signature
 
-	t.setupHeaders(res, msg, requestID)
+	setupHeaders(res, msg, requestID)
 	return nil
 }
 
 func (t *Transport) handleIncomingMessage(msg *transport.AuthMessage) (*transport.AuthMessage, error) {
 	if msg.Version != transport.AuthVersion {
-		return nil, fmt.Errorf("unsupported version")
+		return nil, errors.New("unsupported version")
 	}
 
 	switch msg.MessageType {
@@ -246,10 +252,15 @@ func (t *Transport) handleGeneralRequest(msg *transport.AuthMessage) (*transport
 		return nil, fmt.Errorf("failed to create nonce, %w", err)
 	}
 
+	identityKey, err := t.wallet.GetPublicKey(context.Background(), wallet.GetPublicKeyOptions{IdentityKey: true})
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve identity key, %w", err)
+	}
+
 	response := &transport.AuthMessage{
 		Version:     transport.AuthVersion,
 		MessageType: "general",
-		IdentityKey: *session.PeerIdentityKey,
+		IdentityKey: identityKey,
 		Nonce:       &nonce,
 		YourNonce:   session.PeerNonce,
 	}
@@ -257,12 +268,86 @@ func (t *Transport) handleGeneralRequest(msg *transport.AuthMessage) (*transport
 	return response, nil
 }
 
-func (t *Transport) setupHeaders(w http.ResponseWriter, response *transport.AuthMessage, requestID string) {
+// buildResponsePayload constructs the response payload for signing
+// The payload is constructed as follows:
+// - Request ID (Base64)
+// - Response status
+// - Number of headers
+// - Headers (key length, key, value length, value)
+// - Body length and content
+func buildResponsePayload(
+	requestID string,
+	responseStatus int,
+	responseBody []byte,
+) ([]byte, error) {
+	var writer bytes.Buffer
+
+	requestIDBytes, err := base64.StdEncoding.DecodeString(requestID)
+	if err != nil {
+		return nil, errors.New("failed to decode request ID")
+	}
+	writer.Write(requestIDBytes)
+
+	err = utils.WriteVarIntNum(&writer, responseStatus)
+	if err != nil {
+		return nil, errors.New("failed to write response status")
+	}
+
+	// TODO: #14 - Collect and sort headers
+	includedHeaders := make([][]string, 0)
+	//includedHeaders := utils.FilterAndSortHeaders(responseHeaders)
+
+	if len(includedHeaders) > 0 {
+		err = utils.WriteVarIntNum(&writer, len(includedHeaders))
+		if err != nil {
+			return nil, errors.New("failed to write headers length")
+		}
+
+		for _, header := range includedHeaders {
+			err = utils.WriteVarIntNum(&writer, len(header[0]))
+			if err != nil {
+				return nil, errors.New("failed to write header key length")
+			}
+			writer.WriteString(header[0])
+
+			err = utils.WriteVarIntNum(&writer, len(header[1]))
+			if err != nil {
+				return nil, errors.New("failed to write header value length")
+			}
+			writer.WriteString(header[1])
+		}
+	} else {
+		err = utils.WriteVarIntNum(&writer, -1)
+		if err != nil {
+			return nil, errors.New("failed to write -1 as headers length")
+		}
+	}
+
+	if len(responseBody) > 0 {
+		err = utils.WriteVarIntNum(&writer, len(responseBody))
+		if err != nil {
+			return nil, errors.New("failed to write body length")
+		}
+		writer.Write(responseBody)
+	} else {
+		err = utils.WriteVarIntNum(&writer, -1)
+		if err != nil {
+			return nil, errors.New("failed to write -1 as body length")
+		}
+	}
+
+	return writer.Bytes(), nil
+}
+
+func setupHeaders(w http.ResponseWriter, response *transport.AuthMessage, requestID string) {
 	responseHeaders := map[string]string{
 		versionHeader:     response.Version,
 		messageTypeHeader: response.MessageType.String(),
 		identityKeyHeader: response.IdentityKey,
-		requestIDHeader:   requestID,
+	}
+
+	if response.MessageType == transport.General {
+		responseHeaders[requestIDHeader] = requestID
 	}
 
 	if response.Nonce != nil {
@@ -280,14 +365,9 @@ func (t *Transport) setupHeaders(w http.ResponseWriter, response *transport.Auth
 	for k, v := range responseHeaders {
 		w.Header().Set(k, v)
 	}
-
-	t.logger.Debug(fmt.Sprintf("Sending response: %+v", slog.Any("response", map[string]any{
-		"status":          200,
-		"responseHeaders": responseHeaders,
-	})))
 }
 
-func (t *Transport) setupContent(w http.ResponseWriter, response *transport.AuthMessage) {
+func setupContent(w http.ResponseWriter, response *transport.AuthMessage) {
 	w.Header().Set("Content-Type", "application/json")
 
 	b, err := json.Marshal(response)
@@ -301,13 +381,9 @@ func (t *Transport) setupContent(w http.ResponseWriter, response *transport.Auth
 		http.Error(w, "failed to write response", http.StatusInternalServerError)
 		return
 	}
-
-	t.logger.Debug(fmt.Sprintf("Sending response with content: %+v", slog.Any("response", map[string]any{
-		"messagePayload": *response,
-	})))
 }
 
-func (t *Transport) buildAuthMessageFromRequest(req *http.Request) (*transport.AuthMessage, error) {
+func buildAuthMessageFromRequest(req *http.Request) (*transport.AuthMessage, error) {
 	var writer bytes.Buffer
 
 	requestNonce := req.Header.Get(requestIDHeader)
@@ -318,28 +394,60 @@ func (t *Transport) buildAuthMessageFromRequest(req *http.Request) (*transport.A
 
 	writer.Write(requestNonceBytes)
 
-	utils.WriteVarIntNum(&writer, len(req.Method))
+	err := utils.WriteVarIntNum(&writer, len(req.Method))
+	if err != nil {
+		return nil, errors.New("failed to write method length")
+	}
 	writer.Write([]byte(req.Method))
 
-	utils.WriteVarIntNum(&writer, len(req.URL.Path))
+	err = utils.WriteVarIntNum(&writer, len(req.URL.Path))
+	if err != nil {
+		return nil, errors.New("failed to write path length")
+	}
 	writer.Write([]byte(req.URL.Path))
 
 	// TODO #19: handle query params
+	query := req.URL.RawQuery
+	if len(query) > 0 {
+		searchAsArray := []byte(query)
+		err = utils.WriteVarIntNum(&writer, len(searchAsArray))
+		if err != nil {
+			return nil, errors.New("failed to write query length")
+		}
+		writer.Write([]byte(query))
+	} else {
+		err = utils.WriteVarIntNum(&writer, -1)
+		if err != nil {
+			return nil, errors.New("failed to write -1 as query length")
+		}
+	}
 
 	includedHeaders := utils.ExtractHeaders(req.Header)
-	utils.WriteVarIntNum(&writer, len(includedHeaders))
+	err = utils.WriteVarIntNum(&writer, len(includedHeaders))
+	if err != nil {
+		return nil, errors.New("failed to write headers length")
+	}
 
 	for _, header := range includedHeaders {
 		headerKeyBytes := []byte(header[0])
-		utils.WriteVarIntNum(&writer, len(headerKeyBytes))
+		err = utils.WriteVarIntNum(&writer, len(headerKeyBytes))
+		if err != nil {
+			return nil, errors.New("failed to write header key length")
+		}
 		writer.Write(headerKeyBytes)
 
 		headerValueBytes := []byte(header[1])
-		utils.WriteVarIntNum(&writer, len(headerValueBytes))
+		err = utils.WriteVarIntNum(&writer, len(headerValueBytes))
+		if err != nil {
+			return nil, errors.New("failed to write header value length")
+		}
 		writer.Write(headerValueBytes)
 	}
 
-	utils.WriteBodyToBuffer(req, &writer)
+	err = utils.WriteBodyToBuffer(req, &writer)
+	if err != nil {
+		return nil, errors.New("failed to write request body")
+	}
 
 	payloadBytes := writer.Bytes()
 
@@ -350,14 +458,15 @@ func (t *Transport) buildAuthMessageFromRequest(req *http.Request) (*transport.A
 		Payload:     &payloadBytes,
 	}
 
-	if nonce := req.Header.Get("x-bsv-auth-nonce"); nonce != "" {
+	if nonce := req.Header.Get(nonceHeader); nonce != "" {
 		authMessage.Nonce = &nonce
 	}
-	if yourNonce := req.Header.Get("x-bsv-auth-your-nonce"); yourNonce != "" {
+
+	if yourNonce := req.Header.Get(yourNonceHeader); yourNonce != "" {
 		authMessage.YourNonce = &yourNonce
 	}
 
-	if signature := req.Header.Get("x-bsv-auth-signature"); signature != "" {
+	if signature := req.Header.Get(signatureHeader); signature != "" {
 		decodedBytes, err := hex.DecodeString(signature)
 		if err != nil {
 			return nil, errors.New("error decoding signature")
@@ -367,55 +476,6 @@ func (t *Transport) buildAuthMessageFromRequest(req *http.Request) (*transport.A
 	}
 
 	return authMessage, nil
-}
-
-// buildResponsePayload constructs the response payload for signing
-// The payload is constructed as follows:
-// - Request ID (Base64)
-// - Response status
-// - Number of headers
-// - Headers (key length, key, value length, value)
-// - Body length and content
-func (t *Transport) buildResponsePayload(
-	requestID string,
-	responseStatus int,
-	responseBody []byte,
-) []byte {
-	t.logger.Debug("Building response payload",
-		slog.String("requestID", requestID), slog.Int("responseStatus", responseStatus), slog.Int("responseBodyLength", len(responseBody)))
-
-	var writer bytes.Buffer
-
-	requestIDBytes, err := base64.StdEncoding.DecodeString(requestID)
-	if err != nil {
-		return nil
-	}
-	writer.Write(requestIDBytes)
-
-	utils.WriteVarIntNum(&writer, responseStatus)
-
-	// TODO: #14 - Collect and sort headers
-	includedHeaders := make([][]string, 0)
-	//includedHeaders := utils.FilterAndSortHeaders(responseHeaders)
-
-	utils.WriteVarIntNum(&writer, len(includedHeaders))
-
-	for _, header := range includedHeaders {
-		utils.WriteVarIntNum(&writer, len(header[0]))
-		writer.WriteString(header[0])
-
-		utils.WriteVarIntNum(&writer, len(header[1]))
-		writer.WriteString(header[1])
-	}
-
-	if len(responseBody) > 0 {
-		utils.WriteVarIntNum(&writer, len(responseBody))
-		writer.Write(responseBody)
-	} else {
-		utils.WriteVarIntNum(&writer, -1)
-	}
-
-	return writer.Bytes()
 }
 
 func parseAuthMessage(req *http.Request) (*transport.AuthMessage, error) {

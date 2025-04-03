@@ -2,19 +2,32 @@ package utils
 
 import (
 	"bytes"
+	"encoding/binary"
+	"errors"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 )
 
 // WriteVarIntNum writes a variable-length integer to a buffer
-func WriteVarIntNum(writer *bytes.Buffer, num int) {
-	if num < 0 {
-		writer.WriteByte(0xff) // Representing -1
-	} else {
-		writer.WriteByte(byte(num)) // Simplified, extendable for larger numbers
+// integer is converted to fixed size int64
+func WriteVarIntNum(writer *bytes.Buffer, num int) error {
+	err := binary.Write(writer, binary.LittleEndian, int64(num))
+	if err != nil {
+		return errors.New("failed to write varint number")
 	}
+	return nil
+}
+
+// ReadVarIntNum reads a variable-length integer from a buffer
+func ReadVarIntNum(reader *bytes.Reader) (int64, error) {
+	var intByte int64
+	err := binary.Read(reader, binary.LittleEndian, &intByte)
+	if err != nil {
+		return 0, errors.New("failed to read varint number")
+	}
+
+	return intByte, nil
 }
 
 // ExtractHeaders extracts required headers based on conditions
@@ -31,18 +44,32 @@ func ExtractHeaders(headers http.Header) [][]string {
 }
 
 // WriteBodyToBuffer writes the request body into a buffer
-func WriteBodyToBuffer(req *http.Request, buf *bytes.Buffer) {
+func WriteBodyToBuffer(req *http.Request, buf *bytes.Buffer) error {
+	if req.Body == nil {
+		err := WriteVarIntNum(buf, -1)
+		if err != nil {
+			return errors.New("failed to write -1 for empty body")
+		}
+		return nil
+	}
+
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
-		log.Printf("Failed to read request body: %v", err)
-		WriteVarIntNum(buf, -1)
-		return
+		return errors.New("failed to read request body")
 	}
 
 	if len(body) > 0 {
-		WriteVarIntNum(buf, len(body))
+		err = WriteVarIntNum(buf, len(body))
+		if err != nil {
+			return errors.New("failed to write body length")
+		}
 		buf.Write(body)
-	} else {
-		WriteVarIntNum(buf, -1)
+		return nil
 	}
+
+	err = WriteVarIntNum(buf, -1)
+	if err != nil {
+		return errors.New("failed to write -1 for empty body")
+	}
+	return nil
 }
