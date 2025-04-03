@@ -42,7 +42,7 @@ func TestAuthMiddleware_Handshake_HappyPath(t *testing.T) {
 		testState.rAuthMessage = authMessage
 	})
 
-	t.Run("check authorization", func(t *testing.T) {
+	t.Run("check authorization with GET", func(t *testing.T) {
 		// given
 		headers, err := mocks.PrepareGeneralRequestHeaders(clientWallet, testState.rAuthMessage, "/ping", "GET")
 		require.NoError(t, err)
@@ -53,7 +53,49 @@ func TestAuthMiddleware_Handshake_HappyPath(t *testing.T) {
 		// then
 		require.NoError(t, err)
 		assert.ResponseOK(t, response)
-		assert.GeneralResponseHeaders(t, response)
+		assert.GeneralResponseHeaders(t, response, 0)
+	})
+
+	t.Run("check authorization with POST", func(t *testing.T) {
+		// given
+		headers, err := mocks.PrepareGeneralRequestHeaders(clientWallet, testState.rAuthMessage, "/ping", "POST")
+		require.NoError(t, err)
+
+		// when
+		response, err := server.SendGeneralRequest(t, "POST", "/ping", headers, nil)
+
+		// then
+		require.NoError(t, err)
+		assert.ResponseOK(t, response)
+		assert.GeneralResponseHeaders(t, response, 1)
+	})
+
+	t.Run("check authorization with PUT", func(t *testing.T) {
+		// given
+		headers, err := mocks.PrepareGeneralRequestHeaders(clientWallet, testState.rAuthMessage, "/ping", "PUT")
+		require.NoError(t, err)
+
+		// when
+		response, err := server.SendGeneralRequest(t, "PUT", "/ping", headers, nil)
+
+		// then
+		require.NoError(t, err)
+		assert.ResponseOK(t, response)
+		assert.GeneralResponseHeaders(t, response, 2)
+	})
+
+	t.Run("check authorization with DELETE", func(t *testing.T) {
+		// given
+		headers, err := mocks.PrepareGeneralRequestHeaders(clientWallet, testState.rAuthMessage, "/ping", "DELETE")
+		require.NoError(t, err)
+
+		// when
+		response, err := server.SendGeneralRequest(t, "DELETE", "/ping", headers, nil)
+
+		// then
+		require.NoError(t, err)
+		assert.ResponseOK(t, response)
+		assert.GeneralResponseHeaders(t, response, 3)
 	})
 }
 
