@@ -1,7 +1,6 @@
 package assert
 
 import (
-	"fmt"
 	"net/http"
 	"testing"
 
@@ -29,7 +28,6 @@ func InitialResponseHeaders(t *testing.T, response *http.Response) {
 // GeneralResponseHeaders checks if the response headers are correct for the general response.
 func GeneralResponseHeaders(t *testing.T, response *http.Response, requestNumber int) {
 	for key, value := range getGeneralResponseHeaders(requestNumber) {
-		fmt.Println(key, value)
 		require.Equal(t, value, response.Header.Get(key))
 	}
 
