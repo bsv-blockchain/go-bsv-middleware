@@ -47,21 +47,22 @@ The client walks through the complete DPP payment flow:
 
 ## Flow Diagram
 
-```
-Client                                Server
-  |                                     |
-  |--- Authentication (BRC-103/104) --->|
-  |<------ Authentication Response -----|
-  |                                     |
-  |---------- Request /info ----------->|
-  |<-------- Free Info Response --------|
-  |                                     |
-  |-------- Request /premium ---------->|
-  |<-- 402 Payment Required + Terms ----|
-  |                                     |
-  |--- Request with Payment Header ---->|
-  |<------ Premium Data Response -------|
-```
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+
+    Client->>Server: Authentication (BRC-103/104)
+    Server-->>Client: Authentication Response
+
+    Client->>Server: Request /info
+    Server-->>Client: Free Info Response
+
+    Client->>Server: Request /premium
+    Server-->>Client: 402 Payment Required + Terms
+
+    Client->>Server: Request with Payment Header
+    Server-->>Client: Premium Data Response
 
 ## Key DPP Concepts Demonstrated
 

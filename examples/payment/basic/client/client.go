@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/4chain-ag/go-bsv-middleware/pkg/utils"
 	"io"
 	"log"
 	"net/http"
 	"time"
 
-	"github.com/4chain-ag/go-bsv-middleware/examples/utils"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/payment"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
@@ -46,10 +46,18 @@ func main() {
 }
 
 func authenticate(wallet wallet.WalletInterface) *transport.AuthMessage {
-	req := utils.PrepareInitialRequest(wallet)
-	data, _ := json.Marshal(req)
+	req := utils.PrepareInitialRequestBody(wallet)
+	data, err := json.Marshal(req)
+	if err != nil {
+		log.Fatalf("failed to marshal auth request: %s", err)
+		return nil
+	}
 
-	httpReq, _ := http.NewRequest("POST", "http://localhost:8080/.well-known/auth", bytes.NewBuffer(data))
+	httpReq, err := http.NewRequest("POST", "http://localhost:8080/.well-known/auth", bytes.NewBuffer(data))
+	if err != nil {
+		log.Fatalf("failed to create auth request: %s", err)
+		return nil
+	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(httpReq)
@@ -63,7 +71,11 @@ func authenticate(wallet wallet.WalletInterface) *transport.AuthMessage {
 		}
 	}(resp.Body)
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalf("failed to read auth response: %s", err)
+		return nil
+	}
 	if resp.StatusCode != http.StatusOK {
 		log.Fatalf("auth failed: %s", string(body))
 	}
@@ -78,7 +90,11 @@ func authenticate(wallet wallet.WalletInterface) *transport.AuthMessage {
 }
 
 func callFree(wallet wallet.WalletInterface, auth *transport.AuthMessage) {
-	httpReq, _ := http.NewRequest("GET", "http://localhost:8080/info", nil)
+	httpReq, err := http.NewRequest("GET", "http://localhost:8080/info", nil)
+	if err != nil {
+		log.Fatalf("failed to create auth request: %s", err)
+		return
+	}
 	utils.PreparePingRequest(httpReq, wallet, auth)
 
 	resp, err := http.DefaultClient.Do(httpReq)

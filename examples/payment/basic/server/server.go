@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -17,7 +18,7 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 	paymentWallet := wallet.NewMockPaymentWallet()
-	authMiddleware := auth.New(auth.Options{
+	authMiddleware := auth.New(auth.Config{
 		AllowUnauthenticated: false,
 		Logger:               logger,
 		Wallet:               paymentWallet,
@@ -57,7 +58,7 @@ func main() {
 		logger.Info("/.well-known/auth")
 		logger.Info("/info (auth only)")
 		logger.Info("/premium (paid)")
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("server error", slog.Any("error", err))
 		}
 	}()
@@ -81,7 +82,7 @@ func premiumHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if ok && info.SatoshisPaid > 0 {
-		_, err := w.Write([]byte(`{"name":"BSV Payment API","version":"1.0","type":"premium","paid":true,"satoshis":10}`))
+		_, err := w.Write([]byte(`{"name":"BSV Payment API","version":"1.0","type":"premium","paid":true,"satoshis": ` + fmt.Sprintf("%d", info.SatoshisPaid) + `}`))
 		if err != nil {
 			fmt.Println("Error writing response:", err)
 			return
