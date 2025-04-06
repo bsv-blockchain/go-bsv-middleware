@@ -82,7 +82,17 @@ func premiumHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if ok && info.SatoshisPaid > 0 {
-		_, err := w.Write([]byte(`{"name":"BSV Payment API","version":"1.0","type":"premium","paid":true,"satoshis": ` + fmt.Sprintf("%d", info.SatoshisPaid) + `}`))
+		response := fmt.Sprintf(`{
+            "name": "BSV Payment API",
+            "version": "1.0",
+            "type": "premium",
+            "paid": true,
+            "satoshis": %d,
+            "status": "Payment accepted",
+            "txid": "%s"
+        }`, info.SatoshisPaid, info.TransactionID)
+
+		_, err := w.Write([]byte(response))
 		if err != nil {
 			fmt.Println("Error writing response:", err)
 			return
@@ -90,7 +100,18 @@ func premiumHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := w.Write([]byte(`{"name":"BSV Payment API","version":"1.0","type":"premium","paid":false}`))
+	// NOTE: This code path is for demonstration only and won't actually execute
+	// in normal operation because the payment middleware would intercept the request
+	// with a 402 Payment Required response before reaching this handler
+	response := `{
+        "name": "BSV Payment API", 
+        "version": "1.0", 
+        "type": "premium", 
+        "paid": false,
+        "note": "This code path would normally not be reached - middleware would return 402 Payment Required"
+    }`
+
+	_, err := w.Write([]byte(response))
 	if err != nil {
 		fmt.Println("Error writing response:", err)
 		return

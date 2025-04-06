@@ -95,7 +95,13 @@ func callFree(wallet wallet.WalletInterface, auth *transport.AuthMessage) {
 		log.Fatalf("failed to create auth request: %s", err)
 		return
 	}
-	utils.PreparePingRequest(httpReq, wallet, auth)
+	headers, err := utils.PrepareGeneralRequestHeaders(wallet, auth, httpReq.URL.Path, httpReq.Method)
+	if err != nil {
+		log.Fatalf("failed to prepare request headers: %s", err)
+	}
+	for key, value := range headers {
+		httpReq.Header.Set(key, value)
+	}
 
 	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
@@ -114,7 +120,13 @@ func callFree(wallet wallet.WalletInterface, auth *transport.AuthMessage) {
 
 func requestPremium(wallet wallet.WalletInterface, auth *transport.AuthMessage) *payment.PaymentTerms {
 	httpReq, _ := http.NewRequest("GET", "http://localhost:8080/premium", nil)
-	utils.PreparePingRequest(httpReq, wallet, auth)
+	headers, err := utils.PrepareGeneralRequestHeaders(wallet, auth, httpReq.URL.Path, httpReq.Method)
+	if err != nil {
+		log.Fatalf("failed to prepare request headers: %s", err)
+	}
+	for key, value := range headers {
+		httpReq.Header.Set(key, value)
+	}
 
 	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
@@ -155,7 +167,13 @@ func createMockPayment(terms *payment.PaymentTerms) *payment.Payment {
 
 func payPremium(wallet wallet.WalletInterface, auth *transport.AuthMessage, pmt *payment.Payment) {
 	httpReq, _ := http.NewRequest("GET", "http://localhost:8080/premium", nil)
-	utils.PreparePingRequest(httpReq, wallet, auth)
+	headers, err := utils.PrepareGeneralRequestHeaders(wallet, auth, httpReq.URL.Path, httpReq.Method)
+	if err != nil {
+		log.Fatalf("failed to prepare request headers: %s", err)
+	}
+	for key, value := range headers {
+		httpReq.Header.Set(key, value)
+	}
 
 	data, _ := json.Marshal(pmt)
 	httpReq.Header.Set("X-BSV-Payment", string(data))
