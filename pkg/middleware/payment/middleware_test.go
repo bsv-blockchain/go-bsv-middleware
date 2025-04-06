@@ -40,7 +40,7 @@ func TestNewMiddleware(t *testing.T) {
 
 		_, err := payment.New(options)
 
-		assert.Error(t, err)
+		assert.ErrorIs(t, err, payment.ErrNoWallet)
 		assert.Equal(t, payment.ErrNoWallet, err)
 	})
 
