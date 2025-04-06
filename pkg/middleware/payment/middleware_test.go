@@ -1,4 +1,4 @@
-package payment
+package payment_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/payment"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	fixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
@@ -20,9 +21,6 @@ func addIdentityToContext(r *http.Request, identityKey string) *http.Request {
 	return r.WithContext(ctx)
 }
 
-// mockWalletSetup ensures the mock wallet's verifyNonce will return true for our test
-// We do this by first calling createNonce on the wallet with our intended nonce
-// This introduces it into the wallet's internal valid nonces map
 func mockWalletSetup(t *testing.T, w wallet.WalletInterface, expectedNonce string) {
 	nonce, err := w.CreateNonce(context.Background())
 	require.NoError(t, err)
@@ -38,37 +36,30 @@ func mockWalletSetup(t *testing.T, w wallet.WalletInterface, expectedNonce strin
 
 func TestNewMiddleware(t *testing.T) {
 	t.Run("Returns error with no wallet", func(t *testing.T) {
-		//given
-		options := Options{}
+		options := payment.Options{}
 
-		//when
-		_, err := New(options)
+		_, err := payment.New(options)
 
-		//then
 		assert.Error(t, err)
-		assert.Equal(t, ErrNoWallet, err)
+		assert.Equal(t, payment.ErrNoWallet, err)
 	})
 
 	t.Run("Creates middleware with valid options", func(t *testing.T) {
-		//given
 		mockWallet := wallet.NewMockPaymentWallet()
-		options := Options{
+		options := payment.Options{
 			Wallet: mockWallet,
 		}
 
-		//when
-		middleware, err := New(options)
+		middleware, err := payment.New(options)
 
-		//then
 		assert.NoError(t, err)
 		assert.NotNil(t, middleware)
 	})
 }
 
 func TestMiddleware_Handler_MissingAuthContext(t *testing.T) {
-	//given
 	mockWallet := wallet.NewMockPaymentWallet()
-	middleware, err := New(Options{
+	middleware, err := payment.New(payment.Options{
 		Wallet: mockWallet,
 	})
 	require.NoError(t, err)
@@ -81,10 +72,8 @@ func TestMiddleware_Handler_MissingAuthContext(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
 
-	//when
 	handler.ServeHTTP(w, req)
 
-	//then
 	assert.False(t, handlerCalled)
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 
@@ -92,12 +81,12 @@ func TestMiddleware_Handler_MissingAuthContext(t *testing.T) {
 	err = json.NewDecoder(w.Body).Decode(&resp)
 	require.NoError(t, err)
 
-	assert.Equal(t, ErrCodeServerMisconfigured, resp["code"])
+	assert.Equal(t, payment.ErrCodeServerMisconfigured, resp["code"])
 }
 
 func TestMiddleware_Handler_FreeAccess(t *testing.T) {
 	mockWallet := wallet.NewMockPaymentWallet()
-	middleware, err := New(Options{
+	middleware, err := payment.New(payment.Options{
 		Wallet: mockWallet,
 		CalculateRequestPrice: func(r *http.Request) (int, error) {
 			return 0, nil
@@ -109,7 +98,7 @@ func TestMiddleware_Handler_FreeAccess(t *testing.T) {
 	handler := middleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handlerCalled = true
 
-		info, ok := GetPaymentInfoFromContext(r.Context())
+		info, ok := payment.GetPaymentInfoFromContext(r.Context())
 		assert.True(t, ok)
 		assert.NotNil(t, info)
 		assert.Equal(t, 0, info.SatoshisPaid)
@@ -125,9 +114,8 @@ func TestMiddleware_Handler_FreeAccess(t *testing.T) {
 }
 
 func TestMiddleware_Handler_PaymentRequired(t *testing.T) {
-	//given
 	mockWallet := wallet.NewMockPaymentWallet()
-	middleware, err := New(Options{
+	middleware, err := payment.New(payment.Options{
 		Wallet: mockWallet,
 		CalculateRequestPrice: func(r *http.Request) (int, error) {
 			return 100, nil
@@ -144,28 +132,24 @@ func TestMiddleware_Handler_PaymentRequired(t *testing.T) {
 	req = addIdentityToContext(req, "test-identity-key")
 	w := httptest.NewRecorder()
 
-	//when
 	handler.ServeHTTP(w, req)
 
-	//then
 	assert.False(t, handlerCalled)
 	assert.Equal(t, http.StatusPaymentRequired, w.Code)
 
-	var terms PaymentTerms
+	var terms payment.PaymentTerms
 	err = json.NewDecoder(w.Body).Decode(&terms)
 	require.NoError(t, err)
 
-	assert.Equal(t, NetworkBSV, terms.Network)
-	assert.Equal(t, PaymentVersion, terms.Version)
+	assert.Equal(t, payment.NetworkBSV, terms.Network)
+	assert.Equal(t, payment.PaymentVersion, terms.Version)
 	assert.Equal(t, 100, terms.SatoshisRequired)
 	assert.NotEmpty(t, terms.DerivationPrefix)
 }
 
-// TestMiddleware_Handler_InvalidPaymentData tests handling of malformed payment data
 func TestMiddleware_Handler_InvalidPaymentData(t *testing.T) {
-	//given
 	mockWallet := wallet.NewMockPaymentWallet()
-	middleware, err := New(Options{
+	middleware, err := payment.New(payment.Options{
 		Wallet: mockWallet,
 	})
 	require.NoError(t, err)
@@ -175,17 +159,14 @@ func TestMiddleware_Handler_InvalidPaymentData(t *testing.T) {
 		handlerCalled = true
 	}))
 
-	// Invalid JSON
 	req := httptest.NewRequest("GET", "/", nil)
 	req = addIdentityToContext(req, "test-identity-key")
-	req.Header.Set(HeaderPayment, "invalid-json-data")
+	req.Header.Set(payment.HeaderPayment, "invalid-json-data")
 
 	w := httptest.NewRecorder()
 
-	//when
 	handler.ServeHTTP(w, req)
 
-	//then
 	assert.False(t, handlerCalled)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 
@@ -193,22 +174,19 @@ func TestMiddleware_Handler_InvalidPaymentData(t *testing.T) {
 	err = json.NewDecoder(w.Body).Decode(&resp)
 	require.NoError(t, err)
 
-	assert.Equal(t, ErrCodeMalformedPayment, resp["code"])
+	assert.Equal(t, payment.ErrCodeMalformedPayment, resp["code"])
 }
 
-// TestCases for verifying payment processing
 func TestMiddleware_Handler_ProcessPayment(t *testing.T) {
 	t.Run("successful payment", func(t *testing.T) {
-		//given
 		mockWallet := wallet.NewMockPaymentWallet()
-
 		mockWalletSetup(t, mockWallet, fixtures.MockNonce)
 
 		mockWallet.SetInternalizeActionResult(wallet.InternalizeActionResult{
 			Accepted: true,
 		})
 
-		middleware, err := New(Options{
+		middleware, err := payment.New(payment.Options{
 			Wallet: mockWallet,
 			CalculateRequestPrice: func(r *http.Request) (int, error) {
 				return 100, nil
@@ -220,14 +198,14 @@ func TestMiddleware_Handler_ProcessPayment(t *testing.T) {
 		handler := middleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			handlerCalled = true
 
-			info, ok := GetPaymentInfoFromContext(r.Context())
+			info, ok := payment.GetPaymentInfoFromContext(r.Context())
 			assert.True(t, ok)
 			assert.NotNil(t, info)
 			assert.Equal(t, 100, info.SatoshisPaid)
 			assert.True(t, info.Accepted)
 		}))
 
-		paymentData := Payment{
+		paymentData := payment.Payment{
 			ModeID:           "bsv-direct",
 			DerivationPrefix: fixtures.MockNonce,
 			DerivationSuffix: "test-suffix",
@@ -238,17 +216,15 @@ func TestMiddleware_Handler_ProcessPayment(t *testing.T) {
 
 		req := httptest.NewRequest("GET", "/", nil)
 		req = addIdentityToContext(req, "test-identity-key")
-		req.Header.Set(HeaderPayment, string(paymentJSON))
+		req.Header.Set(payment.HeaderPayment, string(paymentJSON))
 
 		w := httptest.NewRecorder()
 
-		//when
 		handler.ServeHTTP(w, req)
 
-		//then
 		assert.True(t, handlerCalled)
 		assert.Equal(t, http.StatusOK, w.Code)
-		assert.Equal(t, "100", w.Header().Get(HeaderSatoshisPaid))
+		assert.Equal(t, "100", w.Header().Get(payment.HeaderSatoshisPaid))
 
 		assert.True(t, mockWallet.InternalizeActionCalled)
 		require.NotEmpty(t, mockWallet.InternalizeActionArgs.Outputs)
@@ -259,15 +235,12 @@ func TestMiddleware_Handler_ProcessPayment(t *testing.T) {
 	})
 
 	t.Run("wallet returns error", func(t *testing.T) {
-		//given
 		expectedError := errors.New("payment validation failed")
 		mockWallet := wallet.NewMockPaymentWallet()
-
 		mockWalletSetup(t, mockWallet, fixtures.MockNonce)
-
 		mockWallet.SetInternalizeActionError(expectedError)
 
-		middleware, err := New(Options{
+		middleware, err := payment.New(payment.Options{
 			Wallet: mockWallet,
 		})
 		require.NoError(t, err)
@@ -277,7 +250,7 @@ func TestMiddleware_Handler_ProcessPayment(t *testing.T) {
 			handlerCalled = true
 		}))
 
-		paymentData := Payment{
+		paymentData := payment.Payment{
 			ModeID:           "bsv-direct",
 			DerivationPrefix: fixtures.MockNonce,
 			DerivationSuffix: "test-suffix",
@@ -288,14 +261,12 @@ func TestMiddleware_Handler_ProcessPayment(t *testing.T) {
 
 		req := httptest.NewRequest("GET", "/", nil)
 		req = addIdentityToContext(req, "test-identity-key")
-		req.Header.Set(HeaderPayment, string(paymentJSON))
+		req.Header.Set(payment.HeaderPayment, string(paymentJSON))
 
 		w := httptest.NewRecorder()
 
-		//when
 		handler.ServeHTTP(w, req)
 
-		//then
 		assert.False(t, handlerCalled)
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 
@@ -303,7 +274,7 @@ func TestMiddleware_Handler_ProcessPayment(t *testing.T) {
 		err = json.NewDecoder(w.Body).Decode(&resp)
 		require.NoError(t, err)
 
-		assert.Equal(t, ErrCodePaymentFailed, resp["code"])
+		assert.Equal(t, payment.ErrCodePaymentFailed, resp["code"])
 		assert.Contains(t, resp["description"].(string), expectedError.Error())
 	})
 }

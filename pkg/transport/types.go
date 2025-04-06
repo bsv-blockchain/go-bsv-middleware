@@ -14,7 +14,7 @@ const (
 	// IdentityKey is the key used to store the identity key in the context.
 	IdentityKey contextKey = "identity"
 	// RequestID is the key used to store the request ID in the context.
-	RequestID = "requestID"
+	RequestID contextKey = "requestID"
 )
 
 // Definition of the Message Types used in the authentication process.

@@ -506,7 +506,7 @@ func createNonGeneralAuthSignature(wallet wallet.WalletInterface, initialNonce, 
 
 func setupContext(req *http.Request, requestData *transport.AuthMessage, requestID string) *http.Request {
 	ctx := context.WithValue(req.Context(), transport.IdentityKey, requestData.IdentityKey)
-	ctx = context.WithValue(ctx, transport.RequestID, requestID) //nolint:staticcheck // we want to use the key as a static string
+	ctx = context.WithValue(ctx, transport.RequestID, requestID)
 	req = req.WithContext(ctx)
 	return req
 }
