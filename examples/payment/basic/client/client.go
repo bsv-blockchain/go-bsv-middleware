@@ -1,11 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/utils"
-	"io"
+	"github.com/go-resty/resty/v2"
 	"log"
 	"net/http"
 	"time"
@@ -46,116 +45,99 @@ func main() {
 }
 
 func authenticate(wallet wallet.WalletInterface) *transport.AuthMessage {
-	req := utils.PrepareInitialRequestBody(wallet)
-	data, err := json.Marshal(req)
+	client := resty.New()
+
+	reqBody := utils.PrepareInitialRequestBody(wallet)
+
+	var result transport.AuthMessage
+	var errMsg any
+
+	resp, err := client.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(reqBody).
+		SetResult(&result).
+		SetError(&errMsg).
+		Post("http://localhost:8080/.well-known/auth")
+
 	if err != nil {
-		log.Fatalf("failed to marshal auth request: %s", err)
+		log.Fatalf("failed to send auth request: %s", err)
 		return nil
 	}
 
-	httpReq, err := http.NewRequest("POST", "http://localhost:8080/.well-known/auth", bytes.NewBuffer(data))
-	if err != nil {
-		log.Fatalf("failed to create auth request: %s", err)
+	if resp.IsError() {
+		log.Fatalf("auth failed: Status %d, Body: %s", resp.StatusCode(), resp.String())
 		return nil
 	}
-	httpReq.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(httpReq)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Fatalf("failed to close response body: %s\n", err)
-		}
-	}(resp.Body)
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatalf("failed to read auth response: %s", err)
-		return nil
-	}
-	if resp.StatusCode != http.StatusOK {
-		log.Fatalf("auth failed: %s", string(body))
-	}
-
-	var result *transport.AuthMessage
-	err = json.Unmarshal(body, &result)
-	if err != nil {
-		log.Fatalf("failed to unmarshal auth response: %s", err)
-		return nil
-	}
-	return result
+	return &result
 }
 
 func callFree(wallet wallet.WalletInterface, auth *transport.AuthMessage) {
-	httpReq, err := http.NewRequest("GET", "http://localhost:8080/info", nil)
+	client := resty.New()
+	url := "http://localhost:8080/info"
+	method := "GET"
+
+	headers, err := utils.PrepareGeneralRequestHeaders(wallet, auth, url, method)
 	if err != nil {
-		log.Fatalf("failed to create auth request: %s", err)
-		return
-	}
-	headers, err := utils.PrepareGeneralRequestHeaders(wallet, auth, httpReq.URL.Path, httpReq.Method)
-	if err != nil {
-		log.Fatalf("failed to prepare request headers: %s", err)
-	}
-	for key, value := range headers {
-		httpReq.Header.Set(key, value)
+		log.Fatalf("failed to prepare request headers for free endpoint: %s", err)
 	}
 
-	resp, err := http.DefaultClient.Do(httpReq)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Fatalf("failed to unmarshal payment terms: %s", err)
-		}
-	}(resp.Body)
+	resp, err := client.R().
+		SetHeaders(headers).
+		Get(url)
 
-	body, _ := io.ReadAll(resp.Body)
-	fmt.Printf("← HTTP %d: %s\n", resp.StatusCode, string(body))
+	if err != nil {
+		log.Fatalf("failed to call free endpoint: %s", err)
+	}
+
+	fmt.Printf("← HTTP %d: %s\n", resp.StatusCode(), resp.String())
 }
 
 func requestPremium(wallet wallet.WalletInterface, auth *transport.AuthMessage) *payment.PaymentTerms {
-	httpReq, _ := http.NewRequest("GET", "http://localhost:8080/premium", nil)
-	headers, err := utils.PrepareGeneralRequestHeaders(wallet, auth, httpReq.URL.Path, httpReq.Method)
-	if err != nil {
-		log.Fatalf("failed to prepare request headers: %s", err)
-	}
-	for key, value := range headers {
-		httpReq.Header.Set(key, value)
-	}
+	client := resty.New()
+	url := "http://localhost:8080/premium"
+	method := "GET"
 
-	resp, err := http.DefaultClient.Do(httpReq)
+	headers, err := utils.PrepareGeneralRequestHeaders(wallet, auth, url, method)
 	if err != nil {
-		log.Fatal(err)
-	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Fatalf("failed to unmarshal payment terms: %s", err)
-		}
-	}(resp.Body)
-
-	if resp.StatusCode != http.StatusPaymentRequired {
-		log.Fatalf("expected 402, got %d", resp.StatusCode)
-	}
-
-	body, _ := io.ReadAll(resp.Body)
-	var terms payment.PaymentTerms
-	err = json.Unmarshal(body, &terms)
-	if err != nil {
-		log.Fatalf("failed to unmarshal payment terms: %s", err)
+		log.Fatalf("failed to prepare request headers for premium request: %s", err)
 		return nil
 	}
+
+	var terms payment.PaymentTerms
+	var errMsg any
+
+	resp, err := client.R().
+		SetHeaders(headers).
+		SetError(&errMsg).
+		Get(url)
+
+	if err != nil {
+		log.Fatalf("failed to request premium endpoint: %s", err)
+		return nil
+	}
+
+	if resp.StatusCode() != http.StatusPaymentRequired {
+		log.Fatalf("expected status %d for premium request, got %d. Body: %s",
+			http.StatusPaymentRequired, resp.StatusCode(), resp.String())
+		return nil
+	}
+
+	// Manually unmarshal the expected 402 body
+	err = json.Unmarshal(resp.Body(), &terms)
+	if err != nil {
+		log.Fatalf("failed to unmarshal payment terms (402 response): %s. Body: %s", err, resp.String())
+		return nil
+	}
+
 	return &terms
 }
 
 func createMockPayment(terms *payment.PaymentTerms) *payment.Payment {
 	suffix := fmt.Sprintf("client-%d", time.Now().Unix())
-	mockTx := []byte{0x01, 0x02, 0x03, 0x04}
+	// In a real scenario, you would construct a valid BSV transaction here
+	// using the details from 'terms' (like outputs, amounts).
+	mockTx := []byte{0x01, 0x02, 0x03, 0x04} // Placeholder transaction bytes
 
 	return &payment.Payment{
 		ModeID:           "bsv-direct",
@@ -166,33 +148,41 @@ func createMockPayment(terms *payment.PaymentTerms) *payment.Payment {
 }
 
 func payPremium(wallet wallet.WalletInterface, auth *transport.AuthMessage, pmt *payment.Payment) {
-	httpReq, _ := http.NewRequest("GET", "http://localhost:8080/premium", nil)
-	headers, err := utils.PrepareGeneralRequestHeaders(wallet, auth, httpReq.URL.Path, httpReq.Method)
+	client := resty.New()
+	url := "http://localhost:8080/premium"
+	method := "GET"
+
+	generalHeaders, err := utils.PrepareGeneralRequestHeaders(wallet, auth, url, method)
 	if err != nil {
-		log.Fatalf("failed to prepare request headers: %s", err)
-	}
-	for key, value := range headers {
-		httpReq.Header.Set(key, value)
+		log.Fatalf("failed to prepare request headers for paying premium: %s", err)
 	}
 
-	data, _ := json.Marshal(pmt)
-	httpReq.Header.Set("X-BSV-Payment", string(data))
-
-	resp, err := http.DefaultClient.Do(httpReq)
+	paymentData, err := json.Marshal(pmt)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed to marshal payment data for header: %s", err)
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Fatalf("failed to close response body: %s\n", err)
-		}
-	}(resp.Body)
 
-	body, _ := io.ReadAll(resp.Body)
-	fmt.Printf("← HTTP %d: %s\n", resp.StatusCode, string(body))
+	var errMsg any
 
-	if sat := resp.Header.Get("X-BSV-Payment-Satoshis-Paid"); sat != "" {
+	resp, err := client.R().
+		SetHeaders(generalHeaders).
+		SetHeader("X-BSV-Payment", string(paymentData)).
+		SetError(&errMsg).
+		Get(url)
+
+	if err != nil {
+		log.Fatalf("failed to pay premium endpoint: %s", err)
+	}
+
+	fmt.Printf("← HTTP %d: %s\n", resp.StatusCode(), resp.String())
+
+	if resp.IsError() {
+		log.Printf("Warning: Received non-success status %d after payment.", resp.StatusCode())
+	}
+
+	if sat := resp.Header().Get("X-BSV-Payment-Satoshis-Paid"); sat != "" {
 		fmt.Printf("← Confirmed: %s satoshis paid\n", sat)
+	} else if resp.IsSuccess() {
+		log.Printf("Warning: Payment request successful (Status %d), but 'X-BSV-Payment-Satoshis-Paid' header was missing or empty.", resp.StatusCode())
 	}
 }
