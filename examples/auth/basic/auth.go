@@ -78,7 +78,7 @@ func callInitialRequest(mockedWallet wallet.WalletInterface) *transport.AuthMess
 
 	client := resty.New()
 	var result transport.AuthMessage
-	var errMsg interface{}
+	var errMsg any
 
 	resp, err := client.R().
 		SetHeader("Content-Type", "application/json").
