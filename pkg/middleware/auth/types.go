@@ -10,7 +10,7 @@ import (
 )
 
 // Options configures the auth middleware
-type Options struct {
+type Config struct {
 	Wallet                 wallet.WalletInterface
 	SessionManager         sessionmanager.SessionManagerInterface
 	AllowUnauthenticated   bool

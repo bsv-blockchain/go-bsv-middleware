@@ -3,11 +3,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/utils"
-	"github.com/go-resty/resty/v2"
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/4chain-ag/go-bsv-middleware/pkg/utils"
+	"github.com/go-resty/resty/v2"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/payment"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"

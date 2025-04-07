@@ -120,7 +120,7 @@ func main() {
 		}
 	}
 
-	opts := auth.Options{
+	opts := auth.Config{
 		AllowUnauthenticated:   false,
 		Logger:                 logger,
 		Wallet:                 wallet.NewMockWallet(true, nil, walletFixtures.DefaultNonces...),
@@ -240,15 +240,15 @@ func callPingEndpoint(mockedWallet wallet.WalletInterface, response *transport.A
 		log.Fatalf("Failed to create request: %v", err)
 	}
 
-	var yourNonce string
-
-	if response.InitialNonce != "" {
-		yourNonce = response.InitialNonce
-	} else {
-		yourNonce = *response.Nonce
+	if response.InitialNonce == "" {
+		response.InitialNonce = *response.Nonce
 	}
 
-	headers, err := mocks.PrepareGeneralRequestHeaders(mockedWallet, response.IdentityKey, yourNonce, "/ping", "GET", nil)
+	if response.Nonce == nil {
+		response.Nonce = &response.InitialNonce
+	}
+
+	headers, err := mocks.PrepareGeneralRequestHeaders(mockedWallet, response, "/ping", "GET")
 	if err != nil {
 		panic(err)
 	}
@@ -346,7 +346,7 @@ func sendCertificate(clientWallet wallet.WalletInterface, serverIdentityKey, pre
 
 	certMessage.Signature = &signature
 
-	headers, err := mocks.PrepareGeneralRequestHeaders(clientWallet, serverIdentityKey, previousNonce, "/.well-known/auth", "POST", requestBody)
+	headers, err := mocks.PrepareGeneralRequestHeaders(clientWallet, &certMessage, "/.well-known/auth", "POST")
 	if err != nil {
 		panic(err)
 	}

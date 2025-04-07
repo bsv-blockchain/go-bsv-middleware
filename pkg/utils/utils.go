@@ -38,9 +38,9 @@ func PrepareInitialRequestBody(walletInstance wallet.WalletInterface) transport.
 }
 
 // PrepareGeneralRequestHeaders prepares the general request headers
-func PrepareGeneralRequestHeaders(walletInstance wallet.WalletInterface, identityKey, initialNonce, path, method string, body []byte) (map[string]string, error) {
-	serverIdentityKey := identityKey
-	serverNonce := initialNonce
+func PrepareGeneralRequestHeaders(walletInstance wallet.WalletInterface, previousResponse *transport.AuthMessage, path, method string) (map[string]string, error) {
+	serverIdentityKey := previousResponse.IdentityKey
+	serverNonce := previousResponse.InitialNonce
 
 	opts := wallet.GetPublicKeyOptions{IdentityKey: true}
 	clientIdentityKey, err := walletInstance.GetPublicKey(context.Background(), opts)
@@ -87,17 +87,10 @@ func PrepareGeneralRequestHeaders(walletInstance wallet.WalletInterface, identit
 		return nil, errors.New("failed to write headers length")
 	}
 
-	if len(body) > 0 {
-		err = utils.WriteVarIntNum(&writer, len(body))
-		if err != nil {
-			return nil, errors.New("failed to write body length")
-		}
-		writer.Write(body)
-	} else {
-		err = utils.WriteVarIntNum(&writer, -1)
-		if err != nil {
-			return nil, errors.New("failed to write -1 for empty body")
-		}
+	// Write -1 (no body)
+	err = utils.WriteVarIntNum(&writer, -1)
+	if err != nil {
+		return nil, errors.New("failed to write body length")
 	}
 
 	signature, err := walletInstance.CreateSignature(
