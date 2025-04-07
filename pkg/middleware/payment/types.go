@@ -23,7 +23,7 @@ type Merchant struct {
 	Email string `json:"email,omitempty"`
 	// PaymentReference is a reference for the payment
 	PaymentReference string `json:"paymentReference,omitempty"`
-	// PaymentReference is a reference for the payment
+	// ExtendedData contains additional data about the beneficiary
 	ExtendedData map[string]any `json:"extendedData,omitempty"`
 }
 
