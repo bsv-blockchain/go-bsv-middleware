@@ -19,9 +19,9 @@ type PaymentMode struct { //nolint: revive // Ignore that struct starts with pac
 type Merchant struct {
 	// Name is the name of the beneficiary
 	Name string `json:"name"`
-	// Description provides a description of the beneficiary
-	Email string `json:"email,omitempty"`
 	// Email is the email address of the beneficiary
+	Email string `json:"email,omitempty"`
+	// PaymentReference is a reference for the payment
 	PaymentReference string `json:"paymentReference,omitempty"`
 	// PaymentReference is a reference for the payment
 	ExtendedData map[string]any `json:"extendedData,omitempty"`
