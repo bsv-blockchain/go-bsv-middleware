@@ -36,16 +36,16 @@ type MessageType string
 
 // AuthMessage represents a type message sent between peers during the authentication process.
 type AuthMessage struct {
-	Version               string                  `json:"version"`
-	MessageType           MessageType             `json:"messageType"`
-	IdentityKey           string                  `json:"identityKey"`
-	Nonce                 *string                 `json:"nonce,omitempty"`
-	InitialNonce          string                  `json:"initialNonce"`
-	YourNonce             *string                 `json:"yourNonce,omitempty"`
-	Payload               *[]byte                 `json:"payload,omitempty"`
-	Signature             *[]byte                 `json:"signature,omitempty"`
-	Certificates          *[]wallet.Certificate   `json:"certificates"`
-	RequestedCertificates RequestedCertificateSet `json:"requestedCertificates"`
+	Version               string                          `json:"version"`
+	MessageType           MessageType                     `json:"messageType"`
+	IdentityKey           string                          `json:"identityKey"`
+	Nonce                 *string                         `json:"nonce,omitempty"`
+	InitialNonce          string                          `json:"initialNonce"`
+	YourNonce             *string                         `json:"yourNonce,omitempty"`
+	Payload               *[]byte                         `json:"payload,omitempty"`
+	Signature             *[]byte                         `json:"signature,omitempty"`
+	Certificates          *[]wallet.VerifiableCertificate `json:"certificates"`
+	RequestedCertificates RequestedCertificateSet         `json:"requestedCertificates"`
 }
 
 // RequestedCertificateSet represents the set of certificates requested by a peer.
@@ -57,7 +57,7 @@ type RequestedCertificateSet struct {
 // OnCertificatesReceivedFunc callback type for handling received certificates
 type OnCertificatesReceivedFunc func(
 	senderPublicKey string,
-	certs []any,
+	certs *[]wallet.VerifiableCertificate,
 	req *http.Request,
 	res http.ResponseWriter,
 	next func(),

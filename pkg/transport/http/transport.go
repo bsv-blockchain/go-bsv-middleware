@@ -33,22 +33,43 @@ const (
 
 // Transport implements the HTTP transport
 type Transport struct {
-	wallet               wallet.WalletInterface
-	sessionManager       sessionmanager.SessionManagerInterface
-	allowUnauthenticated bool
-	logger               *slog.Logger
+	wallet                  wallet.WalletInterface
+	sessionManager          sessionmanager.SessionManagerInterface
+	allowUnauthenticated    bool
+	logger                  *slog.Logger
+	certificateRequirements *transport.RequestedCertificateSet
+	onCertificatesReceived  func(
+		senderPublicKey string,
+		certs *[]wallet.VerifiableCertificate,
+		req *http.Request,
+		res http.ResponseWriter,
+		next func(),
+	)
 }
 
 // New creates a new HTTP transport
-func New(wallet wallet.WalletInterface, sessionManager sessionmanager.SessionManagerInterface, allowUnauthenticated bool, logger *slog.Logger) transport.TransportInterface {
+func New(
+	wallet wallet.WalletInterface,
+	sessionManager sessionmanager.SessionManagerInterface,
+	allowUnauthenticated bool, logger *slog.Logger,
+	reqCerts *transport.RequestedCertificateSet,
+	OnCertificatesReceived func(
+		senderPublicKey string,
+		certs *[]wallet.VerifiableCertificate,
+		req *http.Request,
+		res http.ResponseWriter,
+		next func(),
+	)) transport.TransportInterface {
 	transportLogger := logging.Child(logger, "http-transport")
 	transportLogger.Info(fmt.Sprintf("Creating HTTP transport with allowUnauthenticated = %t", allowUnauthenticated))
 
 	return &Transport{
-		wallet:               wallet,
-		sessionManager:       sessionManager,
-		allowUnauthenticated: allowUnauthenticated,
-		logger:               transportLogger,
+		wallet:                  wallet,
+		sessionManager:          sessionManager,
+		allowUnauthenticated:    allowUnauthenticated,
+		logger:                  transportLogger,
+		certificateRequirements: reqCerts,
+		onCertificatesReceived:  OnCertificatesReceived,
 	}
 }
 
@@ -63,7 +84,7 @@ func (t *Transport) Send(_ transport.AuthMessage) {
 }
 
 // HandleNonGeneralRequest handles incoming non general requests
-func (t *Transport) HandleNonGeneralRequest(req *http.Request, w http.ResponseWriter, _ transport.OnCertificatesReceivedFunc) error {
+func (t *Transport) HandleNonGeneralRequest(req *http.Request, res http.ResponseWriter) error {
 	requestData, err := parseAuthMessage(req)
 	if err != nil {
 		t.logger.Error("Invalid request body", slog.String("error", err.Error()))
@@ -77,20 +98,20 @@ func (t *Transport) HandleNonGeneralRequest(req *http.Request, w http.ResponseWr
 		requestID = requestData.InitialNonce
 	}
 
-	response, err := t.handleIncomingMessage(requestData)
+	response, err := t.handleIncomingMessage(requestData, req, res)
 	if err != nil {
 		t.logger.Error("Failed to process request", slog.String("error", err.Error()))
 		return err
 	}
 
-	setupHeaders(w, response, requestID)
-	setupContent(w, response)
+	setupHeaders(res, response, requestID)
+	setupContent(res, response)
 
 	return nil
 }
 
 // HandleGeneralRequest handles incoming general requests
-func (t *Transport) HandleGeneralRequest(req *http.Request, res http.ResponseWriter, _ transport.OnCertificatesReceivedFunc) (*http.Request, *transport.AuthMessage, error) {
+func (t *Transport) HandleGeneralRequest(req *http.Request, res http.ResponseWriter) (*http.Request, *transport.AuthMessage, error) {
 	requestID := req.Header.Get(requestIDHeader)
 	if requestID == "" {
 		if t.allowUnauthenticated {
@@ -110,7 +131,7 @@ func (t *Transport) HandleGeneralRequest(req *http.Request, res http.ResponseWri
 		return nil, nil, err
 	}
 
-	response, err := t.handleIncomingMessage(requestData)
+	response, err := t.handleIncomingMessage(requestData, req, res)
 	if err != nil {
 		t.logger.Error("Failed to process request", slog.String("error", err.Error()))
 		return nil, nil, err
@@ -132,14 +153,14 @@ func (t *Transport) HandleResponse(req *http.Request, res http.ResponseWriter, b
 		return err
 	}
 
-	payload, err := buildResponsePayload(requestID, status, body)
-	if err != nil {
-		return err
-	}
-
 	session := t.sessionManager.GetSession(identityKey)
 	if session == nil {
 		return errors.New("session not found")
+	}
+
+	payload, err := buildResponsePayload(requestID, status, body)
+	if err != nil {
+		return err
 	}
 
 	nonce, err := t.wallet.CreateNonce(req.Context())
@@ -170,7 +191,7 @@ func (t *Transport) HandleResponse(req *http.Request, res http.ResponseWriter, b
 	return nil
 }
 
-func (t *Transport) handleIncomingMessage(msg *transport.AuthMessage) (*transport.AuthMessage, error) {
+func (t *Transport) handleIncomingMessage(msg *transport.AuthMessage, req *http.Request, res http.ResponseWriter) (*transport.AuthMessage, error) {
 	if msg.Version != transport.AuthVersion {
 		return nil, errors.New("unsupported version")
 	}
@@ -178,10 +199,12 @@ func (t *Transport) handleIncomingMessage(msg *transport.AuthMessage) (*transpor
 	switch msg.MessageType {
 	case transport.InitialRequest:
 		return t.handleInitialRequest(msg)
-	case transport.InitialResponse, transport.CertificateRequest, transport.CertificateResponse:
+	case transport.CertificateResponse:
+		return t.handleCertificateResponse(msg, req, res)
+	case transport.InitialResponse, transport.CertificateRequest:
 		return nil, errors.New("not implemented")
 	case transport.General:
-		return t.handleGeneralRequest(msg)
+		return t.handleGeneralRequest(msg, req, res)
 	default:
 		return nil, errors.New("unsupported message type")
 	}
@@ -197,8 +220,12 @@ func (t *Transport) handleInitialRequest(msg *transport.AuthMessage) (*transport
 		return nil, fmt.Errorf("failed to create session nonce, %w", err)
 	}
 
+	authenticated := false
+	if t.certificateRequirements == nil {
+		authenticated = true
+	}
 	session := sessionmanager.PeerSession{
-		IsAuthenticated: true,
+		IsAuthenticated: authenticated,
 		SessionNonce:    &sessionNonce,
 		PeerNonce:       &msg.InitialNonce,
 		PeerIdentityKey: &msg.IdentityKey,
@@ -228,7 +255,89 @@ func (t *Transport) handleInitialRequest(msg *transport.AuthMessage) (*transport
 	return &initialResponseMessage, nil
 }
 
-func (t *Transport) handleGeneralRequest(msg *transport.AuthMessage) (*transport.AuthMessage, error) {
+func (t *Transport) handleCertificateResponse(msg *transport.AuthMessage, req *http.Request, res http.ResponseWriter) (*transport.AuthMessage, error) {
+	valid, err := t.wallet.VerifyNonce(context.Background(), *msg.YourNonce)
+	if err != nil || !valid {
+		return nil, fmt.Errorf("unable to verify nonce, %w", err)
+	}
+
+	if msg.Certificates == nil {
+		return nil, fmt.Errorf("failed to retrieve certificates")
+	}
+
+	payload, err := json.Marshal(*msg.Certificates)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode certificates, %w", err)
+	}
+
+	session := t.sessionManager.GetSession(msg.IdentityKey)
+	if session == nil {
+		return nil, fmt.Errorf("no session found for identity key")
+	}
+
+	if msg.YourNonce == nil {
+		return nil, fmt.Errorf("msg.YourNonce is nil")
+	}
+
+	if session.PeerIdentityKey == nil {
+		return nil, fmt.Errorf("session.PeerIdentityKey is nil")
+	}
+	if msg.Nonce == nil || msg.YourNonce == nil {
+		return nil, fmt.Errorf("msg.Nonce or msg.YourNonce is nil")
+	}
+	if *session.PeerIdentityKey == "" {
+		return nil, fmt.Errorf("identityKey is empty")
+	}
+
+	valid, err = t.wallet.VerifySignature(context.Background(), payload, *msg.Signature, "auth message signature", fmt.Sprintf("%s %s", *msg.Nonce, *msg.YourNonce), *session.PeerIdentityKey)
+	if err != nil || !valid {
+		return nil, fmt.Errorf("unable to verify signature, %w", err)
+	}
+
+	if msg.Certificates == nil {
+		return nil, fmt.Errorf("certificate response missing certificates")
+	}
+
+	if t.onCertificatesReceived != nil {
+		t.onCertificatesReceived(*session.PeerIdentityKey,
+			msg.Certificates,
+			req,
+			res,
+			func() {
+				session.IsAuthenticated = true
+				session.LastUpdate = time.Now()
+				t.sessionManager.UpdateSession(*session)
+				t.logger.Debug("Certificate verification successful")
+			},
+		)
+	}
+	nonce, err := t.wallet.CreateNonce(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create nonce")
+	}
+
+	signature, err := createNonGeneralAuthSignature(t.wallet, *session.PeerNonce, nonce, msg.IdentityKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create signature")
+	}
+
+	identityKey, err := t.wallet.GetPublicKey(context.Background(), wallet.GetPublicKeyOptions{IdentityKey: true})
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve identity key")
+	}
+
+	response := &transport.AuthMessage{
+		Version:     transport.AuthVersion,
+		MessageType: transport.CertificateResponse,
+		IdentityKey: identityKey,
+		Nonce:       &nonce,
+		YourNonce:   session.PeerNonce,
+		Signature:   &signature,
+	}
+	return response, nil
+}
+
+func (t *Transport) handleGeneralRequest(msg *transport.AuthMessage, _ *http.Request, res http.ResponseWriter) (*transport.AuthMessage, error) {
 	valid, err := t.wallet.VerifyNonce(context.Background(), *msg.YourNonce)
 	if err != nil || !valid {
 		return nil, fmt.Errorf("unable to verify nonce, %w", err)
@@ -237,6 +346,16 @@ func (t *Transport) handleGeneralRequest(msg *transport.AuthMessage) (*transport
 	session := t.sessionManager.GetSession(*msg.YourNonce)
 	if session == nil {
 		return nil, errors.New("session not found")
+	}
+
+	if !session.IsAuthenticated && !t.allowUnauthenticated {
+		if t.certificateRequirements != nil {
+			// TODO Should change finalizing response as now when error is returned, code response is set to 401
+			res.WriteHeader(http.StatusBadRequest)
+			res.Write([]byte("No certificates provided"))
+			return nil, errors.New("no certificates provided")
+		}
+		return nil, errors.New("session not authenticated")
 	}
 
 	valid, err = t.wallet.VerifySignature(context.Background(), *msg.Payload, *msg.Signature, "auth message signature", fmt.Sprintf("%s %s", *msg.Nonce, *msg.YourNonce), *session.PeerIdentityKey)
