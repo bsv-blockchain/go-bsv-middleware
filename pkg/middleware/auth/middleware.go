@@ -78,11 +78,7 @@ func New(opts Config) (*Middleware, error) {
 	}
 
 	if opts.Wallet == nil {
-		if opts.PrivateKey == nil {
-			return nil, errors.New("private key is required no create wallet")
-		}
-
-		opts.Wallet = wallet.NewMockWallet(opts.PrivateKey)
+		return nil, errors.New("wallet is required")
 	}
 
 	if opts.Logger == nil {

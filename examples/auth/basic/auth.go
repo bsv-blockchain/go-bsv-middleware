@@ -40,7 +40,6 @@ func main() {
 		AllowUnauthenticated: false,
 		Logger:               logger,
 		Wallet:               serverMockedWallet,
-		PrivateKey:           sPrivKey,
 	}
 	middleware, err := auth.New(opts)
 	if err != nil {

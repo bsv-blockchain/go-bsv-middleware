@@ -122,7 +122,6 @@ func (s *MockHTTPServer) createMiddleware() {
 		AllowUnauthenticated: s.allowUnauthenticated,
 		Logger:               s.logger,
 		Wallet:               CreateServerMockWallet(key),
-		PrivateKey:           key,
 	}
 	s.authMiddleware, err = auth.New(opts)
 	if err != nil {

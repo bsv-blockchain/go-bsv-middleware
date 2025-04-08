@@ -29,7 +29,6 @@ func main() {
 		AllowUnauthenticated: false,
 		Logger:               logger,
 		Wallet:               paymentWallet,
-		PrivateKey:           key,
 	})
 	if err != nil {
 		logger.Error("create auth middleware failed", slog.String("error", err.Error()))

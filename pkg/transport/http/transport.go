@@ -212,9 +212,8 @@ func (t *Transport) handleInitialRequest(msg *transport.AuthMessage) (*transport
 	}
 
 	initialResponseMessage := transport.AuthMessage{
-		Version:     transport.AuthVersion,
-		MessageType: "initialResponse",
-		// TODO: check
+		Version:      transport.AuthVersion,
+		MessageType:  "initialResponse",
 		IdentityKey:  identityKey.PublicKey.ToDERHex(),
 		InitialNonce: sessionNonce,
 		YourNonce:    &msg.InitialNonce,
