@@ -74,7 +74,7 @@ func PrepareInitialRequestBody(mockedWallet wallet.WalletInterface) *RequestBody
 
 // PrepareGeneralRequestHeaders prepares the general request headers
 func PrepareGeneralRequestHeaders(mockedWallet wallet.WalletInterface, previousResponse *transport.AuthMessage, request *http.Request, opts ...func(m map[string]string)) error {
-	headers, err := utils.PrepareGeneralRequestHeaders(mockedWallet, previousResponse, request)
+	headers, err := utils.PrepareGeneralRequestHeaders(mockedWallet, previousResponse, utils.RequestData{Request: request})
 	if err != nil {
 		return errors.New("failed to prepare general request headers")
 	}

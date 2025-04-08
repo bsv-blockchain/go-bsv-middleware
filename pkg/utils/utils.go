@@ -18,6 +18,15 @@ import (
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )
 
+// RequestData holds the request information used to create auth headers
+type RequestData struct {
+	Method  string
+	URL     string
+	Headers map[string]string
+	Body    []byte
+	Request *http.Request
+}
+
 // PrepareInitialRequestBody prepares the initial request body
 func PrepareInitialRequestBody(walletInstance wallet.WalletInterface) transport.AuthMessage {
 	opts := wallet.GetPublicKeyArgs{IdentityKey: true}
@@ -42,7 +51,7 @@ func PrepareInitialRequestBody(walletInstance wallet.WalletInterface) transport.
 }
 
 // PrepareGeneralRequestHeaders prepares the general request headers
-func PrepareGeneralRequestHeaders(walletInstance wallet.WalletInterface, previousResponse *transport.AuthMessage, request *http.Request) (map[string]string, error) {
+func PrepareGeneralRequestHeaders(walletInstance wallet.WalletInterface, previousResponse *transport.AuthMessage, requestData RequestData) (map[string]string, error) {
 	serverIdentityKey := previousResponse.IdentityKey
 	serverNonce := previousResponse.InitialNonce
 
@@ -66,6 +75,7 @@ func PrepareGeneralRequestHeaders(walletInstance wallet.WalletInterface, previou
 	writer.Write(requestID)
 
 	// Write request method, url, query params, headers and body
+	request := getOrPrepareTempRequest(requestData)
 	err = WriteRequestData(request, &writer)
 	if err != nil {
 		return nil, err
@@ -241,4 +251,21 @@ func generateRandom() []byte {
 		panic(err)
 	}
 	return b
+}
+
+func getOrPrepareTempRequest(requestData RequestData) *http.Request {
+	if requestData.Request != nil {
+		return requestData.Request
+	}
+
+	req, err := http.NewRequest(requestData.Method, requestData.URL, bytes.NewBuffer(requestData.Body))
+	if err != nil {
+		panic(err)
+	}
+
+	for key, value := range requestData.Headers {
+		req.Header.Set(key, value)
+	}
+
+	return req
 }

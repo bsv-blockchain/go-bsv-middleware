@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"log/slog"
@@ -131,7 +130,11 @@ func callInitialRequest(mockedWallet wallet.WalletInterface) *transport.AuthMess
 func callPingEndpoint(mockedWallet wallet.WalletInterface, response *transport.AuthMessage) {
 	url := "http://localhost:8080/ping"
 
-	headers, err := utils.PrepareGeneralRequestHeaders(mockedWallet, response, req)
+	requestData := utils.RequestData{
+		Method: "GET",
+		URL:    url,
+	}
+	headers, err := utils.PrepareGeneralRequestHeaders(mockedWallet, response, requestData)
 	if err != nil {
 		log.Fatalf("Failed to prepare general request headers: %v", err)
 	}
