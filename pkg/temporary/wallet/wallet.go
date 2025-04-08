@@ -3,15 +3,15 @@ package wallet
 import "context"
 
 // WalletInterface defines the core functionality needed for authentication
-type WalletInterface interface { //nolint:revive // This is an interface, so it's fine to use the name "WalletInterface".
+type WalletInterface interface { //nolint:revive // WalletInterface will be adopted from GO-SDK in the future.
 	// GetPublicKey returns a public key
-	GetPublicKey(ctx context.Context, options GetPublicKeyOptions) (string, error)
+	GetPublicKey(args *GetPublicKeyArgs, originator string) (*GetPublicKeyResult, error)
 
 	// CreateSignature signs data with specific protocol/key IDs
-	CreateSignature(ctx context.Context, data []byte, protocolID any, keyID string, counterparty string) ([]byte, error)
+	CreateSignature(args *CreateSignatureArgs, originator string) (*CreateSignatureResult, error)
 
 	// VerifySignature verifies a signature
-	VerifySignature(ctx context.Context, data []byte, signature []byte, protocolID any, keyID string, counterparty string) (bool, error)
+	VerifySignature(args *VerifySignatureArgs) (*VerifySignatureResult, error)
 
 	// CreateNonce creates a nonce for challenge-response authentication
 	CreateNonce(ctx context.Context) (string, error)

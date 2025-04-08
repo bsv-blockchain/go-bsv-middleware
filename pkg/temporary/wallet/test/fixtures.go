@@ -2,33 +2,8 @@ package wallet
 
 // Constants for expected return values
 const (
-	// IdentityKeyMock is the expected identity key
-	IdentityKeyMock = "02mockidentitykey0000000000000000000000000000000000000000000000000000000"
-	// DerivedKeyMock is the expected derived key
-	DerivedKeyMock = "02mockderivedkey0000000000000000000000000000000000000000000000000000000"
-	// MockSignature is the expected signature
-	MockSignature = "mocksignaturedata"
 	// MockNonce is the expected nonce
 	MockNonce = "VIKeYfx4YAoDnlEx87/f4/32ytl+R+dN6Qm8oEB6Hw="
-
-	// TODO: be replaced with actual error messages from the wallet package
-
-	// ErrorNoPrivilege is the error message for no privilege support
-	ErrorNoPrivilege = "no privilege support"
-	// ErrorKeyDeriver is the error message for key deriver not initialized
-	ErrorKeyDeriver = "keyDeriver is not initialized"
-	// ErrorMissingParams is the error message for missing parameters
-	ErrorMissingParams = "protocolID and keyID are required if identityKey is false or undefined"
-	// ErrorInvalidInput is the error message for invalid input
-	ErrorInvalidInput = "invalid input"
-)
-
-// Constants for mock setup
-const (
-	// WithKeyDeriver is a flag to initialize the key deriver
-	WithKeyDeriver = true
-	// WithoutKeyDeriver is a flag to not initialize the key deriver
-	WithoutKeyDeriver = false
 )
 
 // Nonces for testing, used real Nonces values to see if the process is working correctly
@@ -79,6 +54,8 @@ var (
 		"OuYi1TJLoUF2MVT8HYKm6SF3iZypyvjysaE3iCl7OR4=",
 	}
 
-	ServerIdentityKey = "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
-	ClientIdentityKey = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+	ServerIdentityKey = "022b0020d72601948e798eadc6376d94f395d80deb57f62d91dafa5003ec0db6b0"
+
+	ServerPrivateKeyHex = "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+	ClientPrivateKeyHex = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
 )

@@ -47,7 +47,7 @@ func UnableToVerifyNonceError(t *testing.T, res *http.Response) {
 // UnableToVerifySignatureError checks if the response body contains the "unable to verify signature" error.
 func UnableToVerifySignatureError(t *testing.T, res *http.Response) {
 	errString := readBody(t, res)
-	require.Contains(t, errString, "unable to verify signature")
+	require.Contains(t, errString, "failed to parse signature, malformed signature")
 }
 
 // MissingRequiredFieldsError checks if the response body contains the "missing required fields in initial request" error.

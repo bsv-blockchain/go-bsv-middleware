@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -37,6 +38,8 @@ func TestAuthMiddleware_Handshake_HappyPath(t *testing.T) {
 		require.NoError(t, err)
 		assert.ResponseOK(t, response)
 		assert.InitialResponseHeaders(t, response)
+
+		fmt.Print("response: ", response)
 
 		authMessage, err := mocks.MapBodyToAuthMessage(t, response)
 		require.NoError(t, err)

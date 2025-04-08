@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"log/slog"
 	"net/http"
@@ -17,27 +15,37 @@ import (
 	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/utils"
+	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
+	"github.com/go-resty/resty/v2"
 )
 
 func main() {
 	fmt.Println("BSV Auth middleware - Demo")
-	// Create structured logger
 	logHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
 	logger := slog.New(logHandler)
 
-	serverMockedWallet := wallet.NewMockWallet(true, nil, walletFixtures.DefaultNonces...)
+	sPrivKey, err := ec.PrivateKeyFromHex(walletFixtures.ServerPrivateKeyHex)
+	if err != nil {
+		panic(err)
+	}
+
+	serverMockedWallet := wallet.NewMockWallet(sPrivKey, walletFixtures.DefaultNonces...)
 	fmt.Println("✓ Server mockWallet created")
 
 	// Create authentication middleware with:
 	// - authentication enabled
 	// - custom logger
 	// - mocked wallet with predefined nonces
-	opts := auth.Options{
+	// - server private key
+	opts := auth.Config{
 		AllowUnauthenticated: false,
 		Logger:               logger,
 		Wallet:               serverMockedWallet,
 	}
-	middleware := auth.New(opts)
+	middleware, err := auth.New(opts)
+	if err != nil {
+		panic(err)
+	}
 
 	fmt.Println("✓ Auth middleware created")
 
@@ -61,103 +69,98 @@ func main() {
 	fmt.Println("✓ HTTP Server started")
 
 	// Create mocked client wallet with predefined client nonces and client identity key
-	mockedWallet := wallet.NewMockWallet(true, &walletFixtures.ClientIdentityKey, walletFixtures.ClientNonces...)
+	cPrivKey, err := ec.PrivateKeyFromHex(walletFixtures.ServerPrivateKeyHex)
+	if err != nil {
+		panic(err)
+	}
+	mockedWallet := wallet.NewMockWallet(cPrivKey, walletFixtures.ClientNonces...)
 	fmt.Println("✓ Client mockWallet created")
 
-	// Send initial request to /.well-known/auth endpoint
 	fmt.Println("\n📡 STEP 1: Sending non general request to /.well-known/auth endpoint")
 	responseData := callInitialRequest(mockedWallet)
 	fmt.Println("✓ Auth completed")
 
-	// Call /ping endpoint with set up auth headers
 	fmt.Println("\n📡 STEP 2: Sending general request to test authorization")
 	callPingEndpoint(mockedWallet, responseData)
 	fmt.Println("✓ General request completed")
 }
 
 func pingHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Pong!"))
+	_, err := w.Write([]byte("Pong!"))
+	if err != nil {
+		log.Printf("Error writing ping response: %v", err)
+	}
 }
 
 func callInitialRequest(mockedWallet wallet.WalletInterface) *transport.AuthMessage {
 	requestData := utils.PrepareInitialRequestBody(mockedWallet)
-	jsonData, err := json.Marshal(requestData)
-	if err != nil {
-		log.Fatalf("Failed to marshal request: %v", err)
-	}
-
 	url := "http://localhost:8080/.well-known/auth"
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		log.Fatalf("Failed to create request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	client := resty.New()
+	var result transport.AuthMessage
+	var errMsg any
+
+	resp, err := client.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(requestData).
+		SetResult(&result).
+		SetError(&errMsg).
+		Post(url)
+
 	if err != nil {
 		log.Fatalf("Request failed: %v", err)
 	}
-	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatalf("Failed to read response: %v", err)
+	if resp.IsError() {
+		log.Fatalf("Request failed: Status %d, Body: %s", resp.StatusCode(), resp.String())
 	}
 
-	fmt.Println("Response from server: ", string(body))
-
-	var responseData *transport.AuthMessage
-	if err = json.Unmarshal(body, &responseData); err != nil {
-		log.Fatalf("Failed to unmarshal response: %v", err)
-	}
+	fmt.Println("Response from server: ", resp.String())
 
 	fmt.Println("🔑 Response Headers:")
-	for key, value := range resp.Header {
-		if strings.Contains(strings.ToLower(key), "x-bsv-auth") {
-			fmt.Println(strings.ToLower(key), value)
+	for key, value := range resp.Header() {
+		lowerKey := strings.ToLower(key)
+		if strings.Contains(lowerKey, "x-bsv-auth") {
+			fmt.Println(lowerKey, strings.Join(value, ", "))
 		}
 	}
 
-	return responseData
+	return &result
 }
 
 func callPingEndpoint(mockedWallet wallet.WalletInterface, response *transport.AuthMessage) {
 	url := "http://localhost:8080/ping"
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		log.Fatalf("Failed to create request: %v", err)
-	}
 
 	headers, err := utils.PrepareGeneralRequestHeaders(mockedWallet, response, req)
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to prepare general request headers: %v", err)
 	}
 
 	fmt.Println("🔑 Request headers")
 	for key, value := range headers {
 		fmt.Println(key, value)
-		req.Header.Set(key, value)
 	}
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	client := resty.New()
+	resp, err := client.R().
+		SetHeaders(headers).
+		Get(url)
+
 	if err != nil {
 		log.Fatalf("Request failed: %v", err)
 	}
 
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatalf("Failed to read response: %v", err)
-	}
-
-	log.Printf("Response from server:            %s", string(body))
+	log.Printf("Response from server: %s", resp.String())
 
 	fmt.Println("🔑 Response Headers:")
-	for key, value := range resp.Header {
-		if strings.Contains(strings.ToLower(key), "x-bsv-auth") {
-			fmt.Println(strings.ToLower(key), value)
+	for key, value := range resp.Header() {
+		lowerKey := strings.ToLower(key)
+		if strings.Contains(lowerKey, "x-bsv-auth") {
+			fmt.Println(lowerKey, strings.Join(value, ", "))
 		}
+	}
+
+	if resp.IsError() {
+		log.Printf("Warning: Received non-success status from /ping: %d", resp.StatusCode())
 	}
 }
