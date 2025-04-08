@@ -87,6 +87,8 @@ func (kd *KeyDeriver) normalizeCounterparty(counterparty Counterparty) (*ec.Publ
 	case CounterpartyTypeAnyone:
 		_, pub := AnyoneKey()
 		return pub, nil
+	case CounterpartyUninitialized:
+		return nil, errors.New("counterparty type uninitialized")
 	default:
 		return nil, errors.New("invalid counterparty, must be self, other, or anyone")
 	}
