@@ -116,6 +116,7 @@ func PrepareGeneralRequestHeaders(walletInstance wallet.WalletInterface, previou
 	return headers, nil
 }
 
+// WriteRequestData writes the request data into a buffer
 func WriteRequestData(request *http.Request, writer *bytes.Buffer) error {
 	// Write the method and path
 	err := WriteVarIntNum(writer, len(request.Method))

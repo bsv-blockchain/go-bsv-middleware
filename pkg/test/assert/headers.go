@@ -16,14 +16,6 @@ var (
 		"x-bsv-auth-identity-key": walletFixtures.ServerIdentityKey,
 		"x-bsv-auth-your-nonce":   walletFixtures.ClientNonces[0],
 	}
-
-	generalResponseHeaders = map[string]string{
-		"x-bsv-auth-version":      "0.1",
-		"x-bsv-auth-message-type": "general",
-		"x-bsv-auth-identity-key": walletFixtures.ServerIdentityKey,
-		"x-bsv-auth-your-nonce":   walletFixtures.ClientNonces[0],
-		"x-bsv-auth-nonce":        walletFixtures.DefaultNonces[1],
-	}
 )
 
 // InitialResponseHeaders checks if the response headers are correct for the initial response.
