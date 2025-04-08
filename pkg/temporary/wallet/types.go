@@ -116,8 +116,6 @@ var (
 type CounterpartyType int
 
 const (
-	// CounterpartyUninitialized is used when the counterparty type is not set.
-	CounterpartyUninitialized CounterpartyType = 0
 	// CounterpartyTypeAnyone is used when the counterparty is anyone.
 	CounterpartyTypeAnyone CounterpartyType = 1
 	// CounterpartyTypeSelf is used when the counterparty is self.
