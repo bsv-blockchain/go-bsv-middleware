@@ -44,6 +44,5 @@ func getGeneralResponseHeaders(i int) map[string]string {
 		"x-bsv-auth-identity-key": walletFixtures.ServerIdentityKey,
 		"x-bsv-auth-your-nonce":   walletFixtures.ClientNonces[0],
 		"x-bsv-auth-nonce":        walletFixtures.DefaultNonces[1+i*2],
-		"x-bsv-auth-signature":    "6d6f636b7369676e617475726564617461",
 	}
 }
