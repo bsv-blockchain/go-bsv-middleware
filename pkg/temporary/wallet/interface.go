@@ -2,7 +2,7 @@ package wallet
 
 import (
 	"context"
-	
+
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )
 
