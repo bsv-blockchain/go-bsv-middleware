@@ -3,12 +3,12 @@ package wallet_test
 import (
 	"context"
 	"errors"
-	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
-	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
+	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMockPaymentWallet(t *testing.T) {
