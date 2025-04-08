@@ -6,16 +6,23 @@ import (
 	"testing"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
+	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMockPaymentWallet(t *testing.T) {
+	key, err := ec.NewPrivateKey()
+	if err != nil {
+		require.NoError(t, err)
+	}
+
 	t.Run("Implements PaymentInterface", func(t *testing.T) {
 		var _ wallet.PaymentInterface = &wallet.MockPaymentWallet{}
 	})
 
 	t.Run("Records InternalizeAction arguments", func(t *testing.T) {
-		mock := wallet.NewMockPaymentWallet()
+		mock := wallet.NewMockPaymentWallet(key)
 		args := wallet.InternalizeActionArgs{
 			Tx: []byte{1, 2, 3},
 			Outputs: []wallet.InternalizeOutput{
@@ -41,7 +48,7 @@ func TestMockPaymentWallet(t *testing.T) {
 	})
 
 	t.Run("Returns configured error", func(t *testing.T) {
-		mock := wallet.NewMockPaymentWallet()
+		mock := wallet.NewMockPaymentWallet(key)
 		expectedErr := errors.New("payment error")
 		mock.SetInternalizeActionError(expectedErr)
 
@@ -52,7 +59,7 @@ func TestMockPaymentWallet(t *testing.T) {
 	})
 
 	t.Run("Returns configured result", func(t *testing.T) {
-		mock := wallet.NewMockPaymentWallet()
+		mock := wallet.NewMockPaymentWallet(key)
 		expectedResult := wallet.InternalizeActionResult{Accepted: false}
 		mock.SetInternalizeActionResult(expectedResult)
 

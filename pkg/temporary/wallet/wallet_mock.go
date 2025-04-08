@@ -2,84 +2,154 @@ package wallet
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
+	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )
 
 // Wallet provides a simple mock implementation of WalletInterface.
 type Wallet struct {
-	identityKey string
-	keyDeriver  bool
+	keyDeriver  *KeyDeriver
 	validNonces map[string]bool
 	nonces      []string
 }
 
-// NewMockWallet creates a new mock wallet with the following options:
-// - keyDeriver: Enables or disables key derivation.
-// - identityKey: Uses the provided identity key or a default one if none is given.
-// - nonces: Uses the provided nonces or default one if none are provided.
-func NewMockWallet(enableKeyDeriver bool, identityKey *string, nonces ...string) WalletInterface {
-	if identityKey == nil {
-		identityKey = &wallet.ServerIdentityKey
-	}
+// NewMockWallet creates a new mock wallet with given privateKey and nonces if provided.
+func NewMockWallet(privateKey *ec.PrivateKey, nonces ...string) WalletInterface {
 	return &Wallet{
-		identityKey: *identityKey,
-		keyDeriver:  enableKeyDeriver,
 		validNonces: make(map[string]bool),
 		nonces:      append([]string(nil), nonces...),
+		keyDeriver:  NewKeyDeriver(privateKey),
 	}
 }
 
-// GetPublicKey returns a mock public key while validating required parameters.
-func (m *Wallet) GetPublicKey(ctx context.Context, options GetPublicKeyOptions) (string, error) {
-	if ctx.Err() != nil {
-		return "", fmt.Errorf("ctx err: %w", ctx.Err())
+// GetPublicKey retrieves the public key based on the provided arguments.
+func (m *Wallet) GetPublicKey(args *GetPublicKeyArgs, _ string) (*GetPublicKeyResult, error) {
+	if args == nil {
+		return nil, errors.New("args must be provided")
+	}
+	if args.IdentityKey {
+		return &GetPublicKeyResult{
+			PublicKey: m.keyDeriver.rootKey.PubKey(),
+		}, nil
 	}
 
-	if options.Privileged {
-		return "", errors.New(wallet.ErrorNoPrivilege)
+	if args.ProtocolID.Protocol == "" || args.KeyID == "" {
+		return nil, errors.New("protocolID and keyID are required if identityKey is false or undefined")
 	}
 
-	if options.IdentityKey {
-		if !m.keyDeriver {
-			return "", errors.New(wallet.ErrorKeyDeriver)
+	// Handle default counterparty (self)
+	counterparty := args.Counterparty
+	if counterparty.Type == CounterpartyUninitialized {
+		counterparty = Counterparty{
+			Type: CounterpartyTypeSelf,
 		}
-		return m.identityKey, nil
 	}
 
-	if options.ProtocolID == nil || options.KeyID == "" || options.KeyID == " " {
-		return "", errors.New(wallet.ErrorMissingParams)
+	pubKey, err := m.keyDeriver.DerivePublicKey(
+		args.ProtocolID,
+		args.KeyID,
+		counterparty,
+		args.ForSelf,
+	)
+	if err != nil {
+		return nil, err
 	}
 
-	if !m.keyDeriver {
-		return "", errors.New(wallet.ErrorKeyDeriver)
-	}
-
-	return wallet.DerivedKeyMock, nil
+	return &GetPublicKeyResult{
+		PublicKey: pubKey,
+	}, nil
 }
 
-// CreateSignature returns a mock signature.
-func (m *Wallet) CreateSignature(ctx context.Context, data []byte, protocolID any, keyID string, counterparty string) ([]byte, error) {
-	if ctx.Err() != nil {
-		return nil, fmt.Errorf("ctx err: %w", ctx.Err())
+// CreateSignature creates a digital signature for the given arguments
+func (w *Wallet) CreateSignature(args *CreateSignatureArgs, _ string) (*CreateSignatureResult, error) {
+	if args == nil {
+		return nil, errors.New("args must be provided")
+	}
+	if len(args.Data) == 0 && len(args.DashToDirectlySign) == 0 {
+		return nil, errors.New("args.data or args.hashToDirectlySign must be valid")
 	}
 
-	if len(data) == 0 || keyID == "" || counterparty == "" {
-		return nil, errors.New(wallet.ErrorInvalidInput)
+	var hash []byte
+	if len(args.DashToDirectlySign) > 0 {
+		hash = args.DashToDirectlySign
+	} else {
+		sum := sha256.Sum256(args.Data)
+		hash = sum[:]
 	}
 
-	return []byte(wallet.MockSignature), nil
+	counterparty := args.Counterparty
+	if counterparty.Type == CounterpartyUninitialized {
+		counterparty = Counterparty{
+			Type: CounterpartyTypeAnyone,
+		}
+	}
+
+	privKey, err := w.keyDeriver.DerivePrivateKey(
+		args.ProtocolID,
+		args.KeyID,
+		counterparty,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive private key: %w", err)
+	}
+
+	signature, err := privKey.Sign(hash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create signature: %w", err)
+	}
+
+	return &CreateSignatureResult{
+		Signature: *signature,
+	}, nil
 }
 
-// VerifySignature returns true if the signature matches expected mock data.
-func (m *Wallet) VerifySignature(ctx context.Context, data []byte, signature []byte, protocolID any, keyID string, counterparty string) (bool, error) {
-	if ctx.Err() != nil {
-		return false, fmt.Errorf("ctx err: %w", ctx.Err())
+// VerifySignature checks the validity of a cryptographic signature.
+// It verifies that the signature was created using the expected protocol and key ID.
+func (w *Wallet) VerifySignature(args *VerifySignatureArgs) (*VerifySignatureResult, error) {
+	if args == nil {
+		return nil, errors.New("args must be provided")
+	}
+	if len(args.Data) == 0 && len(args.HashToDirectlyVerify) == 0 {
+		return nil, errors.New("args.data or args.hashToDirectlyVerify must be valid")
 	}
 
-	return string(signature) == wallet.MockSignature, nil
+	var hash []byte
+	if len(args.HashToDirectlyVerify) > 0 {
+		hash = args.HashToDirectlyVerify
+	} else {
+		sum := sha256.Sum256(args.Data)
+		hash = sum[:]
+	}
+
+	counterparty := args.Counterparty
+	if counterparty.Type == CounterpartyUninitialized {
+		counterparty = Counterparty{
+			Type: CounterpartyTypeSelf,
+		}
+	}
+
+	pubKey, err := w.keyDeriver.DerivePublicKey(
+		args.ProtocolID,
+		args.KeyID,
+		counterparty,
+		args.ForSelf,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive public key: %w", err)
+	}
+
+	valid := args.Signature.Verify(hash, pubKey)
+	if !valid {
+		return nil, errors.New("signature is not valid")
+	}
+
+	return &VerifySignatureResult{
+		Valid: valid,
+	}, nil
 }
 
 // CreateNonce generates a deterministic nonce.
