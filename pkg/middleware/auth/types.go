@@ -5,6 +5,7 @@ import (
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/sessionmanager"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
+	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )
 
 // Options configures the auth middleware
@@ -13,4 +14,5 @@ type Options struct {
 	SessionManager       sessionmanager.SessionManagerInterface
 	AllowUnauthenticated bool
 	Logger               *slog.Logger
+	PrivateKey           *ec.PrivateKey
 }

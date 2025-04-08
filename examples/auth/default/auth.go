@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"io"
 	"log"
 	"log/slog"
@@ -25,19 +26,29 @@ func main() {
 	logHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
 	logger := slog.New(logHandler)
 
-	serverMockedWallet := wallet.NewMockWallet(true, nil, walletFixtures.DefaultNonces...)
+	sPrivKey, err := ec.PrivateKeyFromHex(walletFixtures.ServerPrivateKeyHex)
+	if err != nil {
+		panic(err)
+	}
+
+	serverMockedWallet := wallet.NewMockWallet(sPrivKey, walletFixtures.DefaultNonces...)
 	fmt.Println("✓ Server mockWallet created")
 
 	// Create authentication middleware with:
 	// - authentication enabled
 	// - custom logger
 	// - mocked wallet with predefined nonces
+	// - server private key
 	opts := auth.Options{
 		AllowUnauthenticated: false,
 		Logger:               logger,
 		Wallet:               serverMockedWallet,
+		PrivateKey:           sPrivKey,
 	}
-	middleware := auth.New(opts)
+	middleware, err := auth.New(opts)
+	if err != nil {
+		panic(err)
+	}
 
 	fmt.Println("✓ Auth middleware created")
 
@@ -61,7 +72,11 @@ func main() {
 	fmt.Println("✓ HTTP Server started")
 
 	// Create mocked client wallet with predefined client nonces and client identity key
-	mockedWallet := wallet.NewMockWallet(true, &walletFixtures.ClientIdentityKey, walletFixtures.ClientNonces...)
+	cPrivKey, err := ec.PrivateKeyFromHex(walletFixtures.ServerPrivateKeyHex)
+	if err != nil {
+		panic(err)
+	}
+	mockedWallet := wallet.NewMockWallet(cPrivKey, walletFixtures.ClientNonces...)
 	fmt.Println("✓ Client mockWallet created")
 
 	// Send initial request to /.well-known/auth endpoint

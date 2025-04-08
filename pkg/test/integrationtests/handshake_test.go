@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
@@ -34,6 +35,8 @@ func TestAuthMiddleware_Handshake_HappyPath(t *testing.T) {
 		require.NoError(t, err)
 		assert.ResponseOK(t, response)
 		assert.InitialResponseHeaders(t, response)
+
+		fmt.Print("response: ", response)
 
 		authMessage, err := mocks.MapBodyToAuthMessage(t, response)
 		require.NoError(t, err)
