@@ -29,7 +29,6 @@ func main() {
 	fmt.Println("🔒 AGE VERIFICATION DEMO - SECURE AUTHENTICATION FLOW")
 	fmt.Println("============================================================")
 
-	// Initialize logger
 	logHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
 	logger := slog.New(logHandler)
 
@@ -49,7 +48,6 @@ func main() {
 		res http.ResponseWriter,
 		next func()) {
 
-		// Reject if no certificate was provided
 		if certs == nil || len(*certs) == 0 {
 			logger.Error("No certificates provided")
 			res.WriteHeader(http.StatusForbidden)
@@ -59,11 +57,9 @@ func main() {
 
 		validAge := false
 
-		// Validate each certificate
 		for i, cert := range *certs {
 			logger.Info("Certificate received", slog.Int("index", i), slog.Any("certificate", cert))
 
-			// Ensure the certificate subject matches the sender
 			if cert.Certificate.Subject != senderPublicKey {
 				logger.Error("Certificate subject mismatch",
 					slog.String("subject", cert.Certificate.Subject),
@@ -71,19 +67,16 @@ func main() {
 				continue
 			}
 
-			// Check certifier
 			if cert.Certificate.Certifier != trustedCertifier {
 				logger.Error("Certificate not from trusted certifier")
 				continue
 			}
 
-			// Check type
 			if cert.Certificate.Type != "age-verification" {
 				logger.Error("Unexpected certificate type")
 				continue
 			}
 
-			// Extract and parse age
 			ageVal, ok := cert.Certificate.Fields["age"]
 			if !ok {
 				logger.Error("No age field found")
@@ -96,7 +89,6 @@ func main() {
 				continue
 			}
 
-			// Validate age
 			if age < 18 {
 				logger.Error("Age below 18", slog.Int("age", age))
 				continue
@@ -107,7 +99,6 @@ func main() {
 			break
 		}
 
-		// Block request if no valid cert
 		if !validAge {
 			logger.Error("Age verification failed")
 			res.WriteHeader(http.StatusForbidden)
@@ -115,14 +106,12 @@ func main() {
 			return
 		}
 
-		// Continue request if age is verified
 		logger.Info("Age verification successful")
 		if next != nil {
 			next()
 		}
 	}
 
-	// Configure authentication middleware
 	opts := auth.Config{
 		AllowUnauthenticated:   false,
 		Logger:                 logger,
@@ -132,12 +121,10 @@ func main() {
 	}
 	middleware := auth.New(opts)
 
-	// Setup HTTP routes with middleware
 	mux := http.NewServeMux()
 	mux.Handle("/", middleware.Handler(http.HandlerFunc(pingHandler)))
 	mux.Handle("/ping", middleware.Handler(http.HandlerFunc(pingHandler)))
 
-	// Start HTTP server
 	srv := &http.Server{
 		Addr:    ":8080",
 		Handler: mux,
@@ -149,7 +136,6 @@ func main() {
 		}
 	}()
 
-	// Allow server some time to start
 	time.Sleep(1 * time.Second)
 	fmt.Println("\n✅ Server initialized successfully on http://localhost:8080")
 	fmt.Println("   Protected endpoints: / and /ping")
@@ -160,15 +146,12 @@ func main() {
 	fmt.Println("🧪 SIMULATING CLIENT AUTHENTICATION FLOW")
 	fmt.Println("============================================================")
 
-	// Create mocked client wallet
 	mockedWallet := wallet.NewMockWallet(true, &walletFixtures.ClientIdentityKey, walletFixtures.ClientNonces...)
 
-	// Step 1: Initial authentication request
 	fmt.Println("\n📡 STEP 1: Client initiates authentication handshake")
 	responseData := callInitialRequest(mockedWallet)
 	fmt.Printf("   ↪ Server responded with identity key: %s...\n", responseData.IdentityKey[:16])
 
-	// Step 2: Try to access protected resource without certificate
 	fmt.Println("\n📡 STEP 2: Testing access to protected resource WITHOUT certificate")
 	resp := callPingEndpoint(mockedWallet, responseData)
 	expectedErrorCode := http.StatusUnauthorized
@@ -178,7 +161,6 @@ func main() {
 		fmt.Printf("   ✅ SUCCESS: Server correctly denied access with status %d (Unauthorized)\n", expectedErrorCode)
 	}
 
-	// Step 3: Send valid certificate
 	fmt.Println("\n📡 STEP 3: Sending valid age verification certificate")
 	response2 := sendCertificate(mockedWallet, responseData.IdentityKey, responseData.InitialNonce)
 	if response2.StatusCode != http.StatusOK {
@@ -187,7 +169,6 @@ func main() {
 		fmt.Println("   ✅ SUCCESS: Server accepted the age verification certificate")
 	}
 
-	// Step 4: Try accessing protected resource again (should be allowed now)
 	fmt.Println("\n📡 STEP 4: Testing access to protected resource WITH valid certificate")
 	resp = callPingEndpoint(mockedWallet, responseData)
 	if resp.StatusCode != http.StatusOK {
@@ -204,14 +185,12 @@ func main() {
 
 // ========== Handlers ==========
 
-// Simple test handler to validate access
 func pingHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Pong!"))
 }
 
 // ========== Client Request Helpers ==========
 
-// Sends the initial authentication request
 func callInitialRequest(mockedWallet wallet.WalletInterface) *transport.AuthMessage {
 	requestData := mocks.PrepareInitialRequestBody(mockedWallet)
 	jsonData, err := json.Marshal(requestData)
@@ -247,7 +226,6 @@ func callInitialRequest(mockedWallet wallet.WalletInterface) *transport.AuthMess
 	return responseData
 }
 
-// Sends GET /ping with appropriate authentication headers
 func callPingEndpoint(mockedWallet wallet.WalletInterface, response *transport.AuthMessage) *http.Response {
 	url := "http://localhost:8080/ping"
 	req, err := http.NewRequest("GET", url, nil)
@@ -255,7 +233,6 @@ func callPingEndpoint(mockedWallet wallet.WalletInterface, response *transport.A
 		log.Fatalf("Failed to create request: %v", err)
 	}
 
-	// Ensure nonces are set
 	if response.InitialNonce == "" {
 		response.InitialNonce = *response.Nonce
 	}
@@ -288,7 +265,6 @@ func callPingEndpoint(mockedWallet wallet.WalletInterface, response *transport.A
 	return resp
 }
 
-// Sends a valid age-verification certificate to the server
 func sendCertificate(clientWallet wallet.WalletInterface, serverIdentityKey, previousNonce string) *http.Response {
 	identityKey, err := clientWallet.GetPublicKey(context.Background(), wallet.GetPublicKeyOptions{IdentityKey: true})
 	if err != nil {
@@ -316,7 +292,6 @@ func sendCertificate(clientWallet wallet.WalletInterface, serverIdentityKey, pre
 		},
 	}
 
-	// Create and sign AuthMessage
 	certMessage := transport.AuthMessage{
 		Version:      "0.1",
 		MessageType:  "certificateResponse",
@@ -330,7 +305,6 @@ func sendCertificate(clientWallet wallet.WalletInterface, serverIdentityKey, pre
 	certMessage.Signature = &signature
 	requestBody, _ = json.Marshal(certMessage)
 
-	// Create request with headers
 	headers, _ := mocks.PrepareGeneralRequestHeaders(clientWallet, &certMessage, "/.well-known/auth", "POST")
 	req, _ := http.NewRequest("POST", "http://localhost:8080/.well-known/auth", bytes.NewReader(requestBody))
 	for key, value := range headers {

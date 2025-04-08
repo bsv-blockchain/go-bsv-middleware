@@ -73,19 +73,14 @@ func PrepareInitialRequestBody(mockedWallet wallet.WalletInterface) *RequestBody
 
 // PrepareGeneralRequestHeaders prepares the general request headers
 func PrepareGeneralRequestHeaders(mockedWallet wallet.WalletInterface, previousResponse *transport.AuthMessage, path, method string) (Headers, error) {
-	// Protection against nil previousResponse - common issue in tests
 	if previousResponse == nil {
 		return nil, errors.New("previous response is nil")
 	}
 
-	// Protection against incomplete previousResponse object
-	// Ensure required fields for PrepareGeneralRequestHeaders are available
 	if previousResponse.IdentityKey == "" {
 		return nil, errors.New("previous response missing identity key")
 	}
 
-	// Ensure we have a nonce to use - either InitialNonce or Nonce
-	// This handles cases where there might be inconsistency in the response structure
 	yourNonce := previousResponse.InitialNonce
 	if yourNonce == "" && previousResponse.Nonce != nil {
 		yourNonce = *previousResponse.Nonce
@@ -95,8 +90,6 @@ func PrepareGeneralRequestHeaders(mockedWallet wallet.WalletInterface, previousR
 		return nil, errors.New("previous response has no nonce to use")
 	}
 
-	// Prepare previous response for utils.PrepareGeneralRequestHeaders
-	// This ensures the response has the expected structure
 	normalizedResponse := &transport.AuthMessage{
 		Version:      previousResponse.Version,
 		MessageType:  previousResponse.MessageType,
@@ -104,7 +97,6 @@ func PrepareGeneralRequestHeaders(mockedWallet wallet.WalletInterface, previousR
 		InitialNonce: yourNonce,
 	}
 
-	// We can now safely call the global utils function
 	headers, err := globalutils.PrepareGeneralRequestHeaders(mockedWallet, normalizedResponse, path, method)
 	if err != nil {
 		return nil, errors.New("failed to prepare general request headers: " + err.Error())

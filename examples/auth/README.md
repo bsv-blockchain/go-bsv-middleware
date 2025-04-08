@@ -98,6 +98,8 @@ opts := auth.Config{
 		next func()) {
             validAge = false
             ...
+            // Do additional checks
+            ...
 			// Extract and parse age
             ...
 			// Validate age
@@ -113,7 +115,6 @@ opts := auth.Config{
 }
 middleware := auth.New(opts)
 
-// Setup HTTP routes with middleware
 mux := http.NewServeMux()
 mux.Handle("/ping", middleware.Handler(http.HandlerFunc(pingHandler)))
 ```

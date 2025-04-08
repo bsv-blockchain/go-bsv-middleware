@@ -18,16 +18,15 @@ func TestNew_PanicsWithInconsistentCertificateConfig(t *testing.T) {
 		mockSessionManager := sessionmanager.NewSessionManager()
 
 		onCertificatesReceived := func(senderPublicKey string, certs *[]wallet.VerifiableCertificate, req *http.Request, res http.ResponseWriter, next func()) {
-			// This shouldn't be called in this test
 		}
 
-		// then - should panic
+		// then
 		assert.Panics(t, func() {
 			auth.New(auth.Config{
 				Wallet:                 mockWallet,
 				SessionManager:         mockSessionManager,
 				OnCertificatesReceived: onCertificatesReceived,
-				CertificatesToRequest:  nil, // Missing certificate request config
+				CertificatesToRequest:  nil,
 			})
 		})
 	})
@@ -44,13 +43,13 @@ func TestNew_PanicsWithInconsistentCertificateConfig(t *testing.T) {
 			},
 		}
 
-		// then - should panic
+		// then
 		assert.Panics(t, func() {
 			auth.New(auth.Config{
 				Wallet:                 mockWallet,
 				SessionManager:         mockSessionManager,
 				CertificatesToRequest:  certificatesToRequest,
-				OnCertificatesReceived: nil, // Missing callback
+				OnCertificatesReceived: nil,
 			})
 		})
 	})
@@ -70,10 +69,9 @@ func TestNew_InitializesWithValidCertificateConfig(t *testing.T) {
 		}
 
 		onCertificatesReceived := func(senderPublicKey string, certs *[]wallet.VerifiableCertificate, req *http.Request, res http.ResponseWriter, next func()) {
-			// Valid callback
 		}
 
-		// when - should not panic
+		// when
 		middleware := auth.New(auth.Config{
 			Wallet:                 mockWallet,
 			SessionManager:         mockSessionManager,
@@ -91,10 +89,9 @@ func TestNew_DefaultSessionManager(t *testing.T) {
 		// given
 		mockWallet := wallet.NewMockWallet(true, nil)
 
-		// when - should not panic
+		// when
 		middleware := auth.New(auth.Config{
 			Wallet: mockWallet,
-			// No SessionManager provided, should create a default one
 		})
 
 		// then
@@ -104,10 +101,8 @@ func TestNew_DefaultSessionManager(t *testing.T) {
 
 func TestNew_DefaultWallet(t *testing.T) {
 	t.Run("creates default wallet when none provided", func(t *testing.T) {
-		// when - should not panic
-		middleware := auth.New(auth.Config{
-			// No Wallet provided, should create a default one
-		})
+		// when
+		middleware := auth.New(auth.Config{})
 
 		// then
 		assert.NotNil(t, middleware)
@@ -119,10 +114,10 @@ func TestNew_MisconfigurationErrors(t *testing.T) {
 		// given
 		mockWallet := wallet.NewMockWallet(true, nil)
 
-		// when - should not panic
+		// when
 		middleware := auth.New(auth.Config{
 			Wallet: mockWallet,
-			Logger: nil, // No logger provided
+			Logger: nil,
 		})
 
 		// then

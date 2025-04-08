@@ -112,14 +112,12 @@ func (s *MockHTTPServer) SendGeneralRequest(t *testing.T, method, path string, h
 
 // SendCertificateResponse sends a certificate response to the server
 func (s *MockHTTPServer) SendCertificateResponse(t *testing.T, clientWallet wallet.WalletInterface, authMsg *transport.AuthMessage, certificates *[]wallet.VerifiableCertificate) (*http.Response, error) {
-	// Create certificate response message
 	nonce, err := clientWallet.CreateNonce(context.Background())
 	require.NoError(t, err)
 
 	identityKey, err := clientWallet.GetPublicKey(context.Background(), wallet.GetPublicKeyOptions{IdentityKey: true})
 	require.NoError(t, err)
 
-	// Create the certificate message
 	certMessage := transport.AuthMessage{
 		Version:      "0.1",
 		MessageType:  "certificateResponse",
@@ -129,11 +127,9 @@ func (s *MockHTTPServer) SendCertificateResponse(t *testing.T, clientWallet wall
 		Certificates: certificates,
 	}
 
-	// Marshal the certificates for signature creation
 	certBytes, err := json.Marshal(*certificates)
 	require.NoError(t, err)
 
-	// Create signature for certificates
 	signature, err := clientWallet.CreateSignature(
 		context.Background(),
 		certBytes,
@@ -144,11 +140,9 @@ func (s *MockHTTPServer) SendCertificateResponse(t *testing.T, clientWallet wall
 	require.NoError(t, err)
 	certMessage.Signature = &signature
 
-	// Marshal the full message
 	jsonData, err := json.Marshal(certMessage)
 	require.NoError(t, err)
 
-	// Prepare and send request
 	req, err := http.NewRequest("POST", s.URL()+"/.well-known/auth", bytes.NewBuffer(jsonData))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
