@@ -93,17 +93,6 @@ func PrepareGeneralRequestHeaders(walletInstance wallet.WalletInterface, previou
 	if err != nil {
 		return nil, errors.New("failed to write body length")
 	}
-	//
-	//signature, err := walletInstance.CreateSignature(
-	//	context.Background(),
-	//	writer.Bytes(),
-	//	"auth message signature",
-	//	fmt.Sprintf("%s %s", newNonce, serverNonce),
-	//	serverIdentityKey,
-	//)
-	//if err != nil {
-	//	return nil, errors.New("failed to create signature")
-	//}
 
 	key, err := ec.PublicKeyFromString(serverIdentityKey)
 	if err != nil {
