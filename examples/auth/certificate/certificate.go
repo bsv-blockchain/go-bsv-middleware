@@ -210,17 +210,7 @@ func pingHandler(w http.ResponseWriter, r *http.Request) {
 
 func callInitialRequest(mockedWallet wallet.WalletInterface) *transport.AuthMessage {
 	requestData := mocks.PrepareInitialRequestBody(mockedWallet)
-	// jsonData, err := json.Marshal(requestData)
-	// if err != nil {
-	// 	log.Fatalf("Failed to marshal request: %v", err)
-	// }
-
 	url := "http://localhost:8080/.well-known/auth"
-	// req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
-	// if err != nil {
-	// 	log.Fatalf("Failed to create request: %v", err)
-	// }
-
 	var result transport.AuthMessage
 	var errMsg any
 
@@ -367,26 +357,6 @@ func sendCertificate(clientWallet wallet.WalletInterface, serverIdentityKey, pre
 	if err != nil {
 		log.Fatalf("Failed to marshal certificate message: %v", err)
 	}
-
-	// req, err := http.NewRequest("POST", "http://localhost:8080/.well-known/auth", bytes.NewReader(requestBody))
-	// if err != nil {
-	// 	log.Fatalf("Failed to create request: %v", err)
-	// }
-	// req.Header.Set("Content-Type", "application/json")
-
-	// client := &http.Client{}
-	// resp, err := client.Do(req)
-	// if err != nil {
-	// 	log.Fatalf("Request failed: %v", err)
-	// }
-	// defer resp.Body.Close()
-
-	// body, err := io.ReadAll(resp.Body)
-	// if err != nil {
-	// 	log.Fatalf("Failed to read response: %v", err)
-	// }
-	// log.Printf("Certificate response: %s", string(body))
-
 	client := resty.New()
 	var result transport.AuthMessage
 	var errMsg any
