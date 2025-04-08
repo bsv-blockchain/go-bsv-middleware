@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -45,7 +46,12 @@ func TestNewMiddleware(t *testing.T) {
 	})
 
 	t.Run("Creates middleware with valid options", func(t *testing.T) {
-		mockWallet := wallet.NewMockPaymentWallet()
+		key, err := ec.NewPrivateKey()
+		if err != nil {
+			require.NoError(t, err)
+		}
+
+		mockWallet := wallet.NewMockPaymentWallet(key)
 		options := payment.Options{
 			Wallet: mockWallet,
 		}
@@ -58,7 +64,11 @@ func TestNewMiddleware(t *testing.T) {
 }
 
 func TestMiddleware_Handler_MissingAuthContext(t *testing.T) {
-	mockWallet := wallet.NewMockPaymentWallet()
+	key, err := ec.NewPrivateKey()
+	if err != nil {
+		require.NoError(t, err)
+	}
+	mockWallet := wallet.NewMockPaymentWallet(key)
 	middleware, err := payment.New(payment.Options{
 		Wallet: mockWallet,
 	})
@@ -85,7 +95,11 @@ func TestMiddleware_Handler_MissingAuthContext(t *testing.T) {
 }
 
 func TestMiddleware_Handler_FreeAccess(t *testing.T) {
-	mockWallet := wallet.NewMockPaymentWallet()
+	key, err := ec.NewPrivateKey()
+	if err != nil {
+		require.NoError(t, err)
+	}
+	mockWallet := wallet.NewMockPaymentWallet(key)
 	middleware, err := payment.New(payment.Options{
 		Wallet: mockWallet,
 		CalculateRequestPrice: func(r *http.Request) (int, error) {
@@ -114,7 +128,11 @@ func TestMiddleware_Handler_FreeAccess(t *testing.T) {
 }
 
 func TestMiddleware_Handler_PaymentRequired(t *testing.T) {
-	mockWallet := wallet.NewMockPaymentWallet()
+	key, err := ec.NewPrivateKey()
+	if err != nil {
+		require.NoError(t, err)
+	}
+	mockWallet := wallet.NewMockPaymentWallet(key)
 	middleware, err := payment.New(payment.Options{
 		Wallet: mockWallet,
 		CalculateRequestPrice: func(r *http.Request) (int, error) {
@@ -148,7 +166,11 @@ func TestMiddleware_Handler_PaymentRequired(t *testing.T) {
 }
 
 func TestMiddleware_Handler_InvalidPaymentData(t *testing.T) {
-	mockWallet := wallet.NewMockPaymentWallet()
+	key, err := ec.NewPrivateKey()
+	if err != nil {
+		require.NoError(t, err)
+	}
+	mockWallet := wallet.NewMockPaymentWallet(key)
 	middleware, err := payment.New(payment.Options{
 		Wallet: mockWallet,
 	})
@@ -179,7 +201,11 @@ func TestMiddleware_Handler_InvalidPaymentData(t *testing.T) {
 
 func TestMiddleware_Handler_ProcessPayment(t *testing.T) {
 	t.Run("successful payment", func(t *testing.T) {
-		mockWallet := wallet.NewMockPaymentWallet()
+		key, err := ec.NewPrivateKey()
+		if err != nil {
+			require.NoError(t, err)
+		}
+		mockWallet := wallet.NewMockPaymentWallet(key)
 		mockWalletSetup(t, mockWallet, fixtures.MockNonce)
 
 		mockWallet.SetInternalizeActionResult(wallet.InternalizeActionResult{
@@ -236,7 +262,11 @@ func TestMiddleware_Handler_ProcessPayment(t *testing.T) {
 
 	t.Run("wallet returns error", func(t *testing.T) {
 		expectedError := errors.New("payment validation failed")
-		mockWallet := wallet.NewMockPaymentWallet()
+		key, err := ec.NewPrivateKey()
+		if err != nil {
+			require.NoError(t, err)
+		}
+		mockWallet := wallet.NewMockPaymentWallet(key)
 		mockWalletSetup(t, mockWallet, fixtures.MockNonce)
 		mockWallet.SetInternalizeActionError(expectedError)
 
