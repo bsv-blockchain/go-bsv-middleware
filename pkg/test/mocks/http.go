@@ -14,7 +14,9 @@ import (
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/internal/logging"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
+	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
+	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/stretchr/testify/require"
 )
 
@@ -111,12 +113,20 @@ func (s *MockHTTPServer) createMiddleware() {
 		s.logger = slog.New(slog.DiscardHandler)
 	}
 
+	key, err := ec.PrivateKeyFromHex(walletFixtures.ServerPrivateKeyHex)
+	if err != nil {
+		panic("failed to create server private key")
+	}
+
 	opts := auth.Config{
 		AllowUnauthenticated: s.allowUnauthenticated,
 		Logger:               s.logger,
-		Wallet:               CreateServerMockWallet(),
+		Wallet:               CreateServerMockWallet(key),
 	}
-	s.authMiddleware = auth.New(opts)
+	s.authMiddleware, err = auth.New(opts)
+	if err != nil {
+		panic("failed to create auth middleware")
+	}
 }
 
 // WithAuthMiddleware adds auth middleware to the server

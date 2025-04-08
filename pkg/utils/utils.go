@@ -12,12 +12,13 @@ import (
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport/utils"
+	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )
 
 // PrepareInitialRequestBody prepares the initial request body
 func PrepareInitialRequestBody(walletInstance wallet.WalletInterface) transport.AuthMessage {
-	opts := wallet.GetPublicKeyOptions{IdentityKey: true}
-	clientIdentityKey, err := walletInstance.GetPublicKey(context.Background(), opts)
+	opts := wallet.GetPublicKeyArgs{IdentityKey: true}
+	clientIdentityKey, err := walletInstance.GetPublicKey(&opts, "")
 	if err != nil {
 		panic(err)
 	}
@@ -30,7 +31,7 @@ func PrepareInitialRequestBody(walletInstance wallet.WalletInterface) transport.
 	initialRequest := transport.AuthMessage{
 		Version:      "0.1",
 		MessageType:  "initialRequest",
-		IdentityKey:  clientIdentityKey,
+		IdentityKey:  clientIdentityKey.PublicKey.ToDERHex(),
 		InitialNonce: initialNonce,
 	}
 
@@ -42,8 +43,8 @@ func PrepareGeneralRequestHeaders(walletInstance wallet.WalletInterface, previou
 	serverIdentityKey := previousResponse.IdentityKey
 	serverNonce := previousResponse.InitialNonce
 
-	opts := wallet.GetPublicKeyOptions{IdentityKey: true}
-	clientIdentityKey, err := walletInstance.GetPublicKey(context.Background(), opts)
+	opts := wallet.GetPublicKeyArgs{IdentityKey: true}
+	clientIdentityKey, err := walletInstance.GetPublicKey(&opts, "")
 	if err != nil {
 		return nil, errors.New("failed to get client identity key")
 	}
@@ -93,23 +94,35 @@ func PrepareGeneralRequestHeaders(walletInstance wallet.WalletInterface, previou
 		return nil, errors.New("failed to write body length")
 	}
 
-	signature, err := walletInstance.CreateSignature(
-		context.Background(),
-		writer.Bytes(),
-		"auth message signature",
-		fmt.Sprintf("%s %s", newNonce, serverNonce),
-		serverIdentityKey,
-	)
+	key, err := ec.PublicKeyFromString(serverIdentityKey)
 	if err != nil {
-		return nil, errors.New("failed to create signature")
+		return nil, fmt.Errorf("failed to parse identity key, %w", err)
+	}
+
+	baseArgs := wallet.EncryptionArgs{
+		ProtocolID: wallet.DefaultAuthProtocol,
+		Counterparty: wallet.Counterparty{
+			Type:         wallet.CounterpartyTypeOther,
+			Counterparty: key,
+		},
+		KeyID: fmt.Sprintf("%s %s", newNonce, serverNonce),
+	}
+	createSignatureArgs := &wallet.CreateSignatureArgs{
+		EncryptionArgs: baseArgs,
+		Data:           writer.Bytes(),
+	}
+
+	signature, err := walletInstance.CreateSignature(createSignatureArgs, "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create signature, %w", err)
 	}
 
 	headers := map[string]string{
 		"x-bsv-auth-version":      "0.1",
-		"x-bsv-auth-identity-key": clientIdentityKey,
+		"x-bsv-auth-identity-key": clientIdentityKey.PublicKey.ToDERHex(),
 		"x-bsv-auth-nonce":        newNonce,
 		"x-bsv-auth-your-nonce":   serverNonce,
-		"x-bsv-auth-signature":    hex.EncodeToString(signature),
+		"x-bsv-auth-signature":    hex.EncodeToString(signature.Signature.Serialize()),
 		"x-bsv-auth-request-id":   encodedRequestID,
 	}
 

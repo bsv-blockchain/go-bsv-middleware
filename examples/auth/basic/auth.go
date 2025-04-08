@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/go-resty/resty/v2"
 	"log"
 	"log/slog"
 	"net/http"
@@ -15,6 +14,8 @@ import (
 	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/test/mocks"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
+	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
+	"github.com/go-resty/resty/v2"
 )
 
 func main() {
@@ -22,15 +23,28 @@ func main() {
 	logHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
 	logger := slog.New(logHandler)
 
-	serverMockedWallet := wallet.NewMockWallet(true, nil, walletFixtures.DefaultNonces...)
+	sPrivKey, err := ec.PrivateKeyFromHex(walletFixtures.ServerPrivateKeyHex)
+	if err != nil {
+		panic(err)
+	}
+
+	serverMockedWallet := wallet.NewMockWallet(sPrivKey, walletFixtures.DefaultNonces...)
 	fmt.Println("✓ Server mockWallet created")
 
+	// Create authentication middleware with:
+	// - authentication enabled
+	// - custom logger
+	// - mocked wallet with predefined nonces
+	// - server private key
 	opts := auth.Config{
 		AllowUnauthenticated: false,
 		Logger:               logger,
 		Wallet:               serverMockedWallet,
 	}
-	middleware := auth.New(opts)
+	middleware, err := auth.New(opts)
+	if err != nil {
+		panic(err)
+	}
 
 	fmt.Println("✓ Auth middleware created")
 
@@ -53,7 +67,12 @@ func main() {
 
 	fmt.Println("✓ HTTP Server started")
 
-	mockedWallet := wallet.NewMockWallet(true, &walletFixtures.ClientIdentityKey, walletFixtures.ClientNonces...)
+	// Create mocked client wallet with predefined client nonces and client identity key
+	cPrivKey, err := ec.PrivateKeyFromHex(walletFixtures.ServerPrivateKeyHex)
+	if err != nil {
+		panic(err)
+	}
+	mockedWallet := wallet.NewMockWallet(cPrivKey, walletFixtures.ClientNonces...)
 	fmt.Println("✓ Client mockWallet created")
 
 	fmt.Println("\n📡 STEP 1: Sending non general request to /.well-known/auth endpoint")

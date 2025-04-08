@@ -72,13 +72,13 @@ func (r *responseRecorder) Finalize() error {
 }
 
 // New creates a new auth middleware
-func New(opts Config) *Middleware {
+func New(opts Config) (*Middleware, error) {
 	if opts.SessionManager == nil {
 		opts.SessionManager = sessionmanager.NewSessionManager()
 	}
 
 	if opts.Wallet == nil {
-		opts.Wallet = wallet.NewMockWallet(true, nil)
+		return nil, errors.New("wallet is required")
 	}
 
 	if opts.Logger == nil {
@@ -99,7 +99,7 @@ func New(opts Config) *Middleware {
 		transport:            t,
 		allowUnauthenticated: opts.AllowUnauthenticated,
 		logger:               middlewareLogger,
-	}
+	}, nil
 }
 
 // Handler returns standard http middleware
