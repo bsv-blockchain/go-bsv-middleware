@@ -37,7 +37,7 @@ func TestNew_PanicsWithInconsistentCertificateConfig(t *testing.T) {
 
 		// then
 		require.Error(t, err)
-		assert.Equal(t, "OnCertificatesReceived is set but CertificatesToRequest is nil", err.Error())
+		assert.Equal(t, "OnCertificatesReceived callback is set but no certificates are requested", err.Error())
 
 	})
 
@@ -67,7 +67,7 @@ func TestNew_PanicsWithInconsistentCertificateConfig(t *testing.T) {
 
 		// then
 		require.Error(t, err)
-		assert.Equal(t, "CertificatesToRequest is set but OnCertificatesReceived is nil", err.Error())
+		assert.Equal(t, "OnCertificatesReceived callback is required when certificates are requested", err.Error())
 	})
 }
 
@@ -122,6 +122,7 @@ func TestNew_DefaultSessionManager(t *testing.T) {
 		})
 
 		// then
+		require.NoError(t, err)
 		assert.NotNil(t, middleware)
 	})
 }
