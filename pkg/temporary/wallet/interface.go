@@ -1,8 +1,6 @@
 package wallet
 
-import (
-	"context"
-)
+import "context"
 
 // WalletInterface defines the core functionality needed for authentication
 type WalletInterface interface { //nolint:revive // This is an interface, so it's fine to use the name "WalletInterface".
