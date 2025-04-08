@@ -2,6 +2,7 @@ package mocks
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,17 +15,20 @@ import (
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/internal/logging"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
+	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	"github.com/stretchr/testify/require"
 )
 
 // MockHTTPServer is a mock HTTP server used in tests
 type MockHTTPServer struct {
-	mux                  *http.ServeMux
-	server               *httptest.Server
-	allowUnauthenticated bool
-	logger               *slog.Logger
-	authMiddleware       *auth.Middleware
+	mux                     *http.ServeMux
+	server                  *httptest.Server
+	allowUnauthenticated    bool
+	logger                  *slog.Logger
+	authMiddleware          *auth.Middleware
+	certificateRequirements *transport.RequestedCertificateSet
+	onCertificatesReceived  transport.OnCertificatesReceivedFunc
 }
 
 // MockHTTPHandler is a mock HTTP handler used in tests
@@ -106,15 +110,67 @@ func (s *MockHTTPServer) SendGeneralRequest(t *testing.T, method, path string, h
 	return response, nil
 }
 
+// SendCertificateResponse sends a certificate response to the server
+func (s *MockHTTPServer) SendCertificateResponse(t *testing.T, clientWallet wallet.WalletInterface, authMsg *transport.AuthMessage, certificates *[]wallet.VerifiableCertificate) (*http.Response, error) {
+	// Create certificate response message
+	nonce, err := clientWallet.CreateNonce(context.Background())
+	require.NoError(t, err)
+
+	identityKey, err := clientWallet.GetPublicKey(context.Background(), wallet.GetPublicKeyOptions{IdentityKey: true})
+	require.NoError(t, err)
+
+	// Create the certificate message
+	certMessage := transport.AuthMessage{
+		Version:      "0.1",
+		MessageType:  "certificateResponse",
+		IdentityKey:  identityKey,
+		Nonce:        &nonce,
+		YourNonce:    &authMsg.InitialNonce,
+		Certificates: certificates,
+	}
+
+	// Marshal the certificates for signature creation
+	certBytes, err := json.Marshal(*certificates)
+	require.NoError(t, err)
+
+	// Create signature for certificates
+	signature, err := clientWallet.CreateSignature(
+		context.Background(),
+		certBytes,
+		"auth message signature",
+		fmt.Sprintf("%s %s", nonce, authMsg.InitialNonce),
+		identityKey,
+	)
+	require.NoError(t, err)
+	certMessage.Signature = &signature
+
+	// Marshal the full message
+	jsonData, err := json.Marshal(certMessage)
+	require.NoError(t, err)
+
+	// Prepare and send request
+	req, err := http.NewRequest("POST", s.URL()+"/.well-known/auth", bytes.NewBuffer(jsonData))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+
+	return resp, nil
+}
+
 func (s *MockHTTPServer) createMiddleware() {
 	if s.logger == nil {
 		s.logger = slog.New(slog.DiscardHandler)
 	}
 
 	opts := auth.Config{
-		AllowUnauthenticated: s.allowUnauthenticated,
-		Logger:               s.logger,
-		Wallet:               CreateServerMockWallet(),
+		AllowUnauthenticated:   s.allowUnauthenticated,
+		Logger:                 s.logger,
+		Wallet:                 CreateServerMockWallet(),
+		CertificatesToRequest:  s.certificateRequirements,
+		OnCertificatesReceived: s.onCertificatesReceived,
 	}
 	s.authMiddleware = auth.New(opts)
 }
@@ -197,4 +253,13 @@ func MapBodyToAuthMessage(t *testing.T, response *http.Response) (*transport.Aut
 	}
 
 	return authMessage, nil
+}
+
+// WithCertificateRequirements is a MockHTTPServer optional setting that adds certificate requirements
+func WithCertificateRequirements(reqs *transport.RequestedCertificateSet, onReceived transport.OnCertificatesReceivedFunc) func(s *MockHTTPServer) *MockHTTPServer {
+	return func(s *MockHTTPServer) *MockHTTPServer {
+		s.certificateRequirements = reqs
+		s.onCertificatesReceived = onReceived
+		return s
+	}
 }
