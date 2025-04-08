@@ -9,7 +9,7 @@ import (
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 )
 
-// Options configures the auth middleware
+// Config configures the auth middleware
 type Config struct {
 	Wallet                 wallet.WalletInterface
 	SessionManager         sessionmanager.SessionManagerInterface

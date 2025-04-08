@@ -104,6 +104,10 @@ func (t *Transport) HandleNonGeneralRequest(req *http.Request, res http.Response
 		return err
 	}
 
+	if response == nil {
+		return nil
+	}
+
 	setupHeaders(res, response, requestID)
 	setupContent(res, response)
 
@@ -200,7 +204,13 @@ func (t *Transport) handleIncomingMessage(msg *transport.AuthMessage, req *http.
 	case transport.InitialRequest:
 		return t.handleInitialRequest(msg)
 	case transport.CertificateResponse:
-		return t.handleCertificateResponse(msg, req, res)
+		result, err := t.handleCertificateResponse(msg, req, res)
+		if err == nil && result == nil {
+			return nil, nil
+		}
+
+		return result, err
+
 	case transport.InitialResponse, transport.CertificateRequest:
 		return nil, errors.New("not implemented")
 	case transport.General:
@@ -252,6 +262,10 @@ func (t *Transport) handleInitialRequest(msg *transport.AuthMessage) (*transport
 		Signature:    &signature,
 	}
 
+	if t.certificateRequirements != nil {
+		initialResponseMessage.RequestedCertificates = *t.certificateRequirements
+	}
+
 	return &initialResponseMessage, nil
 }
 
@@ -265,6 +279,10 @@ func (t *Transport) handleCertificateResponse(msg *transport.AuthMessage, req *h
 		return nil, fmt.Errorf("failed to retrieve certificates")
 	}
 
+	if msg.Nonce == nil {
+		return nil, fmt.Errorf("failed to retrieve nonce")
+	}
+
 	payload, err := json.Marshal(*msg.Certificates)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode certificates, %w", err)
@@ -275,18 +293,8 @@ func (t *Transport) handleCertificateResponse(msg *transport.AuthMessage, req *h
 		return nil, fmt.Errorf("no session found for identity key")
 	}
 
-	if msg.YourNonce == nil {
-		return nil, fmt.Errorf("msg.YourNonce is nil")
-	}
-
 	if session.PeerIdentityKey == nil {
-		return nil, fmt.Errorf("session.PeerIdentityKey is nil")
-	}
-	if msg.Nonce == nil || msg.YourNonce == nil {
-		return nil, fmt.Errorf("msg.Nonce or msg.YourNonce is nil")
-	}
-	if *session.PeerIdentityKey == "" {
-		return nil, fmt.Errorf("identityKey is empty")
+		return nil, fmt.Errorf("failed to retrieve peer identity key")
 	}
 
 	valid, err = t.wallet.VerifySignature(context.Background(), payload, *msg.Signature, "auth message signature", fmt.Sprintf("%s %s", *msg.Nonce, *msg.YourNonce), *session.PeerIdentityKey)
@@ -294,23 +302,37 @@ func (t *Transport) handleCertificateResponse(msg *transport.AuthMessage, req *h
 		return nil, fmt.Errorf("unable to verify signature, %w", err)
 	}
 
-	if msg.Certificates == nil {
-		return nil, fmt.Errorf("certificate response missing certificates")
-	}
+	var sessionAuthenticated bool
+	var authenticationDone bool
 
 	if t.onCertificatesReceived != nil {
+		authCallback := func() {
+			sessionAuthenticated = true
+			authenticationDone = true
+		}
+
 		t.onCertificatesReceived(*session.PeerIdentityKey,
 			msg.Certificates,
 			req,
 			res,
-			func() {
-				session.IsAuthenticated = true
-				session.LastUpdate = time.Now()
-				t.sessionManager.UpdateSession(*session)
-				t.logger.Debug("Certificate verification successful")
-			},
+			authCallback,
 		)
+
+		if !authenticationDone {
+			return nil, nil
+		}
+
+	} else {
+		sessionAuthenticated = true
 	}
+
+	if sessionAuthenticated {
+		session.IsAuthenticated = true
+		session.LastUpdate = time.Now()
+		t.sessionManager.UpdateSession(*session)
+		t.logger.Debug("Certificate verification successful")
+	}
+
 	nonce, err := t.wallet.CreateNonce(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create nonce")
@@ -337,7 +359,7 @@ func (t *Transport) handleCertificateResponse(msg *transport.AuthMessage, req *h
 	return response, nil
 }
 
-func (t *Transport) handleGeneralRequest(msg *transport.AuthMessage, _ *http.Request, res http.ResponseWriter) (*transport.AuthMessage, error) {
+func (t *Transport) handleGeneralRequest(msg *transport.AuthMessage, _ *http.Request, _ http.ResponseWriter) (*transport.AuthMessage, error) {
 	valid, err := t.wallet.VerifyNonce(context.Background(), *msg.YourNonce)
 	if err != nil || !valid {
 		return nil, fmt.Errorf("unable to verify nonce, %w", err)
@@ -350,9 +372,7 @@ func (t *Transport) handleGeneralRequest(msg *transport.AuthMessage, _ *http.Req
 
 	if !session.IsAuthenticated && !t.allowUnauthenticated {
 		if t.certificateRequirements != nil {
-			// TODO Should change finalizing response as now when error is returned, code response is set to 401
-			res.WriteHeader(http.StatusBadRequest)
-			res.Write([]byte("No certificates provided"))
+			// TODO code response should be set to 401
 			return nil, errors.New("no certificates provided")
 		}
 		return nil, errors.New("session not authenticated")
