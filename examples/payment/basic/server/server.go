@@ -12,17 +12,29 @@ import (
 	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/payment"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
+	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )
 
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
-	paymentWallet := wallet.NewMockPaymentWallet()
-	authMiddleware := auth.New(auth.Config{
+	key, err := ec.NewPrivateKey()
+	if err != nil {
+		logger.Error("create private key failed", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
+	paymentWallet := wallet.NewMockPaymentWallet(key)
+	authMiddleware, err := auth.New(auth.Config{
 		AllowUnauthenticated: false,
 		Logger:               logger,
 		Wallet:               paymentWallet,
+		PrivateKey:           key,
 	})
+	if err != nil {
+		logger.Error("create auth middleware failed", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
 
 	paymentMiddleware, err := payment.New(payment.Options{
 		Wallet: paymentWallet,

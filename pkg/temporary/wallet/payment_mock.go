@@ -2,6 +2,8 @@ package wallet
 
 import (
 	"context"
+	
+	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )
 
 // MockPaymentWallet implements wallet.PaymentInterface for testing
@@ -15,9 +17,9 @@ type MockPaymentWallet struct {
 }
 
 // NewMockPaymentWallet creates a new payment-capable mock wallet
-func NewMockPaymentWallet() *MockPaymentWallet {
+func NewMockPaymentWallet(key *ec.PrivateKey) *MockPaymentWallet {
 	return &MockPaymentWallet{
-		Wallet: NewMockWallet(true, nil).(*Wallet),
+		Wallet: NewMockWallet(key).(*Wallet),
 		InternalizeActionResult: InternalizeActionResult{
 			Accepted: true,
 		},
