@@ -1,16 +1,15 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
@@ -19,6 +18,7 @@ import (
 	"github.com/4chain-ag/go-bsv-middleware/pkg/test/mocks"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
+	"github.com/go-resty/resty/v2"
 )
 
 const serverAddress = "http://localhost:8080"
@@ -172,24 +172,24 @@ func main() {
 	fmt.Println("\n📡 STEP 2: Testing access to protected resource WITHOUT certificate")
 	resp := callPingEndpoint(mockedWallet, responseData)
 	expectedErrorCode := http.StatusUnauthorized
-	if resp.StatusCode != expectedErrorCode {
-		fmt.Printf("   ❌ ERROR: Expected status %d, but received: %d\n", expectedErrorCode, resp.StatusCode)
+	if resp.StatusCode() != expectedErrorCode {
+		fmt.Printf("   ❌ ERROR: Expected status %d, but received: %d\n", expectedErrorCode, resp.StatusCode())
 	} else {
 		fmt.Printf("   ✅ SUCCESS: Server correctly denied access with status %d (Unauthorized)\n", expectedErrorCode)
 	}
 
 	fmt.Println("\n📡 STEP 3: Sending valid age verification certificate")
 	response2 := sendCertificate(mockedWallet, responseData.IdentityKey, responseData.InitialNonce)
-	if response2.StatusCode != http.StatusOK {
-		fmt.Printf("   ❌ ERROR: Certificate submission failed with status: %d\n", response2.StatusCode)
+	if response2.StatusCode() != http.StatusOK {
+		fmt.Printf("   ❌ ERROR: Certificate submission failed with status: %d\n", response2.StatusCode())
 	} else {
 		fmt.Println("   ✅ SUCCESS: Server accepted the age verification certificate")
 	}
 
 	fmt.Println("\n📡 STEP 4: Testing access to protected resource WITH valid certificate")
 	resp = callPingEndpoint(mockedWallet, responseData)
-	if resp.StatusCode != http.StatusOK {
-		fmt.Printf("   ❌ ERROR: Access denied with status: %d\n", resp.StatusCode)
+	if resp.StatusCode() != http.StatusOK {
+		fmt.Printf("   ❌ ERROR: Access denied with status: %d\n", resp.StatusCode())
 	} else {
 		fmt.Println("   ✅ SUCCESS: Server granted access to protected resource")
 		fmt.Println("   ↪ Received response: \"Pong!\"")
@@ -210,45 +210,51 @@ func pingHandler(w http.ResponseWriter, r *http.Request) {
 
 func callInitialRequest(mockedWallet wallet.WalletInterface) *transport.AuthMessage {
 	requestData := mocks.PrepareInitialRequestBody(mockedWallet)
-	jsonData, err := json.Marshal(requestData)
-	if err != nil {
-		log.Fatalf("Failed to marshal request: %v", err)
-	}
+	// jsonData, err := json.Marshal(requestData)
+	// if err != nil {
+	// 	log.Fatalf("Failed to marshal request: %v", err)
+	// }
 
 	url := "http://localhost:8080/.well-known/auth"
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		log.Fatalf("Failed to create request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
+	// req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	// if err != nil {
+	// 	log.Fatalf("Failed to create request: %v", err)
+	// }
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	var result transport.AuthMessage
+	var errMsg any
+
+	client := resty.New()
+	resp, err := client.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(requestData).
+		SetResult(&result).
+		SetError(&errMsg).
+		Post(url)
+
 	if err != nil {
 		log.Fatalf("Request failed: %v", err)
 	}
-	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatalf("Failed to read response: %v", err)
-	}
-	log.Printf("Initial response: %s", string(body))
-
-	var responseData *transport.AuthMessage
-	if err = json.Unmarshal(body, &responseData); err != nil {
-		log.Fatalf("Failed to unmarshal response: %v", err)
+	if resp.IsError() {
+		log.Fatalf("Request failed: Status %d, Body: %s", resp.StatusCode(), resp.String())
 	}
 
-	return responseData
+	fmt.Println("Response from server: ", resp.String())
+
+	fmt.Println("🔑 Response Headers:")
+	for key, value := range resp.Header() {
+		lowerKey := strings.ToLower(key)
+		if strings.Contains(lowerKey, "x-bsv-auth") {
+			fmt.Println(lowerKey, strings.Join(value, ", "))
+		}
+	}
+
+	return &result
 }
 
-func callPingEndpoint(mockedWallet wallet.WalletInterface, response *transport.AuthMessage) *http.Response {
+func callPingEndpoint(mockedWallet wallet.WalletInterface, response *transport.AuthMessage) *resty.Response {
 	url := "http://localhost:8080/ping"
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		log.Fatalf("Failed to create request: %v", err)
-	}
 
 	if response.InitialNonce == "" {
 		response.InitialNonce = *response.Nonce
@@ -262,27 +268,35 @@ func callPingEndpoint(mockedWallet wallet.WalletInterface, response *transport.A
 		panic(err)
 	}
 
-	for key, value := range headers {
-		req.Header.Set(key, value)
-	}
+	var result transport.AuthMessage
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	client := resty.New()
+	resp, err := client.R().
+		SetHeaders(headers).
+		SetResult(&result).
+		Get(url)
+
 	if err != nil {
 		log.Fatalf("Request failed: %v", err)
 	}
-	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatalf("Failed to read response: %v", err)
+	log.Printf("Response from server: %s", resp.String())
+
+	fmt.Println("🔑 Response Headers:")
+	for key, value := range resp.Header() {
+		lowerKey := strings.ToLower(key)
+		if strings.Contains(lowerKey, "x-bsv-auth") {
+			fmt.Println(lowerKey, strings.Join(value, ", "))
+		}
 	}
-	log.Printf("Ping response: %s", string(body))
 
+	if resp.IsError() {
+		log.Printf("Warning: Received non-success status from /ping: %d", resp.StatusCode())
+	}
 	return resp
 }
 
-func sendCertificate(clientWallet wallet.WalletInterface, serverIdentityKey, previousNonce string) *http.Response {
+func sendCertificate(clientWallet wallet.WalletInterface, serverIdentityKey, previousNonce string) *resty.Response {
 	identityPubKey, err := clientWallet.GetPublicKey(&wallet.GetPublicKeyArgs{IdentityKey: true}, "")
 	if err != nil {
 		log.Fatalf("Failed to get identity key: %v", err)
@@ -354,24 +368,44 @@ func sendCertificate(clientWallet wallet.WalletInterface, serverIdentityKey, pre
 		log.Fatalf("Failed to marshal certificate message: %v", err)
 	}
 
-	req, err := http.NewRequest("POST", "http://localhost:8080/.well-known/auth", bytes.NewReader(requestBody))
-	if err != nil {
-		log.Fatalf("Failed to create request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
+	// req, err := http.NewRequest("POST", "http://localhost:8080/.well-known/auth", bytes.NewReader(requestBody))
+	// if err != nil {
+	// 	log.Fatalf("Failed to create request: %v", err)
+	// }
+	// req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	// client := &http.Client{}
+	// resp, err := client.Do(req)
+	// if err != nil {
+	// 	log.Fatalf("Request failed: %v", err)
+	// }
+	// defer resp.Body.Close()
+
+	// body, err := io.ReadAll(resp.Body)
+	// if err != nil {
+	// 	log.Fatalf("Failed to read response: %v", err)
+	// }
+	// log.Printf("Certificate response: %s", string(body))
+
+	client := resty.New()
+	var result transport.AuthMessage
+	var errMsg any
+
+	resp, err := client.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(requestBody).
+		SetResult(&result).
+		SetError(&errMsg).
+		Post("http://localhost:8080/.well-known/auth")
+
 	if err != nil {
 		log.Fatalf("Request failed: %v", err)
 	}
-	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatalf("Failed to read response: %v", err)
+	if resp.IsError() {
+		log.Fatalf("Request failed: Status %d, Body: %s", resp.StatusCode(), resp.String())
 	}
-	log.Printf("Certificate response: %s", string(body))
 
+	fmt.Println("Response from server: ", resp.String())
 	return resp
 }
