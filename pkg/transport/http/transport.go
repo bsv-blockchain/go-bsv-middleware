@@ -292,8 +292,32 @@ func (t *Transport) handleCertificateResponse(msg *transport.AuthMessage, req *h
 		return nil, fmt.Errorf("failed to retrieve peer identity key")
 	}
 
-	valid, err = t.wallet.VerifySignature(context.Background(), payload, *msg.Signature, "auth message signature", fmt.Sprintf("%s %s", *msg.Nonce, *msg.YourNonce), *session.PeerIdentityKey)
-	if err != nil || !valid {
+	signatureToVerify, err := ec.ParseSignature(*msg.Signature)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse signature, %w", err)
+	}
+
+	key, err := ec.PublicKeyFromString(*session.PeerIdentityKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse identity key, %w", err)
+	}
+
+	baseArgs := wallet.EncryptionArgs{
+		ProtocolID: wallet.DefaultAuthProtocol,
+		KeyID:      fmt.Sprintf("%s %s", *msg.Nonce, *msg.YourNonce),
+		Counterparty: wallet.Counterparty{
+			Type:         wallet.CounterpartyTypeOther,
+			Counterparty: key,
+		},
+	}
+	verifySignatureArgs := &wallet.VerifySignatureArgs{
+		EncryptionArgs: baseArgs,
+		Signature:      *signatureToVerify,
+		Data:           payload,
+	}
+
+	result, err := t.wallet.VerifySignature(verifySignatureArgs)
+	if err != nil || !result.Valid {
 		return nil, fmt.Errorf("unable to verify signature, %w", err)
 	}
 
@@ -333,20 +357,20 @@ func (t *Transport) handleCertificateResponse(msg *transport.AuthMessage, req *h
 		return nil, fmt.Errorf("failed to create nonce")
 	}
 
-	signature, err := createNonGeneralAuthSignature(t.wallet, *session.PeerNonce, nonce, msg.IdentityKey)
+	signature, err := t.createNonGeneralAuthSignature(msg.InitialNonce, *session.SessionNonce, msg.IdentityKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create signature")
+		return nil, fmt.Errorf("failed to create signature, %w", err)
 	}
 
-	identityKey, err := t.wallet.GetPublicKey(context.Background(), wallet.GetPublicKeyOptions{IdentityKey: true})
+	identityKey, err := t.wallet.GetPublicKey(&wallet.GetPublicKeyArgs{IdentityKey: true}, "")
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve identity key")
+		return nil, fmt.Errorf("failed to retrieve identity key, %w", err)
 	}
 
 	response := &transport.AuthMessage{
 		Version:     transport.AuthVersion,
 		MessageType: transport.CertificateResponse,
-		IdentityKey: identityKey,
+		IdentityKey: identityKey.PublicKey.ToDERHex(),
 		Nonce:       &nonce,
 		YourNonce:   session.PeerNonce,
 		Signature:   &signature,

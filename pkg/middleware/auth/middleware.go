@@ -88,11 +88,11 @@ func New(opts Config) (*Middleware, error) {
 	middlewareLogger := logging.Child(opts.Logger, "auth-middleware")
 
 	if opts.OnCertificatesReceived == nil && opts.CertificatesToRequest != nil {
-		panic("OnCertificatesReceived callback is required when certificates are requested")
+		return nil, errors.New("OnCertificatesReceived callback is required when certificates are requested")
 	}
 
 	if opts.OnCertificatesReceived != nil && opts.CertificatesToRequest == nil {
-		panic("OnCertificatesReceived callback is set but no certificates are requested")
+		return nil, errors.New("OnCertificatesReceived callback is set but no certificates are requested")
 	}
 
 	middlewareLogger.Debug(" Creating new auth middleware")

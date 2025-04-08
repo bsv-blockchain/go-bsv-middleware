@@ -7,33 +7,48 @@ import (
 	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/sessionmanager"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
+	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
+	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNew_PanicsWithInconsistentCertificateConfig(t *testing.T) {
 	t.Run("panics with OnCertificatesReceived but no CertificatesToRequest", func(t *testing.T) {
 		// given
-		mockWallet := wallet.NewMockWallet(true, nil)
+		sPrivKey, err := ec.PrivateKeyFromHex(walletFixtures.ServerPrivateKeyHex)
+		if err != nil {
+			panic(err)
+		}
+
+		serverMockedWallet := wallet.NewMockWallet(sPrivKey, walletFixtures.DefaultNonces...)
 		mockSessionManager := sessionmanager.NewSessionManager()
 
 		onCertificatesReceived := func(senderPublicKey string, certs *[]wallet.VerifiableCertificate, req *http.Request, res http.ResponseWriter, next func()) {
 		}
+		// when
+		_, err = auth.New(auth.Config{
+			Wallet:                 serverMockedWallet,
+			SessionManager:         mockSessionManager,
+			OnCertificatesReceived: onCertificatesReceived,
+			CertificatesToRequest:  nil,
+		})
 
 		// then
-		assert.Panics(t, func() {
-			auth.New(auth.Config{
-				Wallet:                 mockWallet,
-				SessionManager:         mockSessionManager,
-				OnCertificatesReceived: onCertificatesReceived,
-				CertificatesToRequest:  nil,
-			})
-		})
+		require.Error(t, err)
+		assert.Equal(t, "OnCertificatesReceived is set but CertificatesToRequest is nil", err.Error())
+
 	})
 
 	t.Run("panics with CertificatesToRequest but no OnCertificatesReceived", func(t *testing.T) {
 		// given
-		mockWallet := wallet.NewMockWallet(true, nil)
+		sPrivKey, err := ec.PrivateKeyFromHex(walletFixtures.ServerPrivateKeyHex)
+		if err != nil {
+			panic(err)
+		}
+
+		serverMockedWallet := wallet.NewMockWallet(sPrivKey, walletFixtures.DefaultNonces...)
 		mockSessionManager := sessionmanager.NewSessionManager()
 
 		certificatesToRequest := &transport.RequestedCertificateSet{
@@ -42,23 +57,29 @@ func TestNew_PanicsWithInconsistentCertificateConfig(t *testing.T) {
 				"test-cert": {"field1", "field2"},
 			},
 		}
+		// when
+		_, err = auth.New(auth.Config{
+			Wallet:                 serverMockedWallet,
+			SessionManager:         mockSessionManager,
+			CertificatesToRequest:  certificatesToRequest,
+			OnCertificatesReceived: nil,
+		})
 
 		// then
-		assert.Panics(t, func() {
-			auth.New(auth.Config{
-				Wallet:                 mockWallet,
-				SessionManager:         mockSessionManager,
-				CertificatesToRequest:  certificatesToRequest,
-				OnCertificatesReceived: nil,
-			})
-		})
+		require.Error(t, err)
+		assert.Equal(t, "CertificatesToRequest is set but OnCertificatesReceived is nil", err.Error())
 	})
 }
 
 func TestNew_InitializesWithValidCertificateConfig(t *testing.T) {
 	t.Run("initializes with valid certificate configuration", func(t *testing.T) {
 		// given
-		mockWallet := wallet.NewMockWallet(true, nil)
+		sPrivKey, err := ec.PrivateKeyFromHex(walletFixtures.ServerPrivateKeyHex)
+		if err != nil {
+			panic(err)
+		}
+
+		serverMockedWallet := wallet.NewMockWallet(sPrivKey, walletFixtures.DefaultNonces...)
 		mockSessionManager := sessionmanager.NewSessionManager()
 
 		certificatesToRequest := &transport.RequestedCertificateSet{
@@ -72,14 +93,15 @@ func TestNew_InitializesWithValidCertificateConfig(t *testing.T) {
 		}
 
 		// when
-		middleware := auth.New(auth.Config{
-			Wallet:                 mockWallet,
+		middleware, err := auth.New(auth.Config{
+			Wallet:                 serverMockedWallet,
 			SessionManager:         mockSessionManager,
 			CertificatesToRequest:  certificatesToRequest,
 			OnCertificatesReceived: onCertificatesReceived,
 		})
 
 		// then
+		require.NoError(t, err)
 		assert.NotNil(t, middleware)
 	})
 }
@@ -87,37 +109,16 @@ func TestNew_InitializesWithValidCertificateConfig(t *testing.T) {
 func TestNew_DefaultSessionManager(t *testing.T) {
 	t.Run("creates default session manager when none provided", func(t *testing.T) {
 		// given
-		mockWallet := wallet.NewMockWallet(true, nil)
+		sPrivKey, err := ec.PrivateKeyFromHex(walletFixtures.ServerPrivateKeyHex)
+		if err != nil {
+			panic(err)
+		}
+
+		serverMockedWallet := wallet.NewMockWallet(sPrivKey, walletFixtures.DefaultNonces...)
 
 		// when
-		middleware := auth.New(auth.Config{
-			Wallet: mockWallet,
-		})
-
-		// then
-		assert.NotNil(t, middleware)
-	})
-}
-
-func TestNew_DefaultWallet(t *testing.T) {
-	t.Run("creates default wallet when none provided", func(t *testing.T) {
-		// when
-		middleware := auth.New(auth.Config{})
-
-		// then
-		assert.NotNil(t, middleware)
-	})
-}
-
-func TestNew_MisconfigurationErrors(t *testing.T) {
-	t.Run("handles nil logger gracefully", func(t *testing.T) {
-		// given
-		mockWallet := wallet.NewMockWallet(true, nil)
-
-		// when
-		middleware := auth.New(auth.Config{
-			Wallet: mockWallet,
-			Logger: nil,
+		middleware, err := auth.New(auth.Config{
+			Wallet: serverMockedWallet,
 		})
 
 		// then

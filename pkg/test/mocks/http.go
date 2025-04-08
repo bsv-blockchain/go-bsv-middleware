@@ -15,8 +15,8 @@ import (
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/internal/logging"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
-	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
+	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/stretchr/testify/require"
@@ -113,34 +113,52 @@ func (s *MockHTTPServer) SendGeneralRequest(t *testing.T, method, path string, h
 }
 
 // SendCertificateResponse sends a certificate response to the server
-func (s *MockHTTPServer) SendCertificateResponse(t *testing.T, clientWallet wallet.WalletInterface, authMsg *transport.AuthMessage, certificates *[]wallet.VerifiableCertificate) (*http.Response, error) {
+func (s *MockHTTPServer) SendCertificateResponse(t *testing.T, clientWallet wallet.WalletInterface, certificates *[]wallet.VerifiableCertificate) (*http.Response, error) {
+	initialRequest := PrepareInitialRequestBody(clientWallet)
+	response, err := s.SendNonGeneralRequest(t, initialRequest.AuthMessage())
+	require.NoError(t, err)
+
+	authMessage, err := MapBodyToAuthMessage(t, response)
+	require.NoError(t, err)
+
 	nonce, err := clientWallet.CreateNonce(context.Background())
 	require.NoError(t, err)
 
-	identityKey, err := clientWallet.GetPublicKey(context.Background(), wallet.GetPublicKeyOptions{IdentityKey: true})
+	identityKey, err := clientWallet.GetPublicKey(&wallet.GetPublicKeyArgs{IdentityKey: true}, "")
 	require.NoError(t, err)
 
 	certMessage := transport.AuthMessage{
 		Version:      "0.1",
-		MessageType:  "certificateResponse",
-		IdentityKey:  identityKey,
+		MessageType:  transport.CertificateResponse,
+		IdentityKey:  identityKey.PublicKey.ToDERHex(),
 		Nonce:        &nonce,
-		YourNonce:    &authMsg.InitialNonce,
+		YourNonce:    &authMessage.InitialNonce,
 		Certificates: certificates,
 	}
 
 	certBytes, err := json.Marshal(*certificates)
 	require.NoError(t, err)
 
-	signature, err := clientWallet.CreateSignature(
-		context.Background(),
-		certBytes,
-		"auth message signature",
-		fmt.Sprintf("%s %s", nonce, authMsg.InitialNonce),
-		identityKey,
-	)
+	serverKey, err := ec.PublicKeyFromString(authMessage.IdentityKey)
 	require.NoError(t, err)
-	certMessage.Signature = &signature
+
+	signatureArgs := &wallet.CreateSignatureArgs{
+		EncryptionArgs: wallet.EncryptionArgs{
+			ProtocolID: wallet.DefaultAuthProtocol,
+			KeyID:      fmt.Sprintf("%s %s", nonce, authMessage.InitialNonce),
+			Counterparty: wallet.Counterparty{
+				Type:         wallet.CounterpartyTypeOther,
+				Counterparty: serverKey,
+			},
+		},
+		Data: certBytes,
+	}
+
+	signatureResult, err := clientWallet.CreateSignature(signatureArgs, "")
+	require.NoError(t, err)
+
+	signBytes := signatureResult.Signature.Serialize()
+	certMessage.Signature = &signBytes
 
 	jsonData, err := json.Marshal(certMessage)
 	require.NoError(t, err)

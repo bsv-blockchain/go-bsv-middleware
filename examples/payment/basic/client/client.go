@@ -14,12 +14,18 @@ import (
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
+	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )
 
 func main() {
 	fmt.Println("BSV Payment Client - Demo")
 
-	mockWallet := wallet.NewMockWallet(true, &walletFixtures.ClientIdentityKey, walletFixtures.ClientNonces...)
+	sPrivKey, err := ec.PrivateKeyFromHex(walletFixtures.ServerPrivateKeyHex)
+	if err != nil {
+		panic(err)
+	}
+
+	mockWallet := wallet.NewMockWallet(sPrivKey, walletFixtures.DefaultNonces...)
 	fmt.Println("✓ Client mockWallet created")
 
 	time.Sleep(1 * time.Second)

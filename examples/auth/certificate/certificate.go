@@ -18,6 +18,7 @@ import (
 	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/test/mocks"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
+	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )
 
 const serverAddress = "http://localhost:8080"
@@ -31,6 +32,13 @@ func main() {
 
 	logHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
 	logger := slog.New(logHandler)
+
+	sPrivKey, err := ec.PrivateKeyFromHex(walletFixtures.ServerPrivateKeyHex)
+	if err != nil {
+		panic(err)
+	}
+
+	serverMockedWallet := wallet.NewMockWallet(sPrivKey, walletFixtures.DefaultNonces...)
 
 	// Define the certificate types and certifier expected
 	certificateToRequest := transport.RequestedCertificateSet{
@@ -115,11 +123,15 @@ func main() {
 	opts := auth.Config{
 		AllowUnauthenticated:   false,
 		Logger:                 logger,
-		Wallet:                 wallet.NewMockWallet(true, nil, walletFixtures.DefaultNonces...),
+		Wallet:                 serverMockedWallet,
 		CertificatesToRequest:  &certificateToRequest,
 		OnCertificatesReceived: onCertificatesReceived,
 	}
-	middleware := auth.New(opts)
+	middleware, err := auth.New(opts)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("✅ Auth middleware created")
 
 	mux := http.NewServeMux()
 	mux.Handle("/", middleware.Handler(http.HandlerFunc(pingHandler)))
@@ -146,7 +158,12 @@ func main() {
 	fmt.Println("🧪 SIMULATING CLIENT AUTHENTICATION FLOW")
 	fmt.Println("============================================================")
 
-	mockedWallet := wallet.NewMockWallet(true, &walletFixtures.ClientIdentityKey, walletFixtures.ClientNonces...)
+	cPrivKey, err := ec.PrivateKeyFromHex(walletFixtures.ClientPrivateKeyHex)
+	if err != nil {
+		panic(err)
+	}
+
+	mockedWallet := wallet.NewMockWallet(cPrivKey, walletFixtures.DefaultNonces...)
 
 	fmt.Println("\n📡 STEP 1: Client initiates authentication handshake")
 	responseData := callInitialRequest(mockedWallet)
@@ -266,17 +283,18 @@ func callPingEndpoint(mockedWallet wallet.WalletInterface, response *transport.A
 }
 
 func sendCertificate(clientWallet wallet.WalletInterface, serverIdentityKey, previousNonce string) *http.Response {
-	identityKey, err := clientWallet.GetPublicKey(context.Background(), wallet.GetPublicKeyOptions{IdentityKey: true})
+	identityPubKey, err := clientWallet.GetPublicKey(&wallet.GetPublicKeyArgs{IdentityKey: true}, "")
 	if err != nil {
 		log.Fatalf("Failed to get identity key: %v", err)
 	}
+	identityKey := identityPubKey.PublicKey.ToDERHex()
 
 	nonce, err := clientWallet.CreateNonce(context.Background())
 	if err != nil {
 		log.Fatalf("Failed to create nonce: %v", err)
 	}
 
-	certificates := &[]wallet.VerifiableCertificate{
+	certificates := []wallet.VerifiableCertificate{
 		{
 			Certificate: wallet.Certificate{
 				Type:         "age-verification",
@@ -284,11 +302,11 @@ func sendCertificate(clientWallet wallet.WalletInterface, serverIdentityKey, pre
 				Subject:      identityKey,
 				Certifier:    trustedCertifier,
 				Fields: map[string]any{
-					"age": "18",
+					"age": "21",
 				},
 				Signature: "mocksignature",
 			},
-			Keyring: map[string]string{"nameOfField": "symmetricKeyToField"},
+			Keyring: map[string]string{"age": "symmetricKeyToField"},
 		},
 	}
 
@@ -298,18 +316,49 @@ func sendCertificate(clientWallet wallet.WalletInterface, serverIdentityKey, pre
 		IdentityKey:  identityKey,
 		Nonce:        &nonce,
 		YourNonce:    &previousNonce,
-		Certificates: certificates,
+		Certificates: &certificates,
 	}
-	requestBody, _ := json.Marshal(certMessage)
-	signature, _ := clientWallet.CreateSignature(context.Background(), requestBody, "auth message signature", "initialNonce sessionNonce", identityKey)
-	certMessage.Signature = &signature
-	requestBody, _ = json.Marshal(certMessage)
 
-	headers, _ := mocks.PrepareGeneralRequestHeaders(clientWallet, &certMessage, "/.well-known/auth", "POST")
-	req, _ := http.NewRequest("POST", "http://localhost:8080/.well-known/auth", bytes.NewReader(requestBody))
-	for key, value := range headers {
-		req.Header.Set(key, value)
+	certBytes, err := json.Marshal(certificates)
+	if err != nil {
+		log.Fatalf("Failed to marshal certificates: %v", err)
 	}
+
+	serverKey, err := ec.PublicKeyFromString(serverIdentityKey)
+	if err != nil {
+		log.Fatalf("Failed to parse server key: %v", err)
+	}
+
+	signatureArgs := &wallet.CreateSignatureArgs{
+		EncryptionArgs: wallet.EncryptionArgs{
+			ProtocolID: wallet.DefaultAuthProtocol,
+			KeyID:      fmt.Sprintf("%s %s", nonce, previousNonce),
+			Counterparty: wallet.Counterparty{
+				Type:         wallet.CounterpartyTypeOther,
+				Counterparty: serverKey,
+			},
+		},
+		Data: certBytes,
+	}
+
+	signatureResult, err := clientWallet.CreateSignature(signatureArgs, "")
+	if err != nil {
+		log.Fatalf("Failed to create signature: %v", err)
+	}
+
+	signatureBytes := signatureResult.Signature.Serialize()
+	certMessage.Signature = &signatureBytes
+
+	requestBody, err := json.Marshal(certMessage)
+	if err != nil {
+		log.Fatalf("Failed to marshal certificate message: %v", err)
+	}
+
+	req, err := http.NewRequest("POST", "http://localhost:8080/.well-known/auth", bytes.NewReader(requestBody))
+	if err != nil {
+		log.Fatalf("Failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -318,7 +367,10 @@ func sendCertificate(clientWallet wallet.WalletInterface, serverIdentityKey, pre
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalf("Failed to read response: %v", err)
+	}
 	log.Printf("Certificate response: %s", string(body))
 
 	return resp
