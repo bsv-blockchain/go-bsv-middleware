@@ -8,8 +8,8 @@ import (
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )
 
-// Options configures the auth middleware
-type Options struct {
+// Config configures the auth middleware
+type Config struct {
 	Wallet               wallet.WalletInterface
 	SessionManager       sessionmanager.SessionManagerInterface
 	AllowUnauthenticated bool

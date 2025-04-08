@@ -8,8 +8,8 @@ import (
 )
 
 // AuthMiddleware creates a Gin handler for BRC-103/104 authentication
-func AuthMiddleware(opts auth.Options) gin.HandlerFunc {
-	standardMiddleware, _ := auth.New(opts)
+func AuthMiddleware(opts auth.Config) gin.HandlerFunc {
+	standardMiddleware := auth.New(opts)
 
 	return func(c *gin.Context) {
 		handler := standardMiddleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

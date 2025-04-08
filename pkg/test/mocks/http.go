@@ -118,7 +118,7 @@ func (s *MockHTTPServer) createMiddleware() {
 		panic("failed to create server private key")
 	}
 
-	opts := auth.Options{
+	opts := auth.Config{
 		AllowUnauthenticated: s.allowUnauthenticated,
 		Logger:               s.logger,
 		Wallet:               CreateServerMockWallet(key),
