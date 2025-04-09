@@ -142,6 +142,14 @@ func (m *MockableSessionManager) OnHasSessionOnce(identifier string) *mock.Call 
 	return m.On("HasSession", identifier).Once()
 }
 
+func (m *MockableSessionManager) Clear() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.sessions = make(map[string]sessionmanager.PeerSession)
+	m.identityKeyToSessions = make(map[string][]string)
+}
+
 func (m *MockableSessionManager) isExpectedMockCall(method string, arguments ...any) bool {
 	for _, call := range m.ExpectedCalls {
 		if call.Method == method {

@@ -178,9 +178,8 @@ func (s *MockHTTPServer) createMiddleware(sessionManager sessionmanager.SessionM
 	}
 
 	opts := auth.Config{
-		AllowUnauthenticated: s.allowUnauthenticated,
-		Logger:               s.logger,
-		// TODO: add session manager to wallet mock
+		AllowUnauthenticated:   s.allowUnauthenticated,
+		Logger:                 s.logger,
 		Wallet:                 CreateServerMockWallet(key),
 		CertificatesToRequest:  s.certificateRequirements,
 		OnCertificatesReceived: s.onCertificatesReceived,
