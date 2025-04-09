@@ -96,10 +96,12 @@ func TestAuthMiddleware_CertificateHandling(t *testing.T) {
 		authMessage, err := mocks.MapBodyToAuthMessage(t, response)
 		require.NoError(t, err)
 
-		headers, err := mocks.PrepareGeneralRequestHeaders(clientWallet, authMessage, "/ping", "GET")
+		request, err := http.NewRequest(http.MethodGet, server.URL()+"/ping", nil)
+		require.NoError(t, err)
+		err = mocks.PrepareGeneralRequestHeaders(clientWallet, authMessage, request)
 		require.NoError(t, err)
 
-		response, err = server.SendGeneralRequest(t, "GET", "/ping", headers, nil)
+		response, err = server.SendGeneralRequest(t, request)
 		require.NoError(t, err)
 		assert.NotAuthorized(t, response)
 	})
@@ -211,10 +213,12 @@ func TestAuthMiddleware_CertificateHandling(t *testing.T) {
 		require.Equal(t, http.StatusOK, certResponse.StatusCode, "Certificate submission should return 200 OK")
 		require.True(t, receivedCertificateFlag, "Certificate received callback should be called")
 
-		headers, err := mocks.PrepareGeneralRequestHeaders(clientWallet, authMessage, "/ping", "GET")
+		request, err := http.NewRequest(http.MethodGet, server.URL()+"/ping", nil)
+		require.NoError(t, err)
+		err = mocks.PrepareGeneralRequestHeaders(clientWallet, authMessage, request)
 		require.NoError(t, err)
 
-		response, err = server.SendGeneralRequest(t, "GET", "/ping", headers, nil)
+		response, err = server.SendGeneralRequest(t, request)
 		require.NoError(t, err)
 		assert.ResponseOK(t, response) // Now should be authorized
 	})
@@ -375,7 +379,9 @@ func TestAuthMiddleware_InvalidCertificateHandling(t *testing.T) {
 				"Expected HTTP status %d but got %d for certificate case: %s",
 				tc.expectedStatus, certResponse.StatusCode, tc.name)
 
-			response, err := server.SendGeneralRequest(t, "GET", "/ping", nil, nil)
+			request, err := http.NewRequest(http.MethodGet, server.URL()+"/ping", nil)
+			require.NoError(t, err)
+			response, err := server.SendGeneralRequest(t, request)
 			require.NoError(t, err)
 			assert.NotAuthorized(t, response)
 		})
