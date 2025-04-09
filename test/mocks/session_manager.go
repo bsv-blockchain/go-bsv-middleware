@@ -142,6 +142,7 @@ func (m *MockableSessionManager) OnHasSessionOnce(identifier string) *mock.Call 
 	return m.On("HasSession", identifier).Once()
 }
 
+// Clear clears all sessions and identity key mappings.
 func (m *MockableSessionManager) Clear() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
