@@ -71,10 +71,8 @@ func PrepareGeneralRequestHeaders(walletInstance wallet.WalletInterface, previou
 
 	var writer bytes.Buffer
 
-	// Write the request ID
 	writer.Write(requestID)
 
-	// Write request method, url, query params, headers and body
 	request := getOrPrepareTempRequest(requestData)
 	err = WriteRequestData(request, &writer)
 	if err != nil {
