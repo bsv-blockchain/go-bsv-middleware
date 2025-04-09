@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/sessionmanager"
 	"io"
 	"log/slog"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
+	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/sessionmanager"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
