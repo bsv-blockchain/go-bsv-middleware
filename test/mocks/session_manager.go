@@ -11,16 +11,16 @@ import (
 type MockableSessionManager struct {
 	mock.Mock
 
-	mu                   sync.Mutex
-	sessions             map[string]sessionmanager.PeerSession
-	identityKeyToSession map[string][]string
+	mu                    sync.Mutex
+	sessions              map[string]sessionmanager.PeerSession
+	identityKeyToSessions map[string][]string
 }
 
 // NewMockableSessionManager creates a new instance of MockableSessionManager
 func NewMockableSessionManager() *MockableSessionManager {
 	return &MockableSessionManager{
-		sessions:             make(map[string]sessionmanager.PeerSession),
-		identityKeyToSession: make(map[string][]string),
+		sessions:              make(map[string]sessionmanager.PeerSession),
+		identityKeyToSessions: make(map[string][]string),
 	}
 }
 
@@ -38,8 +38,13 @@ func (m *MockableSessionManager) AddSession(session sessionmanager.PeerSession) 
 		m.sessions[*session.SessionNonce] = session
 	}
 	if session.PeerIdentityKey != nil {
-		key := *session.PeerIdentityKey
-		m.identityKeyToSession[key] = append(m.identityKeyToSession[key], *session.SessionNonce)
+		sessionNonces, exists := m.identityKeyToSessions[*session.PeerIdentityKey]
+		if exists {
+			m.identityKeyToSessions[*session.PeerIdentityKey] = append(sessionNonces, *session.SessionNonce)
+			return
+		}
+
+		m.identityKeyToSessions[*session.PeerIdentityKey] = []string{*session.SessionNonce}
 	}
 }
 
@@ -70,7 +75,7 @@ func (m *MockableSessionManager) GetSession(identifier string) *sessionmanager.P
 		return &session
 	}
 
-	if nonces, ok := m.identityKeyToSession[identifier]; ok && len(nonces) > 0 {
+	if nonces, ok := m.identityKeyToSessions[identifier]; ok && len(nonces) > 0 {
 		if session, ok := m.sessions[nonces[0]]; ok {
 			return &session
 		}
@@ -93,7 +98,7 @@ func (m *MockableSessionManager) RemoveSession(session sessionmanager.PeerSessio
 		delete(m.sessions, *session.SessionNonce)
 	}
 	if session.PeerIdentityKey != nil {
-		delete(m.identityKeyToSession, *session.PeerIdentityKey)
+		delete(m.identityKeyToSessions, *session.PeerIdentityKey)
 	}
 }
 
@@ -108,7 +113,7 @@ func (m *MockableSessionManager) HasSession(identifier string) bool {
 	defer m.mu.Unlock()
 
 	_, existsNonce := m.sessions[identifier]
-	nonces, existsIdentity := m.identityKeyToSession[identifier]
+	nonces, existsIdentity := m.identityKeyToSessions[identifier]
 	return existsNonce || (existsIdentity && len(nonces) > 0)
 }
 
