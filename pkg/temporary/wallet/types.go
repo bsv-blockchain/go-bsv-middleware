@@ -160,3 +160,19 @@ type Counterparty struct {
 }
 
 var regexOnlyLettersNumbersSpaces = regexp.MustCompile(`^[a-z0-9 ]+$`)
+
+// VerifiableCertificate is a certificate with a keyring for verifier and optional decrypted fields
+type VerifiableCertificate struct {
+	Certificate
+	// Keyring is a map keys for specific fields
+	Keyring map[string]string `json:"keyring"`
+	// DecryptedFields is a map of decrypted fields
+	DecryptedFields *map[string]string `json:"decryptedFields,omitempty"`
+}
+
+// MasterCertificate is a certificate with a master keyring
+type MasterCertificate struct {
+	Certificate
+	// MasterKeyring is a map of all keys for all fields
+	MasterKeyring map[string]string `json:"masterKeyring"`
+}

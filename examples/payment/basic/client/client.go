@@ -25,7 +25,7 @@ func main() {
 		return
 	}
 
-	mockWallet := wallet.NewMockWallet(key, walletFixtures.ClientNonces...)
+	mockWallet := wallet.NewMockWallet(key, walletFixtures.DefaultNonces...)
 	fmt.Println("✓ Client mockWallet created")
 
 	time.Sleep(1 * time.Second)

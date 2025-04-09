@@ -74,9 +74,33 @@ func PrepareInitialRequestBody(mockedWallet wallet.WalletInterface) *RequestBody
 
 // PrepareGeneralRequestHeaders prepares the general request headers
 func PrepareGeneralRequestHeaders(mockedWallet wallet.WalletInterface, previousResponse *transport.AuthMessage, request *http.Request, opts ...func(m map[string]string)) error {
-	headers, err := utils.PrepareGeneralRequestHeaders(mockedWallet, previousResponse, utils.RequestData{Request: request})
+	if previousResponse == nil {
+		return errors.New("previous response is nil")
+	}
+
+	if previousResponse.IdentityKey == "" {
+		return errors.New("previous response missing identity key")
+	}
+
+	yourNonce := previousResponse.InitialNonce
+	if yourNonce == "" && previousResponse.Nonce != nil {
+		yourNonce = *previousResponse.Nonce
+	}
+
+	if yourNonce == "" {
+		return errors.New("previous response has no nonce to use")
+	}
+
+	normalizedResponse := &transport.AuthMessage{
+		Version:      previousResponse.Version,
+		MessageType:  previousResponse.MessageType,
+		IdentityKey:  previousResponse.IdentityKey,
+		InitialNonce: yourNonce,
+	}
+
+	headers, err := utils.PrepareGeneralRequestHeaders(mockedWallet, normalizedResponse, utils.RequestData{Request: request})
 	if err != nil {
-		return errors.New("failed to prepare general request headers")
+		return errors.New("failed to prepare general request headers: " + err.Error())
 	}
 
 	for _, opt := range opts {
