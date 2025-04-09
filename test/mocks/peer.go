@@ -1,7 +1,7 @@
 package mocks
 
 import (
-	"sync"
+	"errors"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/sessionmanager"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
@@ -9,171 +9,183 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// MockPeer implements the Peer interface for testing
-type MockPeer struct {
+// MockablePeer is a mock implementation of the Peer interface.
+type MockablePeer struct {
 	mock.Mock
-
-	mu                           sync.Mutex
-	Sessions                     map[string]*sessionmanager.PeerSession
-	generalMessageCallbacks      map[int]func(string, []byte)
-	certificateReceivedCallbacks map[int]func(string, []wallet.VerifiableCertificate)
-	certificateRequestCallbacks  map[int]func(string, transport.RequestedCertificateSet)
-	callbackCounter              int
-	lastPeerIdentityKey          string
 }
 
-// NewMockPeer creates a new mock peer for testing
-func NewMockPeer() *MockPeer {
-	return &MockPeer{
-		Sessions:                     make(map[string]*sessionmanager.PeerSession),
-		generalMessageCallbacks:      make(map[int]func(string, []byte)),
-		certificateReceivedCallbacks: make(map[int]func(string, []wallet.VerifiableCertificate)),
-		certificateRequestCallbacks:  make(map[int]func(string, transport.RequestedCertificateSet)),
-		callbackCounter:              0,
+// NewMockablePeer creates a new instance of MockablePeer
+func NewMockablePeer() *MockablePeer {
+	return &MockablePeer{}
+}
+
+// ToPeer mocks sending a message to a peer
+func (m *MockablePeer) ToPeer(message []byte, identityKey string, maxWaitTime int) error {
+	if !isExpectedMockCall(m.ExpectedCalls, "ToPeer", message, identityKey, maxWaitTime) {
+		return errors.New("unexpected call to ToPeer")
 	}
-}
-
-// ToPeer sends a message to a peer
-func (m *MockPeer) ToPeer(message []byte, identityKey string, maxWaitTime int) error {
 	args := m.Called(message, identityKey, maxWaitTime)
-	if args.Get(0) != nil {
-		return args.Get(0).(error)
-	}
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	targetKey := identityKey
-	if targetKey == "" {
-		targetKey = m.lastPeerIdentityKey
-	}
-	m.lastPeerIdentityKey = targetKey
-	return nil
+	return args.Error(0)
 }
 
-// RequestCertificates requests specific certificates from a peer
-func (m *MockPeer) RequestCertificates(certificatesToRequest transport.RequestedCertificateSet, identityKey string, maxWaitTime int) error {
+// RequestCertificates mocks requesting certificates from a peer
+func (m *MockablePeer) RequestCertificates(certificatesToRequest transport.RequestedCertificateSet, identityKey string, maxWaitTime int) error {
+	if !isExpectedMockCall(m.ExpectedCalls, "RequestCertificates", certificatesToRequest, identityKey, maxWaitTime) {
+		return errors.New("unexpected call to RequestCertificates")
+	}
 	args := m.Called(certificatesToRequest, identityKey, maxWaitTime)
 	return args.Error(0)
 }
 
-// GetAuthenticatedSession retrieves an authenticated session for a given peer identity
-func (m *MockPeer) GetAuthenticatedSession(identityKey string, maxWaitTime int) (*sessionmanager.PeerSession, error) {
+// GetAuthenticatedSession mocks retrieving an authenticated session
+func (m *MockablePeer) GetAuthenticatedSession(identityKey string, maxWaitTime int) (*sessionmanager.PeerSession, error) {
+	if !isExpectedMockCall(m.ExpectedCalls, "GetAuthenticatedSession", identityKey, maxWaitTime) {
+		return nil, errors.New("unexpected call to GetAuthenticatedSession")
+	}
 	args := m.Called(identityKey, maxWaitTime)
+
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-
 	return args.Get(0).(*sessionmanager.PeerSession), args.Error(1)
 }
 
-// SendCertificateResponse sends certificates to a peer in response to a request
-func (m *MockPeer) SendCertificateResponse(verifierIdentityKey string, certificates []wallet.VerifiableCertificate) error {
+// SendCertificateResponse mocks sending certificates to a peer
+func (m *MockablePeer) SendCertificateResponse(verifierIdentityKey string, certificates []wallet.VerifiableCertificate) error {
+	if !isExpectedMockCall(m.ExpectedCalls, "SendCertificateResponse", verifierIdentityKey, certificates) {
+		return errors.New("unexpected call to SendCertificateResponse")
+	}
 	args := m.Called(verifierIdentityKey, certificates)
 	return args.Error(0)
 }
 
-// ListenForGeneralMessages registers a callback for receiving general messages
-func (m *MockPeer) ListenForGeneralMessages(callback func(senderPublicKey string, payload []byte)) int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	callbackID := m.callbackCounter
-	m.callbackCounter++
-	m.generalMessageCallbacks[callbackID] = callback
-	args := m.Called(callbackID)
-	if args.Get(0) != nil {
-		return args.Int(0)
+// ListenForGeneralMessages mocks registering a callback for general messages
+func (m *MockablePeer) ListenForGeneralMessages(callback func(senderPublicKey string, payload []byte)) int {
+	if !isExpectedMockCall(m.ExpectedCalls, "ListenForGeneralMessages", mock.Anything) {
+		return -1
 	}
-
-	return callbackID
+	args := m.Called(callback)
+	return args.Int(0)
 }
 
-// StopListeningForGeneralMessages removes a general message listener
-func (m *MockPeer) StopListeningForGeneralMessages(callbackID int) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	delete(m.generalMessageCallbacks, callbackID)
+// StopListeningForGeneralMessages mocks removing a general message listener
+func (m *MockablePeer) StopListeningForGeneralMessages(callbackID int) {
+	if !isExpectedMockCall(m.ExpectedCalls, "StopListeningForGeneralMessages", callbackID) {
+		return
+	}
 	m.Called(callbackID)
 }
 
-// ListenForCertificatesReceived registers a callback for receiving certificates
-func (m *MockPeer) ListenForCertificatesReceived(callback func(senderPublicKey string, certs []wallet.VerifiableCertificate)) int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	callbackID := m.callbackCounter
-	m.callbackCounter++
-	m.certificateReceivedCallbacks[callbackID] = callback
-	args := m.Called(callbackID)
-	if args.Get(0) != nil {
-		return args.Int(0)
+// ListenForCertificatesReceived mocks registering a callback for certificates
+func (m *MockablePeer) ListenForCertificatesReceived(callback func(senderPublicKey string, certs []wallet.VerifiableCertificate)) int {
+	if !isExpectedMockCall(m.ExpectedCalls, "ListenForCertificatesReceived", mock.Anything) {
+		return -1
 	}
-
-	return callbackID
+	args := m.Called(callback)
+	return args.Int(0)
 }
 
-// StopListeningForCertificatesReceived removes a certificate received listener
-func (m *MockPeer) StopListeningForCertificatesReceived(callbackID int) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	delete(m.certificateReceivedCallbacks, callbackID)
+// StopListeningForCertificatesReceived mocks removing a certificate received listener
+func (m *MockablePeer) StopListeningForCertificatesReceived(callbackID int) {
+	if !isExpectedMockCall(m.ExpectedCalls, "StopListeningForCertificatesReceived", callbackID) {
+		return
+	}
 	m.Called(callbackID)
 }
 
-// ListenForCertificatesRequested registers a callback for certificate requests
-func (m *MockPeer) ListenForCertificatesRequested(callback func(senderPublicKey string, requestedCertificates transport.RequestedCertificateSet)) int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	callbackID := m.callbackCounter
-	m.callbackCounter++
-	m.certificateRequestCallbacks[callbackID] = callback
-	args := m.Called(callbackID)
-	if args.Get(0) != nil {
-		return args.Int(0)
+// ListenForCertificatesRequested mocks registering a callback for certificate requests
+func (m *MockablePeer) ListenForCertificatesRequested(callback func(senderPublicKey string, requestedCertificates transport.RequestedCertificateSet)) int {
+	if !isExpectedMockCall(m.ExpectedCalls, "ListenForCertificatesRequested", mock.Anything) {
+		return -1
 	}
-
-	return callbackID
+	args := m.Called(callback)
+	return args.Int(0)
 }
 
-// StopListeningForCertificatesRequested removes a certificate request listener
-func (m *MockPeer) StopListeningForCertificatesRequested(callbackID int) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	delete(m.certificateRequestCallbacks, callbackID)
+// StopListeningForCertificatesRequested mocks removing a certificate request listener
+func (m *MockablePeer) StopListeningForCertificatesRequested(callbackID int) {
+	if !isExpectedMockCall(m.ExpectedCalls, "StopListeningForCertificatesRequested", callbackID) {
+		return
+	}
 	m.Called(callbackID)
 }
 
-// SimulateIncomingGeneralMessage simulates receiving a general message for testing
-func (m *MockPeer) SimulateIncomingGeneralMessage(senderPublicKey string, payload []byte) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for _, callback := range m.generalMessageCallbacks {
-		go callback(senderPublicKey, payload)
-	}
+// OnToPeerOnce sets up a one-time expectation for ToPeer
+func (m *MockablePeer) OnToPeerOnce(message []byte, identityKey string, maxWaitTime int, err error) *mock.Call {
+	return m.On("ToPeer", message, identityKey, maxWaitTime).Return(err).Once()
 }
 
-// SimulateIncomingCertificates simulates receiving certificates for testing
-func (m *MockPeer) SimulateIncomingCertificates(senderPublicKey string, certificates []wallet.VerifiableCertificate) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for _, callback := range m.certificateReceivedCallbacks {
-		go callback(senderPublicKey, certificates)
-	}
+// OnRequestCertificatesOnce sets up a one-time expectation for RequestCertificates
+func (m *MockablePeer) OnRequestCertificatesOnce(certificatesToRequest transport.RequestedCertificateSet, identityKey string, maxWaitTime int, err error) *mock.Call {
+	return m.On("RequestCertificates", certificatesToRequest, identityKey, maxWaitTime).Return(err).Once()
 }
 
-// SimulateIncomingCertificateRequest simulates receiving a certificate request for testing
-func (m *MockPeer) SimulateIncomingCertificateRequest(senderPublicKey string, request transport.RequestedCertificateSet) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for _, callback := range m.certificateRequestCallbacks {
-		go callback(senderPublicKey, request)
-	}
+// OnGetAuthenticatedSessionOnce sets up a one-time expectation for GetAuthenticatedSession
+func (m *MockablePeer) OnGetAuthenticatedSessionOnce(identityKey string, maxWaitTime int, session *sessionmanager.PeerSession, err error) *mock.Call {
+	return m.On("GetAuthenticatedSession", identityKey, maxWaitTime).Return(session, err).Once()
 }
 
-// AddMockSession adds a session for testing
-func (m *MockPeer) AddMockSession(session sessionmanager.PeerSession) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.Sessions[*session.SessionNonce] = &session
-	if session.PeerIdentityKey != nil {
-		m.Sessions[*session.PeerIdentityKey] = &session
+// OnSendCertificateResponseOnce sets up a one-time expectation for SendCertificateResponse
+func (m *MockablePeer) OnSendCertificateResponseOnce(verifierIdentityKey string, certificates []wallet.VerifiableCertificate, err error) *mock.Call {
+	return m.On("SendCertificateResponse", verifierIdentityKey, certificates).Return(err).Once()
+}
+
+// OnListenForGeneralMessagesOnce sets up a one-time expectation for ListenForGeneralMessages
+func (m *MockablePeer) OnListenForGeneralMessagesOnce(callbackID int) *mock.Call {
+	return m.On("ListenForGeneralMessages", mock.Anything).Return(callbackID).Once()
+}
+
+// OnStopListeningForGeneralMessagesOnce sets up a one-time expectation for StopListeningForGeneralMessages
+func (m *MockablePeer) OnStopListeningForGeneralMessagesOnce(callbackID int) *mock.Call {
+	return m.On("StopListeningForGeneralMessages", callbackID).Once()
+}
+
+// OnListenForCertificatesReceivedOnce sets up a one-time expectation for ListenForCertificatesReceived
+func (m *MockablePeer) OnListenForCertificatesReceivedOnce(callbackID int) *mock.Call {
+	return m.On("ListenForCertificatesReceived", mock.Anything).Return(callbackID).Once()
+}
+
+// OnStopListeningForCertificatesReceivedOnce sets up a one-time expectation for StopListeningForCertificatesReceived
+func (m *MockablePeer) OnStopListeningForCertificatesReceivedOnce(callbackID int) *mock.Call {
+	return m.On("StopListeningForCertificatesReceived", callbackID).Once()
+}
+
+// OnListenForCertificatesRequestedOnce sets up a one-time expectation for ListenForCertificatesRequested
+func (m *MockablePeer) OnListenForCertificatesRequestedOnce(callbackID int) *mock.Call {
+	return m.On("ListenForCertificatesRequested", mock.Anything).Return(callbackID).Once()
+}
+
+// OnStopListeningForCertificatesRequestedOnce sets up a one-time expectation for StopListeningForCertificatesRequested
+func (m *MockablePeer) OnStopListeningForCertificatesRequestedOnce(callbackID int) *mock.Call {
+	return m.On("StopListeningForCertificatesRequested", callbackID).Once()
+}
+
+// SimulateIncomingGeneralMessage provides a helper to simulate callbacks for testing
+func (m *MockablePeer) SimulateIncomingGeneralMessage(senderPublicKey string, payload []byte, callback func(string, []byte)) {
+	callback(senderPublicKey, payload)
+}
+
+// SimulateIncomingCertificates provides a helper to simulate callbacks for testing
+func (m *MockablePeer) SimulateIncomingCertificates(senderPublicKey string, certificates []wallet.VerifiableCertificate, callback func(string, []wallet.VerifiableCertificate)) {
+	callback(senderPublicKey, certificates)
+}
+
+// SimulateIncomingCertificateRequest provides a helper to simulate callbacks for testing
+func (m *MockablePeer) SimulateIncomingCertificateRequest(senderPublicKey string, request transport.RequestedCertificateSet, callback func(string, transport.RequestedCertificateSet)) {
+	callback(senderPublicKey, request)
+}
+
+// Helper function to check if a mock call is expected
+func isExpectedMockCall(expectedCalls []*mock.Call, method string, arguments ...interface{}) bool {
+	for _, call := range expectedCalls {
+		if call.Method == method {
+			_, diffCount := call.Arguments.Diff(arguments)
+			if diffCount == 0 {
+				if call.Repeatability > -1 {
+					return true
+				}
+			}
+		}
 	}
+	return false
 }
