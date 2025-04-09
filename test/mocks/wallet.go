@@ -40,7 +40,7 @@ func (m *MockableWallet) GetPublicKey(args *wallet.GetPublicKeyArgs, originator 
 		return nil, errors.New("unexpected call to GetPublicKey")
 	}
 	call := m.Called(args, originator)
-	return call.Get(0).(*wallet.GetPublicKeyResult), call.Error(1) // nolint:wrapcheck // return mocked error
+	return call.Get(0).(*wallet.GetPublicKeyResult), call.Error(1) //nolint:wrapcheck // return mocked error
 }
 
 // CreateSignature return mocked signature value.
@@ -49,7 +49,7 @@ func (m *MockableWallet) CreateSignature(args *wallet.CreateSignatureArgs, origi
 		return nil, errors.New("unexpected call to CreateSignature")
 	}
 	call := m.Called(args, originator)
-	return call.Get(0).(*wallet.CreateSignatureResult), call.Error(1) // nolint:wrapcheck // return mocked error
+	return call.Get(0).(*wallet.CreateSignatureResult), call.Error(1) //nolint:wrapcheck // return mocked error
 }
 
 // VerifySignature return mocked verification value.
@@ -58,7 +58,7 @@ func (m *MockableWallet) VerifySignature(args *wallet.VerifySignatureArgs) (*wal
 		return nil, errors.New("unexpected call to VerifySignature")
 	}
 	call := m.Called(args)
-	return call.Get(0).(*wallet.VerifySignatureResult), call.Error(1) // nolint:wrapcheck // return mocked error
+	return call.Get(0).(*wallet.VerifySignatureResult), call.Error(1) //nolint:wrapcheck // return mocked error
 }
 
 // CreateNonce return mocked nonce value.
@@ -67,7 +67,7 @@ func (m *MockableWallet) CreateNonce(ctx context.Context) (string, error) {
 		return "", errors.New("unexpected call to CreateNonce")
 	}
 	call := m.Called(ctx)
-	return call.String(0), call.Error(1) // nolint:wrapcheck // return mocked error
+	return call.String(0), call.Error(1) //nolint:wrapcheck // return mocked error
 }
 
 // VerifyNonce return mocked verification value.
@@ -76,7 +76,7 @@ func (m *MockableWallet) VerifyNonce(ctx context.Context, nonce string) (bool, e
 		return false, errors.New("unexpected call to VerifyNonce")
 	}
 	call := m.Called(ctx, nonce)
-	return call.Bool(0), call.Error(1) // nolint:wrapcheck // return mocked error
+	return call.Bool(0), call.Error(1) //nolint:wrapcheck // return mocked error
 }
 
 // ListCertificates return mocked certificate list value.
@@ -85,7 +85,7 @@ func (m *MockableWallet) ListCertificates(ctx context.Context, certifiers []stri
 		return nil, errors.New("unexpected call to ListCertificates")
 	}
 	call := m.Called(ctx, certifiers, types)
-	return call.Get(0).([]wallet.Certificate), call.Error(1) // nolint:wrapcheck // return mocked error
+	return call.Get(0).([]wallet.Certificate), call.Error(1) //nolint:wrapcheck // return mocked error
 }
 
 // ProveCertificate return mocked certificate proof value.
@@ -94,7 +94,7 @@ func (m *MockableWallet) ProveCertificate(ctx context.Context, cert wallet.Certi
 		return nil, errors.New("unexpected call to ProveCertificate")
 	}
 	call := m.Called(ctx, cert, verifier, fieldsToReveal)
-	return call.Get(0).(map[string]string), call.Error(1) // nolint:wrapcheck // return mocked error
+	return call.Get(0).(map[string]string), call.Error(1) //nolint:wrapcheck // return mocked error
 }
 
 // OnGetPublicKeyOnce sets up a one-time expectation for GetPublicKey.
