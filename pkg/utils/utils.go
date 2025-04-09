@@ -118,21 +118,18 @@ func PrepareGeneralRequestHeaders(walletInstance wallet.WalletInterface, previou
 
 // WriteRequestData writes the request data into a buffer
 func WriteRequestData(request *http.Request, writer *bytes.Buffer) error {
-	// Write the method and path
 	err := WriteVarIntNum(writer, len(request.Method))
 	if err != nil {
 		return errors.New("failed to write method length")
 	}
 	writer.Write([]byte(request.Method))
 
-	// Write the path
 	err = WriteVarIntNum(writer, len(request.URL.Path))
 	if err != nil {
 		return errors.New("failed to write path length")
 	}
 	writer.Write([]byte(request.URL.Path))
 
-	// Write query parameters
 	query := request.URL.RawQuery
 	if len(query) > 0 {
 		searchAsArray := []byte(query)
@@ -148,7 +145,6 @@ func WriteRequestData(request *http.Request, writer *bytes.Buffer) error {
 		}
 	}
 
-	// Write headers
 	includedHeaders := ExtractHeaders(request.Header)
 	err = WriteVarIntNum(writer, len(includedHeaders))
 	if err != nil {
@@ -171,7 +167,6 @@ func WriteRequestData(request *http.Request, writer *bytes.Buffer) error {
 		writer.Write(headerValueBytes)
 	}
 
-	// Write body
 	err = WriteBodyToBuffer(request, writer)
 	if err != nil {
 		return errors.New("failed to write request body")

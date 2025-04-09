@@ -131,7 +131,7 @@ func callPingEndpoint(mockedWallet wallet.WalletInterface, response *transport.A
 	url := "http://localhost:8080/ping"
 
 	requestData := utils.RequestData{
-		Method: "GET",
+		Method: http.MethodGet,
 		URL:    url,
 	}
 	headers, err := utils.PrepareGeneralRequestHeaders(mockedWallet, response, requestData)

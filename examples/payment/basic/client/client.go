@@ -84,7 +84,7 @@ func callFree(wallet wallet.WalletInterface, auth *transport.AuthMessage) {
 	url := "http://localhost:8080/info"
 
 	requestData := utils.RequestData{
-		Method: "GET",
+		Method: http.MethodGet,
 		URL:    url,
 	}
 	headers, err := utils.PrepareGeneralRequestHeaders(wallet, auth, requestData)
@@ -108,7 +108,7 @@ func requestPremium(wallet wallet.WalletInterface, auth *transport.AuthMessage) 
 	url := "http://localhost:8080/premium"
 
 	requestData := utils.RequestData{
-		Method: "GET",
+		Method: http.MethodGet,
 		URL:    url,
 	}
 	headers, err := utils.PrepareGeneralRequestHeaders(wallet, auth, requestData)
@@ -165,7 +165,7 @@ func payPremium(wallet wallet.WalletInterface, auth *transport.AuthMessage, pmt 
 	url := "http://localhost:8080/premium"
 
 	requestData := utils.RequestData{
-		Method: "GET",
+		Method: http.MethodGet,
 		URL:    url,
 	}
 	generalHeaders, err := utils.PrepareGeneralRequestHeaders(wallet, auth, requestData)
