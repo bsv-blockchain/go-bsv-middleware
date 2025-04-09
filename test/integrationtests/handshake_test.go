@@ -6,15 +6,16 @@ import (
 	"testing"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/test/assert"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/test/mocks"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
+	"github.com/4chain-ag/go-bsv-middleware/test/assert"
+	"github.com/4chain-ag/go-bsv-middleware/test/mocks"
 	"github.com/stretchr/testify/require"
 )
 
 func TestAuthMiddleware_Handshake_HappyPath(t *testing.T) {
 	// given
-	server := mocks.CreateMockHTTPServer(mocks.WithLogger).
+	sessionManager := mocks.NewMockableSessionManager()
+	server := mocks.CreateMockHTTPServer(sessionManager, mocks.WithLogger).
 		WithHandler("/", mocks.IndexHandler().WithAuthMiddleware()).
 		WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
 	defer server.Close()
@@ -115,7 +116,8 @@ func TestAuthMiddleware_Handshake_HappyPath(t *testing.T) {
 
 func TestAuthMiddleware_NonGeneralRequest_ErrorPath(t *testing.T) {
 	// given
-	server := mocks.CreateMockHTTPServer(mocks.WithLogger).
+	sessionManager := mocks.NewMockableSessionManager()
+	server := mocks.CreateMockHTTPServer(sessionManager, mocks.WithLogger).
 		WithHandler("/", mocks.IndexHandler().WithAuthMiddleware()).
 		WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
 	defer server.Close()
@@ -151,7 +153,8 @@ func TestAuthMiddleware_NonGeneralRequest_ErrorPath(t *testing.T) {
 
 func TestAuthMiddleware_GeneralRequest_ErrorPath(t *testing.T) {
 	// given
-	server := mocks.CreateMockHTTPServer(mocks.WithLogger).
+	sessionManager := mocks.NewMockableSessionManager()
+	server := mocks.CreateMockHTTPServer(sessionManager, mocks.WithLogger).
 		WithHandler("/", mocks.IndexHandler().WithAuthMiddleware()).
 		WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
 	defer server.Close()
@@ -264,7 +267,8 @@ func TestAuthMiddleware_GeneralRequest_ErrorPath(t *testing.T) {
 
 func TestAuthMiddleware_WithAllowUnauthenticated_HappyPath(t *testing.T) {
 	// given
-	server := mocks.CreateMockHTTPServer(mocks.WithLogger, mocks.WithAllowUnauthenticated).
+	sessionManager := mocks.NewMockableSessionManager()
+	server := mocks.CreateMockHTTPServer(sessionManager, mocks.WithLogger, mocks.WithAllowUnauthenticated).
 		WithHandler("/", mocks.IndexHandler().WithAuthMiddleware()).
 		WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
 	defer server.Close()

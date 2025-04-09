@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/sessionmanager"
 	"io"
 	"log/slog"
 	"net/http"
@@ -13,7 +14,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/4chain-ag/go-bsv-middleware/pkg/internal/logging"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
@@ -41,7 +41,7 @@ type MockHTTPHandler struct {
 }
 
 // CreateMockHTTPServer creates a new mock HTTP server
-func CreateMockHTTPServer(opts ...func(s *MockHTTPServer) *MockHTTPServer) *MockHTTPServer {
+func CreateMockHTTPServer(sessionManager sessionmanager.SessionManagerInterface, opts ...func(s *MockHTTPServer) *MockHTTPServer) *MockHTTPServer {
 	mux := http.NewServeMux()
 	mockServer := &MockHTTPServer{mux: mux}
 
@@ -49,7 +49,7 @@ func CreateMockHTTPServer(opts ...func(s *MockHTTPServer) *MockHTTPServer) *Mock
 		opt(mockServer)
 	}
 
-	mockServer.createMiddleware()
+	mockServer.createMiddleware(sessionManager)
 
 	s := httptest.NewServer(mux)
 	mockServer.server = s
@@ -167,7 +167,7 @@ func (s *MockHTTPServer) SendCertificateResponse(t *testing.T, clientWallet wall
 	return resp, nil
 }
 
-func (s *MockHTTPServer) createMiddleware() {
+func (s *MockHTTPServer) createMiddleware(sessionManager sessionmanager.SessionManagerInterface) {
 	if s.logger == nil {
 		s.logger = slog.New(slog.DiscardHandler)
 	}
@@ -178,11 +178,13 @@ func (s *MockHTTPServer) createMiddleware() {
 	}
 
 	opts := auth.Config{
-		AllowUnauthenticated:   s.allowUnauthenticated,
-		Logger:                 s.logger,
+		AllowUnauthenticated: s.allowUnauthenticated,
+		Logger:               s.logger,
+		// TODO: add session manager to wallet mock
 		Wallet:                 CreateServerMockWallet(key),
 		CertificatesToRequest:  s.certificateRequirements,
 		OnCertificatesReceived: s.onCertificatesReceived,
+		SessionManager:         sessionManager,
 	}
 	s.authMiddleware, err = auth.New(opts)
 	if err != nil {
@@ -232,8 +234,7 @@ func WithAllowUnauthenticated(s *MockHTTPServer) *MockHTTPServer {
 // WithLogger is a MockHTTPServer optional setting which  sets up logger for the server
 func WithLogger(s *MockHTTPServer) *MockHTTPServer {
 	logHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
-	logger := slog.New(logHandler)
-	s.logger = logging.Child(logger, "tests")
+	s.logger = slog.New(logHandler)
 	return s
 }
 
