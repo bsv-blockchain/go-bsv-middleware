@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+// MockableSessionManager is a mock implementation of the session manager interface
 type MockableSessionManager struct {
 	mock.Mock
 
@@ -15,6 +16,7 @@ type MockableSessionManager struct {
 	identityKeyToSession map[string][]string
 }
 
+// NewMockableSessionManager creates a new instance of MockableSessionManager
 func NewMockableSessionManager() *MockableSessionManager {
 	return &MockableSessionManager{
 		sessions:             make(map[string]sessionmanager.PeerSession),
@@ -22,6 +24,7 @@ func NewMockableSessionManager() *MockableSessionManager {
 	}
 }
 
+// AddSession return mocked value or add a session to the manager.
 func (m *MockableSessionManager) AddSession(session sessionmanager.PeerSession) {
 	if m.isExpectedMockCall("AddSession", session) {
 		m.Called(session)
@@ -40,10 +43,17 @@ func (m *MockableSessionManager) AddSession(session sessionmanager.PeerSession) 
 	}
 }
 
+// UpdateSession return mocked value or update a session to the manager.
 func (m *MockableSessionManager) UpdateSession(session sessionmanager.PeerSession) {
+	if m.isExpectedMockCall("UpdateSession", session) {
+		m.Called(session)
+		return
+	}
+
 	m.AddSession(session)
 }
 
+// GetSession return mocked value or get a session from the manager.
 func (m *MockableSessionManager) GetSession(identifier string) *sessionmanager.PeerSession {
 	if m.isExpectedMockCall("GetSession", identifier) {
 		args := m.Called(identifier)
@@ -69,6 +79,7 @@ func (m *MockableSessionManager) GetSession(identifier string) *sessionmanager.P
 	return nil
 }
 
+// RemoveSession return mocked value or remove a session from the manager.
 func (m *MockableSessionManager) RemoveSession(session sessionmanager.PeerSession) {
 	if m.isExpectedMockCall("RemoveSession", session) {
 		m.Called(session)
@@ -86,6 +97,7 @@ func (m *MockableSessionManager) RemoveSession(session sessionmanager.PeerSessio
 	}
 }
 
+// HasSession return mocked value or check if a session exists in the manager.
 func (m *MockableSessionManager) HasSession(identifier string) bool {
 	if m.isExpectedMockCall("HasSession", identifier) {
 		args := m.Called(identifier)
@@ -100,22 +112,27 @@ func (m *MockableSessionManager) HasSession(identifier string) bool {
 	return existsNonce || (existsIdentity && len(nonces) > 0)
 }
 
+// OnAddSessionOnce sets up a one-time expectation for the AddSession method.
 func (m *MockableSessionManager) OnAddSessionOnce(session sessionmanager.PeerSession) *mock.Call {
 	return m.On("AddSession", session).Once()
 }
 
+// OnUpdateSessionOnce sets up a one-time expectation for the UpdateSession method.
 func (m *MockableSessionManager) OnUpdateSessionOnce(session sessionmanager.PeerSession) *mock.Call {
 	return m.On("UpdateSession", session).Once()
 }
 
+// OnGetSessionOnce sets up a one-time expectation for the GetSession method.
 func (m *MockableSessionManager) OnGetSessionOnce(identifier string, session sessionmanager.PeerSession) *mock.Call {
 	return m.On("GetSession", identifier).Return(session).Once()
 }
 
+// OnRemoveSessionOnce sets up a one-time expectation for the RemoveSession method.
 func (m *MockableSessionManager) OnRemoveSessionOnce(session sessionmanager.PeerSession) *mock.Call {
 	return m.On("RemoveSession", session).Once()
 }
 
+// OnHasSessionOnce sets up a one-time expectation for the HasSession method.
 func (m *MockableSessionManager) OnHasSessionOnce(identifier string) *mock.Call {
 	return m.On("HasSession", identifier).Once()
 }
