@@ -11,7 +11,7 @@ import (
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/sessionmanager"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/transport/http"
+	httptransport "github.com/4chain-ag/go-bsv-middleware/pkg/transport/http"
 )
 
 // Middleware implements BRC-103/104 authentication
@@ -87,9 +87,17 @@ func New(opts Config) (*Middleware, error) {
 
 	middlewareLogger := logging.Child(opts.Logger, "auth-middleware")
 
+	if opts.OnCertificatesReceived == nil && opts.CertificatesToRequest != nil {
+		return nil, errors.New("OnCertificatesReceived callback is required when certificates are requested")
+	}
+
+	if opts.OnCertificatesReceived != nil && opts.CertificatesToRequest == nil {
+		return nil, errors.New("OnCertificatesReceived callback is set but no certificates are requested")
+	}
+
 	middlewareLogger.Debug(" Creating new auth middleware")
 
-	t := httptransport.New(opts.Wallet, opts.SessionManager, opts.AllowUnauthenticated, opts.Logger)
+	t := httptransport.New(opts.Wallet, opts.SessionManager, opts.AllowUnauthenticated, opts.Logger, opts.CertificatesToRequest, opts.OnCertificatesReceived)
 
 	middlewareLogger.Debug(" transport created")
 
@@ -107,7 +115,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		recorder := newResponseRecorder(w)
 		if req.Method == http.MethodPost && req.URL.Path == "/.well-known/auth" {
-			err := m.transport.HandleNonGeneralRequest(req, recorder, nil)
+			err := m.transport.HandleNonGeneralRequest(req, recorder)
 			if err != nil {
 				http.Error(recorder, err.Error(), http.StatusUnauthorized)
 			}
@@ -115,7 +123,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 			return
 		}
 
-		req, authMsg, err := m.transport.HandleGeneralRequest(req, recorder, nil)
+		req, authMsg, err := m.transport.HandleGeneralRequest(req, recorder)
 		if err != nil {
 			http.Error(recorder, err.Error(), http.StatusUnauthorized)
 			createResponse(recorder)
