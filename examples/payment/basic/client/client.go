@@ -7,25 +7,25 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/4chain-ag/go-bsv-middleware/pkg/utils"
-	"github.com/go-resty/resty/v2"
-
 	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/payment"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
+	"github.com/4chain-ag/go-bsv-middleware/pkg/utils"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
+	"github.com/go-resty/resty/v2"
 )
 
 func main() {
 	fmt.Println("BSV Payment Client - Demo")
 
-	sPrivKey, err := ec.PrivateKeyFromHex(walletFixtures.ServerPrivateKeyHex)
+	key, err := ec.NewPrivateKey()
 	if err != nil {
-		panic(err)
+		log.Fatalf("failed to send auth request: %s", err)
+		return
 	}
 
-	mockWallet := wallet.NewMockWallet(sPrivKey, walletFixtures.DefaultNonces...)
+	mockWallet := wallet.NewMockWallet(key, walletFixtures.DefaultNonces...)
 	fmt.Println("✓ Client mockWallet created")
 
 	time.Sleep(1 * time.Second)
@@ -82,9 +82,12 @@ func authenticate(wallet wallet.WalletInterface) *transport.AuthMessage {
 func callFree(wallet wallet.WalletInterface, auth *transport.AuthMessage) {
 	client := resty.New()
 	url := "http://localhost:8080/info"
-	method := "GET"
 
-	headers, err := utils.PrepareGeneralRequestHeaders(wallet, auth, url, method)
+	requestData := utils.RequestData{
+		Method: http.MethodGet,
+		URL:    url,
+	}
+	headers, err := utils.PrepareGeneralRequestHeaders(wallet, auth, requestData)
 	if err != nil {
 		log.Fatalf("failed to prepare request headers for free endpoint: %s", err)
 	}
@@ -103,9 +106,12 @@ func callFree(wallet wallet.WalletInterface, auth *transport.AuthMessage) {
 func requestPremium(wallet wallet.WalletInterface, auth *transport.AuthMessage) *payment.PaymentTerms {
 	client := resty.New()
 	url := "http://localhost:8080/premium"
-	method := "GET"
 
-	headers, err := utils.PrepareGeneralRequestHeaders(wallet, auth, url, method)
+	requestData := utils.RequestData{
+		Method: http.MethodGet,
+		URL:    url,
+	}
+	headers, err := utils.PrepareGeneralRequestHeaders(wallet, auth, requestData)
 	if err != nil {
 		log.Fatalf("failed to prepare request headers for premium request: %s", err)
 		return nil
@@ -157,9 +163,12 @@ func createMockPayment(terms *payment.PaymentTerms) *payment.Payment {
 func payPremium(wallet wallet.WalletInterface, auth *transport.AuthMessage, pmt *payment.Payment) {
 	client := resty.New()
 	url := "http://localhost:8080/premium"
-	method := "GET"
 
-	generalHeaders, err := utils.PrepareGeneralRequestHeaders(wallet, auth, url, method)
+	requestData := utils.RequestData{
+		Method: http.MethodGet,
+		URL:    url,
+	}
+	generalHeaders, err := utils.PrepareGeneralRequestHeaders(wallet, auth, requestData)
 	if err != nil {
 		log.Fatalf("failed to prepare request headers for paying premium: %s", err)
 	}

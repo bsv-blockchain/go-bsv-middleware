@@ -12,8 +12,8 @@ import (
 	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/test/mocks"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
+	"github.com/4chain-ag/go-bsv-middleware/pkg/utils"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/go-resty/resty/v2"
 )
@@ -92,7 +92,7 @@ func pingHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func callInitialRequest(mockedWallet wallet.WalletInterface) *transport.AuthMessage {
-	requestData := mocks.PrepareInitialRequestBody(mockedWallet)
+	requestData := utils.PrepareInitialRequestBody(mockedWallet)
 	url := "http://localhost:8080/.well-known/auth"
 
 	client := resty.New()
@@ -129,9 +129,12 @@ func callInitialRequest(mockedWallet wallet.WalletInterface) *transport.AuthMess
 
 func callPingEndpoint(mockedWallet wallet.WalletInterface, response *transport.AuthMessage) {
 	url := "http://localhost:8080/ping"
-	method := "GET"
 
-	headers, err := mocks.PrepareGeneralRequestHeaders(mockedWallet, response, "/ping", method)
+	requestData := utils.RequestData{
+		Method: http.MethodGet,
+		URL:    url,
+	}
+	headers, err := utils.PrepareGeneralRequestHeaders(mockedWallet, response, requestData)
 	if err != nil {
 		log.Fatalf("Failed to prepare general request headers: %v", err)
 	}

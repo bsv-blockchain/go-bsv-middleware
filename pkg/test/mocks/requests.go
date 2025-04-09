@@ -3,10 +3,11 @@ package mocks
 import (
 	"encoding/hex"
 	"errors"
+	"net/http"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
-	globalutils "github.com/4chain-ag/go-bsv-middleware/pkg/utils"
+	"github.com/4chain-ag/go-bsv-middleware/pkg/utils"
 )
 
 // Headers is a map of headers
@@ -16,27 +17,27 @@ type Headers map[string]string
 type RequestBody transport.AuthMessage
 
 // WithWrongVersion adds a wrong version to the headers
-func (h Headers) WithWrongVersion() {
+func WithWrongVersion(h map[string]string) {
 	h["x-bsv-auth-version"] = "0.2"
 }
 
 // WithWrongSignature adds a wrong signature to the headers
-func (h Headers) WithWrongSignature() {
+func WithWrongSignature(h map[string]string) {
 	h["x-bsv-auth-signature"] = "wrong_signature"
 }
 
 // WithWrongSignatureInHex adds a wrong signature in hex to the headers
-func (h Headers) WithWrongSignatureInHex() {
+func WithWrongSignatureInHex(h map[string]string) {
 	h["x-bsv-auth-signature"] = hex.EncodeToString([]byte("wrong_signature"))
 }
 
 // WithWrongYourNonce adds a wrong your nonce to the headers
-func (h Headers) WithWrongYourNonce() {
+func WithWrongYourNonce(h map[string]string) {
 	h["x-bsv-auth-your-nonce"] = "wrong_your_nonce"
 }
 
 // WithWrongNonce adds a wrong nonce to the headers
-func (h Headers) WithWrongNonce() {
+func WithWrongNonce(h map[string]string) {
 	h["x-bsv-auth-nonce"] = "wrong_nonce"
 }
 
@@ -66,19 +67,19 @@ func (rb *RequestBody) AuthMessage() *transport.AuthMessage {
 
 // PrepareInitialRequestBody prepares the initial request body
 func PrepareInitialRequestBody(mockedWallet wallet.WalletInterface) *RequestBody {
-	initialRequest := globalutils.PrepareInitialRequestBody(mockedWallet)
+	initialRequest := utils.PrepareInitialRequestBody(mockedWallet)
 
 	return NewRequestBody(initialRequest)
 }
 
 // PrepareGeneralRequestHeaders prepares the general request headers
-func PrepareGeneralRequestHeaders(mockedWallet wallet.WalletInterface, previousResponse *transport.AuthMessage, path, method string) (Headers, error) {
+func PrepareGeneralRequestHeaders(mockedWallet wallet.WalletInterface, previousResponse *transport.AuthMessage, request *http.Request, opts ...func(m map[string]string)) error {
 	if previousResponse == nil {
-		return nil, errors.New("previous response is nil")
+		return errors.New("previous response is nil")
 	}
 
 	if previousResponse.IdentityKey == "" {
-		return nil, errors.New("previous response missing identity key")
+		return errors.New("previous response missing identity key")
 	}
 
 	yourNonce := previousResponse.InitialNonce
@@ -87,7 +88,7 @@ func PrepareGeneralRequestHeaders(mockedWallet wallet.WalletInterface, previousR
 	}
 
 	if yourNonce == "" {
-		return nil, errors.New("previous response has no nonce to use")
+		return errors.New("previous response has no nonce to use")
 	}
 
 	normalizedResponse := &transport.AuthMessage{
@@ -97,10 +98,18 @@ func PrepareGeneralRequestHeaders(mockedWallet wallet.WalletInterface, previousR
 		InitialNonce: yourNonce,
 	}
 
-	headers, err := globalutils.PrepareGeneralRequestHeaders(mockedWallet, normalizedResponse, path, method)
+	headers, err := utils.PrepareGeneralRequestHeaders(mockedWallet, normalizedResponse, utils.RequestData{Request: request})
 	if err != nil {
-		return nil, errors.New("failed to prepare general request headers: " + err.Error())
+		return errors.New("failed to prepare general request headers: " + err.Error())
 	}
 
-	return headers, nil
+	for _, opt := range opts {
+		opt(headers)
+	}
+
+	for key, value := range headers {
+		request.Header.Set(key, value)
+	}
+
+	return nil
 }

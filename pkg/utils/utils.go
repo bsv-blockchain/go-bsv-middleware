@@ -5,15 +5,27 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/transport/utils"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )
+
+// RequestData holds the request information used to create auth headers
+type RequestData struct {
+	Method  string
+	URL     string
+	Headers map[string]string
+	Body    []byte
+	Request *http.Request
+}
 
 // PrepareInitialRequestBody prepares the initial request body
 func PrepareInitialRequestBody(walletInstance wallet.WalletInterface) transport.AuthMessage {
@@ -39,7 +51,7 @@ func PrepareInitialRequestBody(walletInstance wallet.WalletInterface) transport.
 }
 
 // PrepareGeneralRequestHeaders prepares the general request headers
-func PrepareGeneralRequestHeaders(walletInstance wallet.WalletInterface, previousResponse *transport.AuthMessage, path, method string) (map[string]string, error) {
+func PrepareGeneralRequestHeaders(walletInstance wallet.WalletInterface, previousResponse *transport.AuthMessage, requestData RequestData) (map[string]string, error) {
 	serverIdentityKey := previousResponse.IdentityKey
 	serverNonce := previousResponse.InitialNonce
 
@@ -59,39 +71,12 @@ func PrepareGeneralRequestHeaders(walletInstance wallet.WalletInterface, previou
 
 	var writer bytes.Buffer
 
-	// Write the request ID
 	writer.Write(requestID)
 
-	// Write the method and path
-	err = utils.WriteVarIntNum(&writer, len(method))
+	request := getOrPrepareTempRequest(requestData)
+	err = WriteRequestData(request, &writer)
 	if err != nil {
-		return nil, errors.New("failed to write method length")
-	}
-	writer.Write([]byte(method))
-
-	// Write the path
-	err = utils.WriteVarIntNum(&writer, len(path))
-	if err != nil {
-		return nil, errors.New("failed to write path length")
-	}
-	writer.Write([]byte(path))
-
-	// Write -1 (no query parameters)
-	err = utils.WriteVarIntNum(&writer, -1)
-	if err != nil {
-		return nil, errors.New("failed to write query parameters length")
-	}
-
-	// Write 0 (no headers)
-	err = utils.WriteVarIntNum(&writer, 0)
-	if err != nil {
-		return nil, errors.New("failed to write headers length")
-	}
-
-	// Write -1 (no body)
-	err = utils.WriteVarIntNum(&writer, -1)
-	if err != nil {
-		return nil, errors.New("failed to write body length")
+		return nil, err
 	}
 
 	key, err := ec.PublicKeyFromString(serverIdentityKey)
@@ -129,6 +114,130 @@ func PrepareGeneralRequestHeaders(walletInstance wallet.WalletInterface, previou
 	return headers, nil
 }
 
+// WriteRequestData writes the request data into a buffer
+func WriteRequestData(request *http.Request, writer *bytes.Buffer) error {
+	err := WriteVarIntNum(writer, len(request.Method))
+	if err != nil {
+		return errors.New("failed to write method length")
+	}
+	writer.Write([]byte(request.Method))
+
+	err = WriteVarIntNum(writer, len(request.URL.Path))
+	if err != nil {
+		return errors.New("failed to write path length")
+	}
+	writer.Write([]byte(request.URL.Path))
+
+	query := request.URL.RawQuery
+	if len(query) > 0 {
+		searchAsArray := []byte(query)
+		err = WriteVarIntNum(writer, len(searchAsArray))
+		if err != nil {
+			return errors.New("failed to write query length")
+		}
+		writer.Write([]byte(query))
+	} else {
+		err = WriteVarIntNum(writer, -1)
+		if err != nil {
+			return errors.New("failed to write -1 as query length")
+		}
+	}
+
+	includedHeaders := ExtractHeaders(request.Header)
+	err = WriteVarIntNum(writer, len(includedHeaders))
+	if err != nil {
+		return errors.New("failed to write headers length")
+	}
+
+	for _, header := range includedHeaders {
+		headerKeyBytes := []byte(header[0])
+		err = WriteVarIntNum(writer, len(headerKeyBytes))
+		if err != nil {
+			return errors.New("failed to write header key length")
+		}
+		writer.Write(headerKeyBytes)
+
+		headerValueBytes := []byte(header[1])
+		err = WriteVarIntNum(writer, len(headerValueBytes))
+		if err != nil {
+			return errors.New("failed to write header value length")
+		}
+		writer.Write(headerValueBytes)
+	}
+
+	err = WriteBodyToBuffer(request, writer)
+	if err != nil {
+		return errors.New("failed to write request body")
+	}
+
+	return nil
+}
+
+// WriteVarIntNum writes a variable-length integer to a buffer
+// integer is converted to fixed size int64
+func WriteVarIntNum(writer *bytes.Buffer, num int) error {
+	err := binary.Write(writer, binary.LittleEndian, int64(num))
+	if err != nil {
+		return errors.New("failed to write varint number")
+	}
+	return nil
+}
+
+// ReadVarIntNum reads a variable-length integer from a buffer
+func ReadVarIntNum(reader *bytes.Reader) (int64, error) {
+	var intByte int64
+	err := binary.Read(reader, binary.LittleEndian, &intByte)
+	if err != nil {
+		return 0, errors.New("failed to read varint number")
+	}
+
+	return intByte, nil
+}
+
+// ExtractHeaders extracts required headers based on conditions
+func ExtractHeaders(headers http.Header) [][]string {
+	var includedHeaders [][]string
+	for k, v := range headers {
+		k = strings.ToLower(k)
+		if (strings.HasPrefix(k, "x-bsv-") || k == "content-type" || k == "authorization") &&
+			!strings.HasPrefix(k, "x-bsv-auth") {
+			includedHeaders = append(includedHeaders, []string{k, v[0]})
+		}
+	}
+	return includedHeaders
+}
+
+// WriteBodyToBuffer writes the request body into a buffer
+func WriteBodyToBuffer(req *http.Request, buf *bytes.Buffer) error {
+	if req.Body == nil {
+		err := WriteVarIntNum(buf, -1)
+		if err != nil {
+			return errors.New("failed to write -1 for empty body")
+		}
+		return nil
+	}
+
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		return errors.New("failed to read request body")
+	}
+
+	if len(body) > 0 {
+		err = WriteVarIntNum(buf, len(body))
+		if err != nil {
+			return errors.New("failed to write body length")
+		}
+		buf.Write(body)
+		return nil
+	}
+
+	err = WriteVarIntNum(buf, -1)
+	if err != nil {
+		return errors.New("failed to write -1 for empty body")
+	}
+	return nil
+}
+
 func generateRandom() []byte {
 	b := make([]byte, 32)
 	_, err := rand.Read(b)
@@ -136,4 +245,21 @@ func generateRandom() []byte {
 		panic(err)
 	}
 	return b
+}
+
+func getOrPrepareTempRequest(requestData RequestData) *http.Request {
+	if requestData.Request != nil {
+		return requestData.Request
+	}
+
+	req, err := http.NewRequest(requestData.Method, requestData.URL, bytes.NewBuffer(requestData.Body))
+	if err != nil {
+		panic(err)
+	}
+
+	for key, value := range requestData.Headers {
+		req.Header.Set(key, value)
+	}
+
+	return req
 }
