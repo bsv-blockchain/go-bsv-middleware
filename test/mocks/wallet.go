@@ -67,7 +67,7 @@ func (m *MockableWallet) CreateNonce(ctx context.Context) (string, error) {
 		return "", errors.New("unexpected call to CreateNonce")
 	}
 	call := m.Called(ctx)
-	return call.String(0), call.Error(1) //nolint:wrapcheck // return mocked error
+	return call.String(0), call.Error(1)
 }
 
 // VerifyNonce return mocked verification value.
@@ -76,7 +76,7 @@ func (m *MockableWallet) VerifyNonce(ctx context.Context, nonce string) (bool, e
 		return false, errors.New("unexpected call to VerifyNonce")
 	}
 	call := m.Called(ctx, nonce)
-	return call.Bool(0), call.Error(1) //nolint:wrapcheck // return mocked error
+	return call.Bool(0), call.Error(1)
 }
 
 // ListCertificates return mocked certificate list value.
