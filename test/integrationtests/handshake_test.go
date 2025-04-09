@@ -1,21 +1,25 @@
 package integrationtests
 
 import (
-	"fmt"
 	"net/http"
 	"testing"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
+	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	"github.com/4chain-ag/go-bsv-middleware/test/assert"
 	"github.com/4chain-ag/go-bsv-middleware/test/mocks"
+	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/stretchr/testify/require"
 )
 
 func TestAuthMiddleware_Handshake_HappyPath(t *testing.T) {
 	// given
+	key, err := ec.PrivateKeyFromHex(walletFixtures.ServerPrivateKeyHex)
+	require.NoError(t, err)
 	sessionManager := mocks.NewMockableSessionManager()
-	server := mocks.CreateMockHTTPServer(sessionManager, mocks.WithLogger).
+	serverWallet := mocks.CreateServerMockWallet(key)
+	server := mocks.CreateMockHTTPServer(serverWallet, sessionManager, mocks.WithLogger).
 		WithHandler("/", mocks.IndexHandler().WithAuthMiddleware()).
 		WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
 	defer server.Close()
@@ -39,8 +43,6 @@ func TestAuthMiddleware_Handshake_HappyPath(t *testing.T) {
 		require.NoError(t, err)
 		assert.ResponseOK(t, response)
 		assert.InitialResponseHeaders(t, response)
-
-		fmt.Print("response: ", response)
 
 		authMessage, err := mocks.MapBodyToAuthMessage(t, response)
 		require.NoError(t, err)
@@ -117,7 +119,8 @@ func TestAuthMiddleware_Handshake_HappyPath(t *testing.T) {
 func TestAuthMiddleware_NonGeneralRequest_ErrorPath(t *testing.T) {
 	// given
 	sessionManager := mocks.NewMockableSessionManager()
-	server := mocks.CreateMockHTTPServer(sessionManager, mocks.WithLogger).
+	serverWallet := mocks.NewMockableWallet()
+	server := mocks.CreateMockHTTPServer(serverWallet, sessionManager, mocks.WithLogger).
 		WithHandler("/", mocks.IndexHandler().WithAuthMiddleware()).
 		WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
 	defer server.Close()
@@ -153,8 +156,11 @@ func TestAuthMiddleware_NonGeneralRequest_ErrorPath(t *testing.T) {
 
 func TestAuthMiddleware_GeneralRequest_ErrorPath(t *testing.T) {
 	// given
+	key, err := ec.PrivateKeyFromHex(walletFixtures.ServerPrivateKeyHex)
+	require.NoError(t, err)
 	sessionManager := mocks.NewMockableSessionManager()
-	server := mocks.CreateMockHTTPServer(sessionManager, mocks.WithLogger).
+	serverWallet := mocks.CreateServerMockWallet(key)
+	server := mocks.CreateMockHTTPServer(serverWallet, sessionManager, mocks.WithLogger).
 		WithHandler("/", mocks.IndexHandler().WithAuthMiddleware()).
 		WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
 	defer server.Close()
@@ -268,7 +274,8 @@ func TestAuthMiddleware_GeneralRequest_ErrorPath(t *testing.T) {
 func TestAuthMiddleware_WithAllowUnauthenticated_HappyPath(t *testing.T) {
 	// given
 	sessionManager := mocks.NewMockableSessionManager()
-	server := mocks.CreateMockHTTPServer(sessionManager, mocks.WithLogger, mocks.WithAllowUnauthenticated).
+	serverWallet := mocks.NewMockableWallet()
+	server := mocks.CreateMockHTTPServer(serverWallet, sessionManager, mocks.WithLogger, mocks.WithAllowUnauthenticated).
 		WithHandler("/", mocks.IndexHandler().WithAuthMiddleware()).
 		WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
 	defer server.Close()
