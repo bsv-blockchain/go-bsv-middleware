@@ -55,12 +55,12 @@ func New(
 	allowUnauthenticated bool, logger *slog.Logger,
 	reqCerts *transport.RequestedCertificateSet,
 	OnCertificatesReceived func(
-		senderPublicKey string,
-		certs *[]wallet.VerifiableCertificate,
-		req *http.Request,
-		res http.ResponseWriter,
-		next func(),
-	)) transport.TransportInterface {
+	senderPublicKey string,
+	certs *[]wallet.VerifiableCertificate,
+	req *http.Request,
+	res http.ResponseWriter,
+	next func(),
+)) transport.TransportInterface {
 	transportLogger := logging.Child(logger, "http-transport")
 	transportLogger.Info(fmt.Sprintf("Creating HTTP transport with allowUnauthenticated = %t", allowUnauthenticated))
 
@@ -129,6 +129,11 @@ func (t *Transport) HandleGeneralRequest(req *http.Request, res http.ResponseWri
 	}
 
 	t.logger.Debug("Received general request", slog.String("requestID", requestID))
+
+	err := checkHeaders(req)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	requestData, err := buildAuthMessageFromRequest(req)
 	if err != nil {
@@ -676,4 +681,56 @@ func getValuesFromContext(req *http.Request) (string, string, error) {
 	}
 
 	return identityKey, requestID, nil
+}
+
+func checkHeaders(req *http.Request) error {
+	if req.Header.Get(versionHeader) == "" {
+		return errors.New("missing version header")
+	}
+
+	if req.Header.Get(identityKeyHeader) == "" {
+		return errors.New("missing identity key header")
+	}
+
+	if req.Header.Get(nonceHeader) == "" {
+		return errors.New("missing nonce header")
+	} else {
+		if err := validateBase64(req.Header.Get(nonceHeader)); err != nil {
+			return errors.New("invalid nonce header")
+		}
+	}
+
+	if req.Header.Get(yourNonceHeader) == "" {
+		return errors.New("missing your nonce header")
+	} else {
+		if err := validateBase64(req.Header.Get(yourNonceHeader)); err != nil {
+			return errors.New("invalid your nonce header")
+		}
+	}
+
+	if req.Header.Get(signatureHeader) == "" {
+		return errors.New("missing signature header")
+	} else {
+		if !isHex(req.Header.Get(signatureHeader)) {
+			return errors.New("invalid signature header")
+		}
+	}
+	return nil
+}
+
+func validateBase64(input string) error {
+	_, err := base64.StdEncoding.DecodeString(input)
+	if err != nil {
+		return fmt.Errorf("invalid base64 string: %w", err)
+	}
+	return nil
+}
+
+func isHex(s string) bool {
+	if len(s)%2 != 0 {
+		return false
+	}
+
+	_, err := hex.DecodeString(s)
+	return err == nil
 }
