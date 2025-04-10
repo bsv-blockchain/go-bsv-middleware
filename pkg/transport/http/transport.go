@@ -55,12 +55,12 @@ func New(
 	allowUnauthenticated bool, logger *slog.Logger,
 	reqCerts *transport.RequestedCertificateSet,
 	OnCertificatesReceived func(
-	senderPublicKey string,
-	certs *[]wallet.VerifiableCertificate,
-	req *http.Request,
-	res http.ResponseWriter,
-	next func(),
-)) transport.TransportInterface {
+		senderPublicKey string,
+		certs *[]wallet.VerifiableCertificate,
+		req *http.Request,
+		res http.ResponseWriter,
+		next func(),
+	)) transport.TransportInterface {
 	transportLogger := logging.Child(logger, "http-transport")
 	transportLogger.Info(fmt.Sprintf("Creating HTTP transport with allowUnauthenticated = %t", allowUnauthenticated))
 
