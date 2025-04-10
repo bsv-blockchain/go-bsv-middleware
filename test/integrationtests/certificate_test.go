@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
+	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	"github.com/4chain-ag/go-bsv-middleware/test/assert"
 	"github.com/4chain-ag/go-bsv-middleware/test/mocks"
@@ -20,7 +21,10 @@ import (
 const trustedCertifier = "02certifieridentitykey00000000000000000000000000000000000000000000000"
 
 func TestAuthMiddleware_CertificateHandling(t *testing.T) {
+	key, err := ec.PrivateKeyFromHex(walletFixtures.ServerPrivateKeyHex)
+	require.NoError(t, err)
 	sessionManager := mocks.NewMockableSessionManager()
+	serverWallet := mocks.CreateServerMockWallet(key)
 
 	t.Run("initial request with certificate requirements", func(t *testing.T) {
 		certificateRequirements := &transport.RequestedCertificateSet{
@@ -41,7 +45,7 @@ func TestAuthMiddleware_CertificateHandling(t *testing.T) {
 			}
 		}
 
-		server := mocks.CreateMockHTTPServer(sessionManager, mocks.WithLogger, mocks.WithCertificateRequirements(certificateRequirements, onCertificatesReceived)).
+		server := mocks.CreateMockHTTPServer(serverWallet, sessionManager, mocks.WithLogger, mocks.WithCertificateRequirements(certificateRequirements, onCertificatesReceived)).
 			WithHandler("/", mocks.IndexHandler().WithAuthMiddleware()).
 			WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
 		defer server.Close()
@@ -85,7 +89,7 @@ func TestAuthMiddleware_CertificateHandling(t *testing.T) {
 			}
 		}
 
-		server := mocks.CreateMockHTTPServer(sessionManager, mocks.WithLogger, mocks.WithCertificateRequirements(certificateRequirements, onCertificatesReceived)).
+		server := mocks.CreateMockHTTPServer(serverWallet, sessionManager, mocks.WithLogger, mocks.WithCertificateRequirements(certificateRequirements, onCertificatesReceived)).
 			WithHandler("/", mocks.IndexHandler().WithAuthMiddleware()).
 			WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
 		defer server.Close()
@@ -109,6 +113,7 @@ func TestAuthMiddleware_CertificateHandling(t *testing.T) {
 	})
 
 	t.Run("send certificate and gain access", func(t *testing.T) {
+		sessionManager.Clear()
 		certificateRequirements := &transport.RequestedCertificateSet{
 			Certifiers: []string{trustedCertifier},
 			Types: map[string][]string{
@@ -129,7 +134,7 @@ func TestAuthMiddleware_CertificateHandling(t *testing.T) {
 			}
 		}
 
-		server := mocks.CreateMockHTTPServer(sessionManager, mocks.WithLogger, mocks.WithCertificateRequirements(certificateRequirements, onCertificatesReceived)).
+		server := mocks.CreateMockHTTPServer(serverWallet, sessionManager, mocks.WithLogger, mocks.WithCertificateRequirements(certificateRequirements, onCertificatesReceived)).
 			WithHandler("/", mocks.IndexHandler().WithAuthMiddleware()).
 			WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
 		defer server.Close()
@@ -279,7 +284,10 @@ func TestAuthMiddleware_InvalidCertificateHandling(t *testing.T) {
 	}
 
 	sessionManager := mocks.NewMockableSessionManager()
-	server := mocks.CreateMockHTTPServer(sessionManager, mocks.WithLogger, mocks.WithCertificateRequirements(certificateRequirements, onCertificatesReceived)).
+	key, err := ec.PrivateKeyFromHex(walletFixtures.ServerPrivateKeyHex)
+	require.NoError(t, err)
+	serverWallet := mocks.CreateServerMockWallet(key)
+	server := mocks.CreateMockHTTPServer(serverWallet, sessionManager, mocks.WithLogger, mocks.WithCertificateRequirements(certificateRequirements, onCertificatesReceived)).
 		WithHandler("/", mocks.IndexHandler().WithAuthMiddleware()).
 		WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
 	defer server.Close()

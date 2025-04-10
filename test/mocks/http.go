@@ -16,7 +16,6 @@ import (
 	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/sessionmanager"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
-	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/stretchr/testify/require"
@@ -41,7 +40,11 @@ type MockHTTPHandler struct {
 }
 
 // CreateMockHTTPServer creates a new mock HTTP server
-func CreateMockHTTPServer(sessionManager sessionmanager.SessionManagerInterface, opts ...func(s *MockHTTPServer) *MockHTTPServer) *MockHTTPServer {
+func CreateMockHTTPServer(
+	wallet wallet.WalletInterface,
+	sessionManager sessionmanager.SessionManagerInterface,
+	opts ...func(s *MockHTTPServer) *MockHTTPServer) *MockHTTPServer {
+
 	mux := http.NewServeMux()
 	mockServer := &MockHTTPServer{mux: mux}
 
@@ -49,7 +52,7 @@ func CreateMockHTTPServer(sessionManager sessionmanager.SessionManagerInterface,
 		opt(mockServer)
 	}
 
-	mockServer.createMiddleware(sessionManager)
+	mockServer.createMiddleware(wallet, sessionManager)
 
 	s := httptest.NewServer(mux)
 	mockServer.server = s
@@ -167,24 +170,21 @@ func (s *MockHTTPServer) SendCertificateResponse(t *testing.T, clientWallet wall
 	return resp, nil
 }
 
-func (s *MockHTTPServer) createMiddleware(sessionManager sessionmanager.SessionManagerInterface) {
+func (s *MockHTTPServer) createMiddleware(wallet wallet.WalletInterface, sessionManager sessionmanager.SessionManagerInterface) {
 	if s.logger == nil {
 		s.logger = slog.New(slog.DiscardHandler)
-	}
-
-	key, err := ec.PrivateKeyFromHex(walletFixtures.ServerPrivateKeyHex)
-	if err != nil {
-		panic("failed to create server private key")
 	}
 
 	opts := auth.Config{
 		AllowUnauthenticated:   s.allowUnauthenticated,
 		Logger:                 s.logger,
-		Wallet:                 CreateServerMockWallet(key),
+		Wallet:                 wallet,
 		CertificatesToRequest:  s.certificateRequirements,
 		OnCertificatesReceived: s.onCertificatesReceived,
 		SessionManager:         sessionManager,
 	}
+
+	var err error
 	s.authMiddleware, err = auth.New(opts)
 	if err != nil {
 		panic("failed to create auth middleware")
