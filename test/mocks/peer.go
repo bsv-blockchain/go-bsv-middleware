@@ -174,18 +174,3 @@ func (m *MockablePeer) SimulateIncomingCertificates(senderPublicKey string, cert
 func (m *MockablePeer) SimulateIncomingCertificateRequest(senderPublicKey string, request transport.RequestedCertificateSet, callback func(string, transport.RequestedCertificateSet)) {
 	callback(senderPublicKey, request)
 }
-
-// Helper function to check if a mock call is expected
-func isExpectedMockCall(expectedCalls []*mock.Call, method string, arguments ...interface{}) bool {
-	for _, call := range expectedCalls {
-		if call.Method == method {
-			_, diffCount := call.Arguments.Diff(arguments)
-			if diffCount == 0 {
-				if call.Repeatability > -1 {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
