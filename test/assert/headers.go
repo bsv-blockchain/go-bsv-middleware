@@ -1,7 +1,6 @@
 package assert
 
 import (
-	"fmt"
 	"net/http"
 	"testing"
 
@@ -23,7 +22,6 @@ func InitialResponseHeaders(t *testing.T, response *http.Response) {
 	for key, value := range initialResponseHeaders {
 		require.Equal(t, value, response.Header.Get(key))
 	}
-	fmt.Println(response.Header.Get("x-bsv-auth-signature"))
 	require.NotNil(t, response.Header.Get("x-bsv-auth-signature"))
 }
 

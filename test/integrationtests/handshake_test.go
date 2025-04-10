@@ -203,7 +203,7 @@ func TestAuthMiddleware_GeneralRequest_ErrorPath(t *testing.T) {
 		// then
 		require.NoError(t, err)
 		assert.NotAuthorized(t, response)
-		assert.DecodingSignatureError(t, response)
+		assert.InvalidHeaderError(t, response, "signature")
 	})
 
 	t.Run("wrong version", func(t *testing.T) {
@@ -235,7 +235,7 @@ func TestAuthMiddleware_GeneralRequest_ErrorPath(t *testing.T) {
 		// then
 		require.NoError(t, err)
 		assert.NotAuthorized(t, response)
-		assert.UnableToVerifyNonceError(t, response)
+		assert.InvalidHeaderError(t, response, "your nonce")
 	})
 
 	t.Run("wrong signature - unable to decode", func(t *testing.T) {
@@ -251,7 +251,7 @@ func TestAuthMiddleware_GeneralRequest_ErrorPath(t *testing.T) {
 		// then
 		require.NoError(t, err)
 		assert.NotAuthorized(t, response)
-		assert.UnableToVerifySignatureError(t, response)
+		assert.FailedToParseSignatureError(t, response)
 	})
 
 	t.Run("wrong signature - unable to decode", func(t *testing.T) {
@@ -267,7 +267,7 @@ func TestAuthMiddleware_GeneralRequest_ErrorPath(t *testing.T) {
 		// then
 		require.NoError(t, err)
 		assert.NotAuthorized(t, response)
-		assert.UnableToVerifySignatureError(t, response)
+		assert.FailedToParseSignatureError(t, response)
 	})
 }
 

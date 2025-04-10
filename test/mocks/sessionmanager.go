@@ -128,7 +128,7 @@ func (m *MockableSessionManager) OnUpdateSessionOnce(session sessionmanager.Peer
 }
 
 // OnGetSessionOnce sets up a one-time expectation for the GetSession method.
-func (m *MockableSessionManager) OnGetSessionOnce(identifier string, session sessionmanager.PeerSession) *mock.Call {
+func (m *MockableSessionManager) OnGetSessionOnce(identifier string, session *sessionmanager.PeerSession) *mock.Call {
 	return m.On("GetSession", identifier).Return(session).Once()
 }
 
