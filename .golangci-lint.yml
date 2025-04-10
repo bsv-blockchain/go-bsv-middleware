@@ -109,6 +109,11 @@ issues:
       linters:
         - gosec
 
+    # Exclude some linters from running on mocks.
+    - path: test/mocks
+      linters:
+        - wrapcheck
+
     # Exclude some "staticcheck" messages
     - linters:
         - staticcheck
