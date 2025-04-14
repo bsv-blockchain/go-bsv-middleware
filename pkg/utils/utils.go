@@ -66,9 +66,9 @@ func PrepareGeneralRequestHeaders(walletInstance *wallet.Wallet, previousRespons
 	requestID := generateRandom()
 	encodedRequestID := base64.StdEncoding.EncodeToString(requestID)
 
-	newNonce, err := sdkUtils.CreateNonce(walletInstance, wallet.CounterpartyTypeOther)
+	newNonce, err := sdkUtils.CreateNonce(walletInstance, wallet.CounterpartyTypeSelf)
 	if err != nil {
-		return nil, errors.New("failed to create new nonce")
+		return nil, errors.New("failed to create new nonce" + err.Error())
 	}
 
 	var writer bytes.Buffer
@@ -84,7 +84,7 @@ func PrepareGeneralRequestHeaders(walletInstance *wallet.Wallet, previousRespons
 	baseArgs := wallet.EncryptionArgs{
 		ProtocolID: DefaultAuthProtocol,
 		Counterparty: wallet.Counterparty{
-			Type:         wallet.CounterpartyTypeOther,
+			Type:         wallet.CounterpartyTypeSelf,
 			Counterparty: &serverIdentityKey,
 		},
 		KeyID: fmt.Sprintf("%s %s", newNonce, serverNonce),

@@ -3,6 +3,7 @@ package auth
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 	"log/slog"
@@ -141,10 +142,14 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 			return
 		}
 
+		fmt.Println("Request after HandleGeneralRequest:", req)
+		fmt.Println(req.Context().Value(transport.IdentityKey))
+
 		next.ServeHTTP(recorder, req)
 
 		err = m.transport.HandleResponse(req, recorder, recorder.body.Bytes(), recorder.statusCode, authMsg)
 		if err != nil {
+			fmt.Println("Error handling response:", err)
 			http.Error(recorder, err.Error(), http.StatusInternalServerError)
 			createResponse(recorder)
 			return

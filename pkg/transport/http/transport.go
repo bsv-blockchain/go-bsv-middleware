@@ -693,7 +693,9 @@ func parseAuthMessage(req *http.Request) (*auth.AuthMessage, error) {
 }
 
 func setupContext(req *http.Request, requestData *auth.AuthMessage, requestID string) *http.Request {
-	ctx := context.WithValue(req.Context(), transport.IdentityKey, requestData.IdentityKey)
+	fmt.Println("Setting up context")
+
+	ctx := context.WithValue(req.Context(), transport.IdentityKey, requestData.IdentityKey.ToDERHex())
 	ctx = context.WithValue(ctx, transport.RequestID, requestID)
 	req = req.WithContext(ctx)
 	return req
