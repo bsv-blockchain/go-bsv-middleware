@@ -8,10 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/bsv-blockchain/go-sdk/auth"
-	"github.com/bsv-blockchain/go-sdk/auth/certificates"
-	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
-	"github.com/bsv-blockchain/go-sdk/wallet"
 	"log/slog"
 	"net/http"
 	"time"
@@ -20,7 +16,11 @@ import (
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/sessionmanager"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/utils"
+	"github.com/bsv-blockchain/go-sdk/auth"
+	"github.com/bsv-blockchain/go-sdk/auth/certificates"
+	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
+	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
 // Constants for the auth headers used in the authorization process
@@ -61,12 +61,12 @@ func New(
 	allowUnauthenticated bool, logger *slog.Logger,
 	reqCerts *transport.RequestedCertificateSet,
 	OnCertificatesReceived func(
-	senderPublicKey string,
-	certs []*certificates.VerifiableCertificate,
-	req *http.Request,
-	res http.ResponseWriter,
-	next func(),
-)) transport.TransportInterface {
+		senderPublicKey string,
+		certs []*certificates.VerifiableCertificate,
+		req *http.Request,
+		res http.ResponseWriter,
+		next func(),
+	)) transport.TransportInterface {
 	transportLogger := logging.Child(logger, "http-transport")
 	transportLogger.Info(fmt.Sprintf("Creating HTTP transport with allowUnauthenticated = %t", allowUnauthenticated))
 

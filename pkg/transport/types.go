@@ -1,10 +1,10 @@
 package transport
 
 import (
-	"github.com/bsv-blockchain/go-sdk/auth"
 	"net/http"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
+	"github.com/bsv-blockchain/go-sdk/auth"
 )
 
 type contextKey string

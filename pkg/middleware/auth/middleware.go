@@ -3,8 +3,6 @@ package auth
 import (
 	"bytes"
 	"errors"
-	"github.com/bsv-blockchain/go-sdk/auth"
-	"github.com/bsv-blockchain/go-sdk/wallet"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -13,6 +11,8 @@ import (
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/sessionmanager"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	httptransport "github.com/4chain-ag/go-bsv-middleware/pkg/transport/http"
+	"github.com/bsv-blockchain/go-sdk/auth"
+	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
 // Middleware implements BRC-103/104 authentication
