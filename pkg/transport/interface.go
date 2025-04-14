@@ -1,14 +1,20 @@
 package transport
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/bsv-blockchain/go-sdk/auth"
+)
 
 // TransportInterface define mechanism used for sending and receiving messages.
 type TransportInterface interface { //nolint:revive // This is an interface, so it's fine to use the name "SessionManagerInterface".
 	// Send Sends an AuthMessage to the connected Peer.
-	Send(message AuthMessage)
+	Send(message *auth.AuthMessage) error
 
 	// OnData Stores the callback bound by a Peer
-	OnData(callback MessageCallback)
+	OnData(callback func(message *auth.AuthMessage) error) error
+
+	SetPeer(peer *auth.Peer) error
 
 	// HandleNonGeneralRequest Handles an incoming request with non-general message types, manages peer-to-peer certificate handling,
 	// and modifies the response object to enable custom behaviors like certificate requests and tailored responses.

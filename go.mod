@@ -14,3 +14,5 @@ require (
 	golang.org/x/crypto v0.35.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/bsv-blockchain/go-sdk => ../../bitcoin-sv/gorilla/go-sdk

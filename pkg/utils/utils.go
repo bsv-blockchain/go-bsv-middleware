@@ -2,7 +2,6 @@ package utils
 
 import (
 	"bytes"
-	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/binary"
@@ -13,10 +12,13 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
-	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
+	"github.com/bsv-blockchain/go-sdk/auth"
+	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
+	"github.com/bsv-blockchain/go-sdk/wallet"
 )
+
+// TODO: duplicate from http/transport.go
+var DefaultAuthProtocol = wallet.Protocol{SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty, Protocol: "auth message signature"}
 
 // RequestData holds the request information used to create auth headers
 type RequestData struct {
@@ -28,22 +30,22 @@ type RequestData struct {
 }
 
 // PrepareInitialRequestBody prepares the initial request body
-func PrepareInitialRequestBody(walletInstance wallet.WalletInterface) transport.AuthMessage {
+func PrepareInitialRequestBody(walletInstance *wallet.Wallet) *auth.AuthMessage {
 	opts := wallet.GetPublicKeyArgs{IdentityKey: true}
 	clientIdentityKey, err := walletInstance.GetPublicKey(&opts, "")
 	if err != nil {
 		panic(err)
 	}
 
-	initialNonce, err := walletInstance.CreateNonce(context.Background())
+	initialNonce, err := sdkUtils.CreateNonce(walletInstance, wallet.CounterpartyTypeSelf)
 	if err != nil {
 		panic(err)
 	}
 
-	initialRequest := transport.AuthMessage{
+	initialRequest := &auth.AuthMessage{
 		Version:      "0.1",
 		MessageType:  "initialRequest",
-		IdentityKey:  clientIdentityKey.PublicKey.ToDERHex(),
+		IdentityKey:  *clientIdentityKey.PublicKey,
 		InitialNonce: initialNonce,
 	}
 
@@ -51,7 +53,7 @@ func PrepareInitialRequestBody(walletInstance wallet.WalletInterface) transport.
 }
 
 // PrepareGeneralRequestHeaders prepares the general request headers
-func PrepareGeneralRequestHeaders(walletInstance wallet.WalletInterface, previousResponse *transport.AuthMessage, requestData RequestData) (map[string]string, error) {
+func PrepareGeneralRequestHeaders(walletInstance *wallet.Wallet, previousResponse *auth.AuthMessage, requestData RequestData) (map[string]string, error) {
 	serverIdentityKey := previousResponse.IdentityKey
 	serverNonce := previousResponse.InitialNonce
 
@@ -64,9 +66,9 @@ func PrepareGeneralRequestHeaders(walletInstance wallet.WalletInterface, previou
 	requestID := generateRandom()
 	encodedRequestID := base64.StdEncoding.EncodeToString(requestID)
 
-	newNonce, err := walletInstance.CreateNonce(context.Background())
+	newNonce, err := sdkUtils.CreateNonce(walletInstance, wallet.CounterpartyTypeSelf)
 	if err != nil {
-		return nil, errors.New("failed to create new nonce")
+		return nil, errors.New("failed to create new nonce" + err.Error())
 	}
 
 	var writer bytes.Buffer
@@ -79,16 +81,11 @@ func PrepareGeneralRequestHeaders(walletInstance wallet.WalletInterface, previou
 		return nil, err
 	}
 
-	key, err := ec.PublicKeyFromString(serverIdentityKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse identity key, %w", err)
-	}
-
 	baseArgs := wallet.EncryptionArgs{
-		ProtocolID: wallet.DefaultAuthProtocol,
+		ProtocolID: DefaultAuthProtocol,
 		Counterparty: wallet.Counterparty{
-			Type:         wallet.CounterpartyTypeOther,
-			Counterparty: key,
+			Type:         wallet.CounterpartyTypeSelf,
+			Counterparty: &serverIdentityKey,
 		},
 		KeyID: fmt.Sprintf("%s %s", newNonce, serverNonce),
 	}

@@ -3,24 +3,28 @@ package auth
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/internal/logging"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/sessionmanager"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	httptransport "github.com/4chain-ag/go-bsv-middleware/pkg/transport/http"
+	"github.com/bsv-blockchain/go-sdk/auth"
+	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
 // Middleware implements BRC-103/104 authentication
 type Middleware struct {
-	wallet               wallet.WalletInterface
+	wallet               wallet.Interface
 	sessionManager       sessionmanager.SessionManagerInterface
 	transport            transport.TransportInterface
 	allowUnauthenticated bool
 	logger               *slog.Logger
+
+	peer *auth.Peer
 }
 
 // ResponseRecorder is a custom ResponseWriter to capture response body and status
@@ -99,6 +103,13 @@ func New(opts Config) (*Middleware, error) {
 
 	t := httptransport.New(opts.Wallet, opts.SessionManager, opts.AllowUnauthenticated, opts.Logger, opts.CertificatesToRequest, opts.OnCertificatesReceived)
 
+	peerOpts := &auth.PeerOptions{
+		Wallet:    opts.Wallet,
+		Transport: t,
+		//SessionManager: opts.SessionManager,
+	}
+	peer := auth.NewPeer(peerOpts)
+
 	middlewareLogger.Debug(" transport created")
 
 	return &Middleware{
@@ -107,6 +118,7 @@ func New(opts Config) (*Middleware, error) {
 		transport:            t,
 		allowUnauthenticated: opts.AllowUnauthenticated,
 		logger:               middlewareLogger,
+		peer:                 peer,
 	}, nil
 }
 
@@ -130,10 +142,14 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 			return
 		}
 
+		fmt.Println("Request after HandleGeneralRequest:", req)
+		fmt.Println(req.Context().Value(transport.IdentityKey))
+
 		next.ServeHTTP(recorder, req)
 
 		err = m.transport.HandleResponse(req, recorder, recorder.body.Bytes(), recorder.statusCode, authMsg)
 		if err != nil {
+			fmt.Println("Error handling response:", err)
 			http.Error(recorder, err.Error(), http.StatusInternalServerError)
 			createResponse(recorder)
 			return
