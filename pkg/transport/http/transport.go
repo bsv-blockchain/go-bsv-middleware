@@ -8,13 +8,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/bsv-blockchain/go-sdk/auth"
+	"github.com/bsv-blockchain/go-sdk/auth/certificates"
+	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
+	"github.com/bsv-blockchain/go-sdk/wallet"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/internal/logging"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/sessionmanager"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/utils"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
@@ -32,35 +35,38 @@ const (
 	messageTypeHeader = authHeaderPrefix + "message-type"
 )
 
+var DefaultAuthProtocol = wallet.Protocol{SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty, Protocol: "auth message signature"}
+
 // Transport implements the HTTP transport
 type Transport struct {
-	wallet                  wallet.WalletInterface
+	wallet                  *wallet.Wallet
 	sessionManager          sessionmanager.SessionManagerInterface
 	allowUnauthenticated    bool
 	logger                  *slog.Logger
 	certificateRequirements *transport.RequestedCertificateSet
 	onCertificatesReceived  func(
 		senderPublicKey string,
-		certs *[]wallet.VerifiableCertificate,
+		certs []*certificates.VerifiableCertificate,
 		req *http.Request,
 		res http.ResponseWriter,
 		next func(),
 	)
+	peer *auth.Peer
 }
 
 // New creates a new HTTP transport
 func New(
-	wallet wallet.WalletInterface,
+	wallet *wallet.Wallet,
 	sessionManager sessionmanager.SessionManagerInterface,
 	allowUnauthenticated bool, logger *slog.Logger,
 	reqCerts *transport.RequestedCertificateSet,
 	OnCertificatesReceived func(
-		senderPublicKey string,
-		certs *[]wallet.VerifiableCertificate,
-		req *http.Request,
-		res http.ResponseWriter,
-		next func(),
-	)) transport.TransportInterface {
+	senderPublicKey string,
+	certs []*certificates.VerifiableCertificate,
+	req *http.Request,
+	res http.ResponseWriter,
+	next func(),
+)) transport.TransportInterface {
 	transportLogger := logging.Child(logger, "http-transport")
 	transportLogger.Info(fmt.Sprintf("Creating HTTP transport with allowUnauthenticated = %t", allowUnauthenticated))
 
@@ -75,13 +81,21 @@ func New(
 }
 
 // OnData implement Transport TransportInterface
-func (t *Transport) OnData(_ transport.MessageCallback) {
-	panic("Not implemented")
+func (t *Transport) OnData(_ func(message *auth.AuthMessage) error) error {
+	fmt.Println("OnData not implemented")
+	//panic("Not implemented")
+	return nil
 }
 
 // Send implement Transport TransportInterface
-func (t *Transport) Send(_ transport.AuthMessage) {
+func (t *Transport) Send(_ *auth.AuthMessage) error {
 	panic("Not implemented")
+}
+
+func (t *Transport) SetPeer(peer *auth.Peer) error {
+	t.peer = peer
+
+	return nil
 }
 
 // HandleNonGeneralRequest handles incoming non general requests
@@ -173,7 +187,8 @@ func (t *Transport) HandleResponse(req *http.Request, res http.ResponseWriter, b
 		return err
 	}
 
-	nonce, err := t.wallet.CreateNonce(req.Context())
+	nonce, err := sdkUtils.CreateNonce(t.wallet, wallet.CounterpartyTypeSelf)
+	//nonce, err := t.wallet.CreateNonce(req.Context())
 	if err != nil {
 		return fmt.Errorf("failed to create nonce, %w", err)
 	}
@@ -195,15 +210,15 @@ func (t *Transport) HandleResponse(req *http.Request, res http.ResponseWriter, b
 	return nil
 }
 
-func (t *Transport) handleIncomingMessage(msg *transport.AuthMessage, req *http.Request, res http.ResponseWriter) (*transport.AuthMessage, error) {
+func (t *Transport) handleIncomingMessage(msg *auth.AuthMessage, req *http.Request, res http.ResponseWriter) (*transport.AuthMessage, error) {
 	if msg.Version != transport.AuthVersion {
 		return nil, errors.New("unsupported version")
 	}
 
 	switch msg.MessageType {
-	case transport.InitialRequest:
+	case auth.MessageTypeInitialRequest:
 		return t.handleInitialRequest(msg)
-	case transport.CertificateResponse:
+	case auth.MessageTypeCertificateResponse:
 		result, err := t.handleCertificateResponse(msg, req, res)
 		if err == nil && result == nil {
 			return nil, nil
@@ -211,21 +226,22 @@ func (t *Transport) handleIncomingMessage(msg *transport.AuthMessage, req *http.
 
 		return result, err
 
-	case transport.InitialResponse, transport.CertificateRequest:
+	case auth.MessageTypeInitialResponse, auth.MessageTypeCertificateRequest:
 		return nil, errors.New("not implemented")
-	case transport.General:
+	case auth.MessageTypeGeneral:
 		return t.handleGeneralRequest(msg, req, res)
 	default:
 		return nil, errors.New("unsupported message type")
 	}
 }
 
-func (t *Transport) handleInitialRequest(msg *transport.AuthMessage) (*transport.AuthMessage, error) {
-	if msg.IdentityKey == "" && msg.InitialNonce == "" {
+func (t *Transport) handleInitialRequest(msg *auth.AuthMessage) (*transport.AuthMessage, error) {
+	if !msg.IdentityKey.Validate() && msg.InitialNonce == "" {
 		return nil, errors.New("missing required fields in initial request")
 	}
 
-	sessionNonce, err := t.wallet.CreateNonce(context.Background())
+	sessionNonce, err := sdkUtils.CreateNonce(t.wallet, wallet.CounterpartyTypeSelf)
+	//sessionNonce, err := t.wallet.CreateNonce(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create session nonce, %w", err)
 	}
@@ -234,16 +250,19 @@ func (t *Transport) handleInitialRequest(msg *transport.AuthMessage) (*transport
 	if t.certificateRequirements == nil {
 		authenticated = true
 	}
+
+	peerIdentityKey := msg.IdentityKey.ToDERHex()
+
 	session := sessionmanager.PeerSession{
 		IsAuthenticated: authenticated,
 		SessionNonce:    &sessionNonce,
 		PeerNonce:       &msg.InitialNonce,
-		PeerIdentityKey: &msg.IdentityKey,
+		PeerIdentityKey: &peerIdentityKey,
 		LastUpdate:      time.Now(),
 	}
 	t.sessionManager.AddSession(session)
 
-	signature, err := t.createNonGeneralAuthSignature(msg.InitialNonce, sessionNonce, msg.IdentityKey)
+	signature, err := t.createNonGeneralAuthSignature(msg.InitialNonce, sessionNonce, msg.IdentityKey.ToDERHex())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create signature, %w", err)
 	}
@@ -269,8 +288,9 @@ func (t *Transport) handleInitialRequest(msg *transport.AuthMessage) (*transport
 	return &initialResponseMessage, nil
 }
 
-func (t *Transport) handleCertificateResponse(msg *transport.AuthMessage, req *http.Request, res http.ResponseWriter) (*transport.AuthMessage, error) {
-	valid, err := t.wallet.VerifyNonce(context.Background(), *msg.YourNonce)
+func (t *Transport) handleCertificateResponse(msg *auth.AuthMessage, req *http.Request, res http.ResponseWriter) (*transport.AuthMessage, error) {
+	valid, err := sdkUtils.VerifyNonce(msg.YourNonce, t.wallet, wallet.CounterpartyTypeSelf)
+	//valid, err := t.wallet.VerifyNonce(context.Background(), *msg.YourNonce)
 	if err != nil || !valid {
 		return nil, fmt.Errorf("unable to verify nonce, %w", err)
 	}
@@ -279,16 +299,16 @@ func (t *Transport) handleCertificateResponse(msg *transport.AuthMessage, req *h
 		return nil, fmt.Errorf("failed to retrieve certificates")
 	}
 
-	if msg.Nonce == nil {
+	if msg.Nonce == "" {
 		return nil, fmt.Errorf("failed to retrieve nonce")
 	}
 
-	payload, err := json.Marshal(*msg.Certificates)
+	payload, err := json.Marshal(msg.Certificates)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode certificates, %w", err)
 	}
 
-	session := t.sessionManager.GetSession(msg.IdentityKey)
+	session := t.sessionManager.GetSession(msg.IdentityKey.ToDERHex())
 	if session == nil {
 		return nil, fmt.Errorf("no session found for identity key")
 	}
@@ -297,7 +317,7 @@ func (t *Transport) handleCertificateResponse(msg *transport.AuthMessage, req *h
 		return nil, fmt.Errorf("failed to retrieve peer identity key")
 	}
 
-	signatureToVerify, err := ec.ParseSignature(*msg.Signature)
+	signatureToVerify, err := ec.ParseSignature(msg.Signature)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse signature, %w", err)
 	}
@@ -308,10 +328,10 @@ func (t *Transport) handleCertificateResponse(msg *transport.AuthMessage, req *h
 	}
 
 	baseArgs := wallet.EncryptionArgs{
-		ProtocolID: wallet.DefaultAuthProtocol,
-		KeyID:      fmt.Sprintf("%s %s", *msg.Nonce, *msg.YourNonce),
+		ProtocolID: DefaultAuthProtocol,
+		KeyID:      fmt.Sprintf("%s %s", msg.Nonce, msg.YourNonce),
 		Counterparty: wallet.Counterparty{
-			Type:         wallet.CounterpartyTypeOther,
+			Type:         wallet.CounterpartyTypeSelf,
 			Counterparty: key,
 		},
 	}
@@ -357,12 +377,12 @@ func (t *Transport) handleCertificateResponse(msg *transport.AuthMessage, req *h
 		t.logger.Debug("Certificate verification successful")
 	}
 
-	nonce, err := t.wallet.CreateNonce(context.Background())
+	nonce, err := sdkUtils.CreateNonce(t.wallet, wallet.CounterpartyTypeSelf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create nonce")
 	}
 
-	signature, err := t.createNonGeneralAuthSignature(msg.InitialNonce, *session.SessionNonce, msg.IdentityKey)
+	signature, err := t.createNonGeneralAuthSignature(msg.InitialNonce, *session.SessionNonce, msg.IdentityKey.ToDERHex())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create signature, %w", err)
 	}
@@ -383,13 +403,14 @@ func (t *Transport) handleCertificateResponse(msg *transport.AuthMessage, req *h
 	return response, nil
 }
 
-func (t *Transport) handleGeneralRequest(msg *transport.AuthMessage, _ *http.Request, _ http.ResponseWriter) (*transport.AuthMessage, error) {
-	valid, err := t.wallet.VerifyNonce(context.Background(), *msg.YourNonce)
+func (t *Transport) handleGeneralRequest(msg *auth.AuthMessage, _ *http.Request, _ http.ResponseWriter) (*transport.AuthMessage, error) {
+	valid, err := sdkUtils.VerifyNonce(msg.YourNonce, t.wallet, wallet.CounterpartyTypeSelf)
+	//valid, err := t.wallet.VerifyNonce(context.Background(), *msg.YourNonce)
 	if err != nil || !valid {
 		return nil, fmt.Errorf("unable to verify nonce, %w", err)
 	}
 
-	session := t.sessionManager.GetSession(*msg.YourNonce)
+	session := t.sessionManager.GetSession(msg.YourNonce)
 	if session == nil {
 		return nil, errors.New("session not found")
 	}
@@ -402,7 +423,7 @@ func (t *Transport) handleGeneralRequest(msg *transport.AuthMessage, _ *http.Req
 		return nil, errors.New("session not authenticated")
 	}
 
-	signature, err := ec.ParseSignature(*msg.Signature)
+	signature, err := ec.ParseSignature(msg.Signature)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse signature, %w", err)
 	}
@@ -413,17 +434,17 @@ func (t *Transport) handleGeneralRequest(msg *transport.AuthMessage, _ *http.Req
 	}
 
 	baseArgs := wallet.EncryptionArgs{
-		ProtocolID: wallet.DefaultAuthProtocol,
-		KeyID:      fmt.Sprintf("%s %s", *msg.Nonce, *msg.YourNonce),
+		ProtocolID: DefaultAuthProtocol,
+		KeyID:      fmt.Sprintf("%s %s", msg.Nonce, msg.YourNonce),
 		Counterparty: wallet.Counterparty{
-			Type:         wallet.CounterpartyTypeOther,
+			Type:         wallet.CounterpartyTypeSelf,
 			Counterparty: key,
 		},
 	}
 	verifySignatureArgs := &wallet.VerifySignatureArgs{
 		EncryptionArgs: baseArgs,
 		Signature:      *signature,
-		Data:           *msg.Payload,
+		Data:           msg.Payload,
 	}
 
 	result, err := t.wallet.VerifySignature(verifySignatureArgs)
@@ -434,7 +455,7 @@ func (t *Transport) handleGeneralRequest(msg *transport.AuthMessage, _ *http.Req
 	session.LastUpdate = time.Now()
 	t.sessionManager.UpdateSession(*session)
 
-	nonce, err := t.wallet.CreateNonce(context.Background())
+	nonce, err := sdkUtils.CreateNonce(t.wallet, wallet.CounterpartyTypeSelf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create nonce, %w", err)
 	}
@@ -474,9 +495,9 @@ func (t *Transport) createSignature(identityKey, keyID string, data []byte) ([]b
 	}
 
 	baseArgs := wallet.EncryptionArgs{
-		ProtocolID: wallet.DefaultAuthProtocol,
+		ProtocolID: DefaultAuthProtocol,
 		Counterparty: wallet.Counterparty{
-			Type:         wallet.CounterpartyTypeOther,
+			Type:         wallet.CounterpartyTypeSelf,
 			Counterparty: key,
 		},
 		KeyID: keyID,
@@ -609,7 +630,7 @@ func setupContent(w http.ResponseWriter, response *transport.AuthMessage) {
 	}
 }
 
-func buildAuthMessageFromRequest(req *http.Request) (*transport.AuthMessage, error) {
+func buildAuthMessageFromRequest(req *http.Request) (*auth.AuthMessage, error) {
 	var writer bytes.Buffer
 
 	requestNonce := req.Header.Get(requestIDHeader)
@@ -627,19 +648,24 @@ func buildAuthMessageFromRequest(req *http.Request) (*transport.AuthMessage, err
 
 	payloadBytes := writer.Bytes()
 
-	authMessage := &transport.AuthMessage{
-		MessageType: "general",
+	key, err := ec.PublicKeyFromString(req.Header.Get(identityKeyHeader))
+	if err != nil {
+		return nil, errors.New("failed to parse identity key")
+	}
+
+	authMessage := &auth.AuthMessage{
+		MessageType: auth.MessageTypeGeneral,
 		Version:     req.Header.Get(versionHeader),
-		IdentityKey: req.Header.Get(identityKeyHeader),
-		Payload:     &payloadBytes,
+		IdentityKey: *key,
+		Payload:     payloadBytes,
 	}
 
 	if nonce := req.Header.Get(nonceHeader); nonce != "" {
-		authMessage.Nonce = &nonce
+		authMessage.Nonce = nonce
 	}
 
 	if yourNonce := req.Header.Get(yourNonceHeader); yourNonce != "" {
-		authMessage.YourNonce = &yourNonce
+		authMessage.YourNonce = yourNonce
 	}
 
 	if signature := req.Header.Get(signatureHeader); signature != "" {
@@ -648,21 +674,25 @@ func buildAuthMessageFromRequest(req *http.Request) (*transport.AuthMessage, err
 			return nil, errors.New("error decoding signature")
 		}
 
-		authMessage.Signature = &decodedBytes
+		authMessage.Signature = decodedBytes
 	}
 
 	return authMessage, nil
 }
 
-func parseAuthMessage(req *http.Request) (*transport.AuthMessage, error) {
-	var requestData transport.AuthMessage
+func parseAuthMessage(req *http.Request) (*auth.AuthMessage, error) {
+	var requestData auth.AuthMessage
+
+	fmt.Println("Parsing request body")
+	fmt.Println(req.Body)
+
 	if err := json.NewDecoder(req.Body).Decode(&requestData); err != nil {
-		return nil, errors.New("failed to decode request body")
+		return nil, errors.New("failed to decode request body, " + err.Error())
 	}
 	return &requestData, nil
 }
 
-func setupContext(req *http.Request, requestData *transport.AuthMessage, requestID string) *http.Request {
+func setupContext(req *http.Request, requestData *auth.AuthMessage, requestID string) *http.Request {
 	ctx := context.WithValue(req.Context(), transport.IdentityKey, requestData.IdentityKey)
 	ctx = context.WithValue(ctx, transport.RequestID, requestID)
 	req = req.WithContext(ctx)

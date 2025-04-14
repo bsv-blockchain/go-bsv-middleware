@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	sdkAuth "github.com/bsv-blockchain/go-sdk/auth"
+	"github.com/bsv-blockchain/go-sdk/wallet"
 	"log"
 	"log/slog"
 	"net/http"
@@ -10,9 +12,8 @@ import (
 	"time"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
+	//"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/utils"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/go-resty/resty/v2"
@@ -28,7 +29,8 @@ func main() {
 		panic(err)
 	}
 
-	serverMockedWallet := wallet.NewMockWallet(sPrivKey, walletFixtures.DefaultNonces...)
+	//serverMockedWallet := wallet.NewMockWallet(sPrivKey, walletFixtures.DefaultNonces...)
+	serverMockedWallet := wallet.NewWallet(sPrivKey)
 	fmt.Println("✓ Server mockWallet created")
 
 	// Create authentication middleware with:
@@ -72,7 +74,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	mockedWallet := wallet.NewMockWallet(cPrivKey, walletFixtures.ClientNonces...)
+	//mockedWallet := wallet.NewMockWallet(cPrivKey, walletFixtures.ClientNonces...)
+	mockedWallet := wallet.NewWallet(cPrivKey)
 	fmt.Println("✓ Client mockWallet created")
 
 	fmt.Println("\n📡 STEP 1: Sending non general request to /.well-known/auth endpoint")
@@ -91,13 +94,17 @@ func pingHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func callInitialRequest(mockedWallet wallet.WalletInterface) *transport.AuthMessage {
+func callInitialRequest(mockedWallet *wallet.Wallet) *sdkAuth.AuthMessage {
 	requestData := utils.PrepareInitialRequestBody(mockedWallet)
 	url := "http://localhost:8080/.well-known/auth"
 
 	client := resty.New()
-	var result transport.AuthMessage
+	var result *sdkAuth.AuthMessage
 	var errMsg any
+
+	fmt.Println("🔑 Request body:")
+	fmt.Println(requestData)
+	fmt.Println(*requestData)
 
 	resp, err := client.R().
 		SetHeader("Content-Type", "application/json").
@@ -124,10 +131,10 @@ func callInitialRequest(mockedWallet wallet.WalletInterface) *transport.AuthMess
 		}
 	}
 
-	return &result
+	return result
 }
 
-func callPingEndpoint(mockedWallet wallet.WalletInterface, response *transport.AuthMessage) {
+func callPingEndpoint(mockedWallet *wallet.Wallet, response *sdkAuth.AuthMessage) {
 	url := "http://localhost:8080/ping"
 
 	requestData := utils.RequestData{

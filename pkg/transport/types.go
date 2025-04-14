@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"github.com/bsv-blockchain/go-sdk/auth"
 	"net/http"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
@@ -64,7 +65,7 @@ type OnCertificatesReceivedFunc func(
 )
 
 // MessageCallback is a callback function for handling messages. Placeholder for now.
-type MessageCallback func(message AuthMessage) error
+type MessageCallback func(message *auth.AuthMessage) error
 
 // String returns a string from a MessageType.
 func (m *MessageType) String() string {

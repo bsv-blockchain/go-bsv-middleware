@@ -3,24 +3,27 @@ package auth
 import (
 	"bytes"
 	"errors"
+	"github.com/bsv-blockchain/go-sdk/auth"
+	"github.com/bsv-blockchain/go-sdk/wallet"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/internal/logging"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/sessionmanager"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	httptransport "github.com/4chain-ag/go-bsv-middleware/pkg/transport/http"
 )
 
 // Middleware implements BRC-103/104 authentication
 type Middleware struct {
-	wallet               wallet.WalletInterface
+	wallet               wallet.Interface
 	sessionManager       sessionmanager.SessionManagerInterface
 	transport            transport.TransportInterface
 	allowUnauthenticated bool
 	logger               *slog.Logger
+
+	peer *auth.Peer
 }
 
 // ResponseRecorder is a custom ResponseWriter to capture response body and status
@@ -99,6 +102,13 @@ func New(opts Config) (*Middleware, error) {
 
 	t := httptransport.New(opts.Wallet, opts.SessionManager, opts.AllowUnauthenticated, opts.Logger, opts.CertificatesToRequest, opts.OnCertificatesReceived)
 
+	peerOpts := &auth.PeerOptions{
+		Wallet:    opts.Wallet,
+		Transport: t,
+		//SessionManager: opts.SessionManager,
+	}
+	peer := auth.NewPeer(peerOpts)
+
 	middlewareLogger.Debug(" transport created")
 
 	return &Middleware{
@@ -107,6 +117,7 @@ func New(opts Config) (*Middleware, error) {
 		transport:            t,
 		allowUnauthenticated: opts.AllowUnauthenticated,
 		logger:               middlewareLogger,
+		peer:                 peer,
 	}, nil
 }
 
