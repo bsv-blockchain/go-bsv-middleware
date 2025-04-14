@@ -1,13 +1,13 @@
 package auth
 
 import (
-	"github.com/bsv-blockchain/go-sdk/wallet"
 	"log/slog"
 	"net/http"
 
 	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/sessionmanager"
 	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
 	"github.com/bsv-blockchain/go-sdk/auth/certificates"
+	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
 // Config configures the auth middleware

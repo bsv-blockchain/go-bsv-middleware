@@ -8,13 +8,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/bsv-blockchain/go-sdk/auth"
-	"github.com/bsv-blockchain/go-sdk/wallet"
 	"io"
 	"net/http"
 	"strings"
 
+	"github.com/bsv-blockchain/go-sdk/auth"
 	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
+	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
 // TODO: duplicate from http/transport.go

@@ -1,8 +1,9 @@
 package transport
 
 import (
-	"github.com/bsv-blockchain/go-sdk/auth"
 	"net/http"
+
+	"github.com/bsv-blockchain/go-sdk/auth"
 )
 
 // TransportInterface define mechanism used for sending and receiving messages.
