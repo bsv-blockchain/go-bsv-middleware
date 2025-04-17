@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 
@@ -10,9 +11,14 @@ import (
 	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
+// Wallet interface defines the methods that the wallet must implement
+type Wallet interface {
+	wallet.KeyOperations
+}
+
 // Config configures the auth middleware
 type Config struct {
-	Wallet                 *wallet.Wallet
+	Wallet                 Wallet
 	SessionManager         sessionmanager.SessionManagerInterface
 	AllowUnauthenticated   bool
 	Logger                 *slog.Logger
