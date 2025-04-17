@@ -1,9 +1,10 @@
 package assert
 
 import (
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // ResponseContainsError checks if the response body contains the specified error substring.
