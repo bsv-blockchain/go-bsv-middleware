@@ -30,7 +30,11 @@ func main() {
 	}
 
 	//serverMockedWallet := wallet.NewMockWallet(sPrivKey, walletFixtures.DefaultNonces...)
-	serverMockedWallet := wallet.NewWallet(sPrivKey)
+	args := wallet.ProtoWalletArgs{PrivateKey: sPrivKey}
+	serverWallet, err := wallet.NewProtoWallet(args)
+	if err != nil {
+		panic(err)
+	}
 	fmt.Println("✓ Server mockWallet created")
 
 	// Create authentication middleware with:
@@ -41,7 +45,7 @@ func main() {
 	opts := auth.Config{
 		AllowUnauthenticated: false,
 		Logger:               logger,
-		Wallet:               serverMockedWallet,
+		Wallet:               serverWallet,
 	}
 	middleware, err := auth.New(opts)
 	if err != nil {
@@ -75,15 +79,19 @@ func main() {
 		panic(err)
 	}
 	//mockedWallet := wallet.NewMockWallet(cPrivKey, walletFixtures.ClientNonces...)
-	mockedWallet := wallet.NewWallet(cPrivKey)
+	argsClient := wallet.ProtoWalletArgs{PrivateKey: cPrivKey}
+	clientWallet, err := wallet.NewProtoWallet(argsClient)
+	if err != nil {
+		panic(err)
+	}
 	fmt.Println("✓ Client mockWallet created")
 
 	fmt.Println("\n📡 STEP 1: Sending non general request to /.well-known/auth endpoint")
-	responseData := callInitialRequest(mockedWallet)
+	responseData := callInitialRequest(clientWallet)
 	fmt.Println("✓ Auth completed")
 
 	fmt.Println("\n📡 STEP 2: Sending general request to test authorization")
-	callPingEndpoint(mockedWallet, responseData)
+	callPingEndpoint(clientWallet, responseData)
 	fmt.Println("✓ General request completed")
 }
 
@@ -94,7 +102,7 @@ func pingHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func callInitialRequest(mockedWallet *wallet.Wallet) *sdkAuth.AuthMessage {
+func callInitialRequest(mockedWallet *auth.Wallet) *sdkAuth.AuthMessage {
 	requestData := utils.PrepareInitialRequestBody(mockedWallet)
 	url := "http://localhost:8080/.well-known/auth"
 
