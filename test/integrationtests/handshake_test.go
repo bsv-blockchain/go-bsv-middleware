@@ -37,7 +37,6 @@ func TestHandshakeHappyPath(t *testing.T) {
 	require.NoError(t, err)
 	assert.InitialResponseAuthMessage(t, authMessage)
 
-	// Try to get a session using the client's identity key - should exist if session was created
 	session := sessionManager.GetSession(initialRequest.IdentityKey)
 	require.NotNil(t, session, "Session should have been created with client's identity key")
 	require.Equal(t, initialRequest.InitialNonce, *session.PeerNonce, "Session nonce should match")
@@ -58,7 +57,6 @@ func TestMissingRequiredFields(t *testing.T) {
 		initialRequest := mocks.PrepareInitialRequestBody(clientWallet)
 		initialRequest.IdentityKey = ""
 
-		// Mock CreateNonce to return the expected error
 		serverWallet.OnCreateNonceOnce("", errors.New("missing required fields in initial request"))
 
 		// when
@@ -75,7 +73,6 @@ func TestMissingRequiredFields(t *testing.T) {
 		initialRequest := mocks.PrepareInitialRequestBody(clientWallet)
 		initialRequest.InitialNonce = ""
 
-		// Mock CreateNonce to return the expected error
 		serverWallet.OnCreateNonceOnce("", errors.New("missing required fields in initial request"))
 
 		// when
@@ -136,7 +133,6 @@ func TestInvalidNonceFormat(t *testing.T) {
 	initialRequest := mocks.PrepareInitialRequestBody(clientWallet)
 	initialRequest.InitialNonce = "this-is-not-valid-base64!"
 
-	// Mock CreateNonce to return the expected error
 	serverWallet.OnCreateNonceOnce("", errors.New("invalid nonce format"))
 
 	// when
@@ -171,13 +167,12 @@ func TestReplayAttack(t *testing.T) {
 	require.NoError(t, err)
 	assert.ResponseOK(t, response)
 
-	// Create a new server instance for the second request
 	sessionManager = mocks.NewMockableSessionManager()
 	serverWallet = mocks.NewMockableWallet()
 	server = mocks.CreateMockHTTPServer(serverWallet, sessionManager, mocks.WithLogger).
 		WithHandler("/", mocks.IndexHandler().WithAuthMiddleware())
 
-	// For the second request (replay attack), simulate returning an error about nonce already used
+	// for the second request (replay attack), simulate returning an error about nonce already used
 	serverWallet.OnCreateNonceOnce("", errors.New("nonce already used"))
 
 	// when - sending the same request again
