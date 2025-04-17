@@ -9,9 +9,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/payment"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/auth"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/payment"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )
 

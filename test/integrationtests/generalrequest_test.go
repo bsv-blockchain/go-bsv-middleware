@@ -4,12 +4,12 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/sessionmanager"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
-	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
-	"github.com/4chain-ag/go-bsv-middleware/test/assert"
-	"github.com/4chain-ag/go-bsv-middleware/test/mocks"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/sessionmanager"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet"
+	walletFixtures "github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet/test"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
+	"github.com/bsv-blockchain/go-bsv-middleware/test/assert"
+	"github.com/bsv-blockchain/go-bsv-middleware/test/mocks"
 	"github.com/stretchr/testify/require"
 )
 

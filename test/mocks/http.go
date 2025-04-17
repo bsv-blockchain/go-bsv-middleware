@@ -13,10 +13,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/sessionmanager"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/auth"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/sessionmanager"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/stretchr/testify/require"
 )

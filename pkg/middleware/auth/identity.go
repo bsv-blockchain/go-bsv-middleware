@@ -3,7 +3,7 @@ package auth
 import (
 	"context"
 
-	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
 )
 
 // GetIdentityFromContext retrieves identity from the request context

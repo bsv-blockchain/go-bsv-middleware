@@ -13,8 +13,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )
 

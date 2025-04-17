@@ -12,11 +12,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
-	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
-	"github.com/4chain-ag/go-bsv-middleware/test/mocks"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/auth"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet"
+	walletFixtures "github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet/test"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/utils"
+	"github.com/bsv-blockchain/go-bsv-middleware/test/mocks"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/go-resty/resty/v2"
 )

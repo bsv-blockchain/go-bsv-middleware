@@ -3,7 +3,7 @@ package transport
 import (
 	"net/http"
 
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet"
 )
 
 type contextKey string
