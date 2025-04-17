@@ -1,7 +1,6 @@
 package mocks
 
 import (
-	"encoding/hex"
 	"errors"
 	"net/http"
 
@@ -26,11 +25,6 @@ func WithWrongSignature(h map[string]string) {
 	h["x-bsv-auth-signature"] = "wrong_signature"
 }
 
-// WithWrongSignatureInHex adds a wrong signature in hex to the headers
-func WithWrongSignatureInHex(h map[string]string) {
-	h["x-bsv-auth-signature"] = hex.EncodeToString([]byte("wrong_signature"))
-}
-
 // WithWrongYourNonce adds a wrong your nonce to the headers
 func WithWrongYourNonce(h map[string]string) {
 	h["x-bsv-auth-your-nonce"] = "wrong_your_nonce"
@@ -53,10 +47,28 @@ func (rb *RequestBody) WithWrongVersion() *RequestBody {
 	return rb
 }
 
+// WithoutIdentityKey removes the identity key from the request body
+func (rb *RequestBody) WithoutIdentityKey() *RequestBody {
+	rb.IdentityKey = ""
+	return rb
+}
+
+// WithoutInitialNonce removes the initial nonce from the request body
+func (rb *RequestBody) WithoutInitialNonce() *RequestBody {
+	rb.InitialNonce = ""
+	return rb
+}
+
 // WithoutIdentityKeyAndNonce removes the identity key and nonce from the request body
 func (rb *RequestBody) WithoutIdentityKeyAndNonce() *RequestBody {
 	rb.IdentityKey = ""
 	rb.InitialNonce = ""
+	return rb
+}
+
+// WithInvalidNonceFormat sets an invalid nonce format in the request body
+func (rb *RequestBody) WithInvalidNonceFormat() *RequestBody {
+	rb.InitialNonce = "this-is-not-valid-base64!"
 	return rb
 }
 
