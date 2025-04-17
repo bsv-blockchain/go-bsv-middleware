@@ -9,8 +9,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/utils"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

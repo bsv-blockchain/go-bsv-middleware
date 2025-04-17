@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
-	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet"
+	walletFixtures "github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet/test"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/stretchr/testify/mock"
 )

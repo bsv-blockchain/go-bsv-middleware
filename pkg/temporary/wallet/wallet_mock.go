@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
+	wallet "github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet/test"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )
 

@@ -7,11 +7,11 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/4chain-ag/go-bsv-middleware/pkg/internal/logging"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/sessionmanager"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
-	httptransport "github.com/4chain-ag/go-bsv-middleware/pkg/transport/http"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/sessionmanager"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
+	httptransport "github.com/bsv-blockchain/go-bsv-middleware/pkg/transport/http"
 )
 
 // Middleware implements BRC-103/104 authentication

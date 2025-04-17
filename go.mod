@@ -1,4 +1,4 @@
-module github.com/4chain-ag/go-bsv-middleware
+module github.com/bsv-blockchain/go-bsv-middleware
 
 go 1.24.0
 

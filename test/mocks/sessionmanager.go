@@ -3,7 +3,7 @@ package mocks
 import (
 	"sync"
 
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/sessionmanager"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/sessionmanager"
 	"github.com/stretchr/testify/mock"
 )
 

@@ -8,9 +8,9 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/4chain-ag/go-bsv-middleware/pkg/internal/logging"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/middleware/auth"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/auth"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet"
 )
 
 // Middleware is the payment middleware handler that implements Direct Payment Protocol (DPP) for HTTP-based micropayments

@@ -4,8 +4,8 @@ import (
 	"encoding/hex"
 	"testing"
 
-	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
+	walletFixtures "github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet/test"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
 	"github.com/stretchr/testify/require"
 )
 

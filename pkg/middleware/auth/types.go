@@ -4,9 +4,9 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/sessionmanager"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet"
-	"github.com/4chain-ag/go-bsv-middleware/pkg/transport"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/sessionmanager"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
 )
 
 // Config configures the auth middleware

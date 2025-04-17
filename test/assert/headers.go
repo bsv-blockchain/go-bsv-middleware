@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	walletFixtures "github.com/4chain-ag/go-bsv-middleware/pkg/temporary/wallet/test"
+	walletFixtures "github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet/test"
 	"github.com/stretchr/testify/require"
 )
 
