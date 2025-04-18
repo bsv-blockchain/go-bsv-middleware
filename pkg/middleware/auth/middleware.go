@@ -3,6 +3,7 @@ package auth
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -134,6 +135,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 
 		err = m.transport.HandleResponse(req, recorder, recorder.body.Bytes(), recorder.statusCode, authMsg)
 		if err != nil {
+			fmt.Print("ERRROR:", err)
 			http.Error(recorder, err.Error(), http.StatusInternalServerError)
 			createResponse(recorder)
 			return
