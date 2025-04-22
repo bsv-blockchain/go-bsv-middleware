@@ -1,6 +1,11 @@
 package integrationtests
 
 import (
+	"io"
+	"net/http"
+	"testing"
+	"time"
+
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/sessionmanager"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet"
 	walletFixtures "github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet/test"
@@ -8,10 +13,6 @@ import (
 	"github.com/bsv-blockchain/go-bsv-middleware/test/mocks"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/stretchr/testify/require"
-	"io"
-	"net/http"
-	"testing"
-	"time"
 )
 
 func TestSessionCreationOnHandshake(t *testing.T) {
