@@ -1,24 +1,25 @@
 package auth
 
 import (
+	"github.com/bsv-blockchain/go-sdk/auth/certificates"
 	"log/slog"
 	"net/http"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/sessionmanager"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
+	"github.com/bsv-blockchain/go-sdk/auth"
+	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
 // Config configures the auth middleware
 type Config struct {
-	Wallet                 wallet.WalletInterface
-	SessionManager         sessionmanager.SessionManagerInterface
+	Wallet                 wallet.KeyOperations
+	SessionManager         auth.SessionManager
 	AllowUnauthenticated   bool
 	Logger                 *slog.Logger
 	CertificatesToRequest  *transport.RequestedCertificateSet
 	OnCertificatesReceived func(
 		senderPublicKey string,
-		certs *[]wallet.VerifiableCertificate,
+		certs *[]certificates.VerifiableCertificate,
 		req *http.Request,
 		res http.ResponseWriter,
 		next func(),

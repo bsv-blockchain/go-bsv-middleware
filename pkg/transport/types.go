@@ -17,37 +17,6 @@ const (
 	RequestID contextKey = "requestID"
 )
 
-// Definition of the Message Types used in the authentication process.
-const (
-	// InitialRequest is the first message sent by the client to the server.
-	InitialRequest MessageType = "initialRequest"
-	// InitialResponse is the response to the initial request.
-	InitialResponse MessageType = "initialResponse"
-	// CertificateRequest is the message sent by the server to request certificates from the client.
-	CertificateRequest MessageType = "certificateRequest"
-	// CertificateResponse is the response to the certificate request.
-	CertificateResponse MessageType = "certificateResponse"
-	// General is a normal endpoint authorized by middleware.
-	General MessageType = "general"
-)
-
-// MessageType represents the type of message sent between peers during the authentication process.
-type MessageType string
-
-// AuthMessage represents a type message sent between peers during the authentication process.
-type AuthMessage struct {
-	Version               string                          `json:"version"`
-	MessageType           MessageType                     `json:"messageType"`
-	IdentityKey           string                          `json:"identityKey"`
-	Nonce                 *string                         `json:"nonce,omitempty"`
-	InitialNonce          string                          `json:"initialNonce"`
-	YourNonce             *string                         `json:"yourNonce,omitempty"`
-	Payload               *[]byte                         `json:"payload,omitempty"`
-	Signature             *[]byte                         `json:"signature,omitempty"`
-	Certificates          *[]wallet.VerifiableCertificate `json:"certificates"`
-	RequestedCertificates RequestedCertificateSet         `json:"requestedCertificates"`
-}
-
 // RequestedCertificateSet represents the set of certificates requested by a peer.
 type RequestedCertificateSet struct {
 	Certifiers []string            `json:"certifiers"`
@@ -62,8 +31,3 @@ type OnCertificatesReceivedFunc func(
 	res http.ResponseWriter,
 	next func(),
 )
-
-// String returns a string from a MessageType.
-func (m *MessageType) String() string {
-	return string(*m)
-}

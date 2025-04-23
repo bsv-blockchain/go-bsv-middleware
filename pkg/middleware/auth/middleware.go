@@ -3,21 +3,22 @@ package auth
 import (
 	"bytes"
 	"errors"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/sessionmanager"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/sessionmanager"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
 	httptransport "github.com/bsv-blockchain/go-bsv-middleware/pkg/transport/http"
+	"github.com/bsv-blockchain/go-sdk/auth"
+	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
 // Middleware implements BRC-103/104 authentication
 type Middleware struct {
-	wallet               wallet.WalletInterface
-	sessionManager       sessionmanager.SessionManagerInterface
+	wallet               wallet.KeyOperations
+	sessionManager       auth.SessionManager
 	transport            transport.TransportInterface
 	allowUnauthenticated bool
 	logger               *slog.Logger

@@ -133,12 +133,6 @@ type Protocol struct {
 	Protocol      string
 }
 
-// Protocols with their respective security levels
-var (
-	// DefaultAuthProtocol is the default protocol for authentication messages.
-	DefaultAuthProtocol = Protocol{SecurityLevel: SecurityLevelEveryAppAndCounterparty, Protocol: "auth message signature"}
-)
-
 // CounterpartyType defines the type of counterparty for operation.
 type CounterpartyType int
 
