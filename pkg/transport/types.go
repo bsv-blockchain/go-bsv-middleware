@@ -63,9 +63,6 @@ type OnCertificatesReceivedFunc func(
 	next func(),
 )
 
-// MessageCallback is a callback function for handling messages. Placeholder for now.
-type MessageCallback func(message AuthMessage) error
-
 // String returns a string from a MessageType.
 func (m *MessageType) String() string {
 	return string(*m)

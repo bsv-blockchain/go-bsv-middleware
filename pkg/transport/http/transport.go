@@ -46,7 +46,7 @@ type Transport struct {
 		res http.ResponseWriter,
 		next func(),
 	)
-	messageCallback transport.MessageCallback
+	messageCallback func(message transport.AuthMessage) error
 	responseMessage *transport.AuthMessage
 }
 
