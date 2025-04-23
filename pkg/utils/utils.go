@@ -9,12 +9,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/bsv-blockchain/go-sdk/auth"
-	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
-	"github.com/bsv-blockchain/go-sdk/wallet"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/bsv-blockchain/go-sdk/auth"
+	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
+	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
 // RequestData holds the request information used to create auth headers
