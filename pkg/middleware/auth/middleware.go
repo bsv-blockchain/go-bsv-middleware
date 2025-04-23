@@ -3,12 +3,12 @@ package auth
 import (
 	"bytes"
 	"errors"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/sessionmanager"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/sessionmanager"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
 	httptransport "github.com/bsv-blockchain/go-bsv-middleware/pkg/transport/http"
 	"github.com/bsv-blockchain/go-sdk/auth"
