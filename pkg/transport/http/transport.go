@@ -46,6 +46,8 @@ type Transport struct {
 		res http.ResponseWriter,
 		next func(),
 	)
+	messageCallback transport.MessageCallback
+	responseMessage *transport.AuthMessage
 }
 
 // New creates a new HTTP transport
@@ -75,13 +77,28 @@ func New(
 }
 
 // OnData implement Transport TransportInterface
-func (t *Transport) OnData(_ transport.MessageCallback) {
-	panic("Not implemented")
+func (t *Transport) OnData(callback func(message transport.AuthMessage) error) error {
+	t.messageCallback = callback
+	return nil
 }
 
 // Send implement Transport TransportInterface
-func (t *Transport) Send(_ transport.AuthMessage) {
-	panic("Not implemented")
+func (t *Transport) Send(message transport.AuthMessage) error {
+	t.logger.Debug("Sending message", slog.String("messageType", message.MessageType.String()))
+
+	switch message.MessageType {
+	case transport.InitialResponse, transport.CertificateResponse:
+		if t.responseMessage == nil {
+			t.responseMessage = &message
+		}
+	case transport.General:
+		t.responseMessage = &message
+	}
+	if t.messageCallback != nil {
+		return t.messageCallback(message)
+	}
+
+	return nil
 }
 
 // HandleNonGeneralRequest handles incoming non general requests
