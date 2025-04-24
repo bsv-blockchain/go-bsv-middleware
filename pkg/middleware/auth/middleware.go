@@ -3,13 +3,12 @@ package auth
 import (
 	"bytes"
 	"errors"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/sessionmanager"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/sessionmanager"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
 	httptransport "github.com/bsv-blockchain/go-bsv-middleware/pkg/transport/http"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/wallet"
@@ -19,7 +18,7 @@ import (
 type Middleware struct {
 	wallet               wallet.KeyOperations
 	sessionManager       auth.SessionManager
-	transport            transport.TransportInterface
+	transport            auth.Transport
 	allowUnauthenticated bool
 	logger               *slog.Logger
 }
@@ -75,7 +74,7 @@ func (r *responseRecorder) Finalize() error {
 // New creates a new auth middleware
 func New(opts Config) (*Middleware, error) {
 	if opts.SessionManager == nil {
-		opts.SessionManager = sessionmanager.NewSessionManager()
+		opts.SessionManager = auth.NewSessionManager()
 	}
 
 	if opts.Wallet == nil {
@@ -116,7 +115,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		recorder := newResponseRecorder(w)
 		if req.Method == http.MethodPost && req.URL.Path == "/.well-known/auth" {
-			err := m.transport.HandleNonGeneralRequest(req, recorder)
+			err := peer.HandleNonGeneralRequest(req, recorder)
 			if err != nil {
 				http.Error(recorder, err.Error(), http.StatusUnauthorized)
 			}
