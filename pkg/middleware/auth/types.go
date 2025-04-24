@@ -1,12 +1,12 @@
 package auth
 
 import (
-	"github.com/bsv-blockchain/go-sdk/auth/utils"
 	"log/slog"
 	"net/http"
 
 	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/auth/certificates"
+	"github.com/bsv-blockchain/go-sdk/auth/utils"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
