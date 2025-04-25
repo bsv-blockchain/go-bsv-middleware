@@ -3,7 +3,6 @@ package auth
 import (
 	"bytes"
 	"errors"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/sessionmanager"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -16,7 +15,8 @@ import (
 
 // Middleware implements BRC-103/104 authentication
 type Middleware struct {
-	wallet               wallet.KeyOperations
+	wallet               wallet.AuthOperations
+	peer                 *auth.Peer
 	sessionManager       auth.SessionManager
 	transport            auth.Transport
 	allowUnauthenticated bool
@@ -95,13 +95,18 @@ func New(opts Config) (*Middleware, error) {
 		return nil, errors.New("OnCertificatesReceived callback is set but no certificates are requested")
 	}
 
-	middlewareLogger.Debug(" Creating new auth middleware")
-
 	t := httptransport.New(opts.Wallet, opts.SessionManager, opts.AllowUnauthenticated, opts.Logger, opts.CertificatesToRequest, opts.OnCertificatesReceived)
-
-	middlewareLogger.Debug(" transport created")
+	peerCfg := &auth.PeerOptions{
+		Wallet:         opts.Wallet,
+		Transport:      t,
+		SessionManager: opts.SessionManager,
+		// TODO: add support for logger
+		//Logger: opts.Logger
+	}
+	peer := auth.NewPeer(peerCfg)
 
 	return &Middleware{
+		peer:                 peer,
 		wallet:               opts.Wallet,
 		sessionManager:       opts.SessionManager,
 		transport:            t,
@@ -113,33 +118,20 @@ func New(opts Config) (*Middleware, error) {
 // Handler returns standard http middleware
 func (m *Middleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		recorder := newResponseRecorder(w)
-		if req.Method == http.MethodPost && req.URL.Path == "/.well-known/auth" {
-			err := peer.HandleNonGeneralRequest(req, recorder)
-			if err != nil {
-				http.Error(recorder, err.Error(), http.StatusUnauthorized)
-			}
-			createResponse(recorder)
-			return
-		}
+		ctx := req.Context()
+		// write response writer
+		// write req
+		// write next
 
-		req, authMsg, err := m.transport.HandleGeneralRequest(req, recorder)
+		msg := &auth.AuthMessage{}
+
+		callback, _ := m.transport.GetRegisteredOnData()
+		err := callback(ctx, msg)
 		if err != nil {
-			http.Error(recorder, err.Error(), http.StatusUnauthorized)
-			createResponse(recorder)
+			m.logger.Error("failed to handle auth message", "error", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
-		next.ServeHTTP(recorder, req)
-
-		err = m.transport.HandleResponse(req, recorder, recorder.body.Bytes(), recorder.statusCode, authMsg)
-		if err != nil {
-			http.Error(recorder, err.Error(), http.StatusInternalServerError)
-			createResponse(recorder)
-			return
-		}
-
-		createResponse(recorder)
 	})
 }
 

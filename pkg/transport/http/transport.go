@@ -41,7 +41,7 @@ const (
 
 // Transport implements the HTTP transport
 type Transport struct {
-	wallet                  wallet.KeyOperations
+	wallet                  wallet.AuthOperations
 	sessionManager          auth.SessionManager
 	allowUnauthenticated    bool
 	logger                  *slog.Logger
@@ -53,13 +53,14 @@ type Transport struct {
 		res http.ResponseWriter,
 		next func(),
 	)
-	messageCallback func(message *auth.AuthMessage) error
+	// TODO: consider changing name to onData
+	messageCallback func(ctx context.Context, message *auth.AuthMessage) error
 	responseMessage *auth.AuthMessage
 }
 
 // New creates a new HTTP transport
 func New(
-	wallet wallet.KeyOperations,
+	wallet wallet.AuthOperations,
 	sessionManager auth.SessionManager,
 	allowUnauthenticated bool, logger *slog.Logger,
 	reqCerts *sdkUtils.RequestedCertificateSet,
@@ -84,222 +85,28 @@ func New(
 }
 
 // OnData implement Transport TransportInterface
-func (t *Transport) OnData(callback func(message *auth.AuthMessage) error) error {
+// TODO: consider changing name to RegisterOnData <- need to be also changed in the interface
+func (t *Transport) OnData(callback func(context.Context, *auth.AuthMessage) error) error {
 	t.messageCallback = callback
 	return nil
 }
 
 // Send implement Transport TransportInterface
-func (t *Transport) Send(message *auth.AuthMessage) error {
-	switch message.MessageType {
-	case auth.MessageTypeInitialResponse, auth.MessageTypeCertificateResponse:
-		if t.responseMessage == nil {
-			t.responseMessage = message
-		}
-	case auth.MessageTypeGeneral:
-		t.responseMessage = message
-	}
-	if t.messageCallback != nil {
-		return t.messageCallback(message)
-	}
+func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
+	// get response from context
+	//
+
+	//nextFromCtx := ctx.Value(transport.Next).(func())
 
 	return nil
 }
 
-// HandleNonGeneralRequest handles incoming nongeneral requests
-func (t *Transport) HandleNonGeneralRequest(req *http.Request, res http.ResponseWriter) error {
-	requestData, err := parseAuthMessage(req)
-	if err != nil {
-		t.logger.Error("Invalid request body", slog.String("error", err.Error()))
-		return err
+func (t *Transport) GetRegisteredOnData() (func(context.Context, *auth.AuthMessage) error, error) {
+	if t.messageCallback == nil {
+		return nil, errors.New("no callback registered")
 	}
 
-	t.logger.Debug("Received non general request request", slog.Any("data", requestData))
-
-	requestID := req.Header.Get(requestIDHeader)
-	if requestID == "" {
-		requestID = requestData.InitialNonce
-	}
-
-	response, err := t.handleIncomingMessage(requestData, req, res)
-	if err != nil {
-		t.logger.Error("Failed to process request", slog.String("error", err.Error()))
-		return err
-	}
-
-	if response == nil {
-		return nil
-	}
-
-	setupHeaders(res, response, requestID)
-	setupContent(res, response)
-
-	return nil
-}
-
-// HandleGeneralRequest handles incoming general requests
-func (t *Transport) HandleGeneralRequest(req *http.Request, res http.ResponseWriter) (*http.Request, *auth.AuthMessage, error) {
-	requestID := req.Header.Get(requestIDHeader)
-	if requestID == "" {
-		if t.allowUnauthenticated {
-			t.logger.Debug("Unauthenticated requests are allowed, skipping auth")
-			return nil, nil, nil
-		}
-		t.logger.Debug("Missing request ID and unauthenticated requests are not allowed")
-
-		return nil, nil, errors.New("missing request ID")
-	}
-
-	t.logger.Debug("Received general request", slog.String("requestID", requestID))
-
-	err := checkHeaders(req)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	requestData, err := buildAuthMessageFromRequest(req)
-	if err != nil {
-		t.logger.Error("Failed to build request data", slog.String("error", err.Error()))
-		return nil, nil, err
-	}
-
-	response, err := t.handleIncomingMessage(requestData, req, res)
-	if err != nil {
-		t.logger.Error("Failed to process request", slog.String("error", err.Error()))
-		return nil, nil, err
-	}
-
-	req = setupContext(req, requestData, requestID)
-
-	return req, response, nil
-}
-
-// HandleResponse sets up auth headers in the response object and generate signature for whole response
-func (t *Transport) HandleResponse(req *http.Request, res http.ResponseWriter, body []byte, status int, msg *auth.AuthMessage) error {
-	if t.allowUnauthenticated {
-		return nil
-	}
-
-	identityKey, requestID, err := getValuesFromContext(req)
-	if err != nil {
-		return err
-	}
-
-	session, err := t.sessionManager.GetSession(identityKey)
-	if err != nil {
-		return fmt.Errorf("failed to get session, %w", err)
-	}
-	if session == nil {
-		return errors.New("session not found")
-	}
-
-	payload, err := buildResponsePayload(requestID, status, body)
-	if err != nil {
-		return err
-	}
-
-	counterparty := wallet.Counterparty{
-		Type:         wallet.CounterpartyTypeSelf,
-		Counterparty: session.PeerIdentityKey,
-	}
-	nonce, err := sdkUtils.CreateNonce(req.Context(), t.wallet, counterparty)
-	if err != nil {
-		return fmt.Errorf("failed to create nonce, %w", err)
-	}
-
-	peerNonce := ""
-	if session.PeerNonce != "" {
-		peerNonce = session.PeerNonce
-	}
-	signatureKey := fmt.Sprintf("%s %s", nonce, peerNonce)
-
-	signature, err := t.createSignature(req.Context(), identityKey, signatureKey, payload)
-	if err != nil {
-		return err
-	}
-
-	msg.Signature = signature
-
-	setupHeaders(res, msg, requestID)
-	return nil
-}
-
-func (t *Transport) handleIncomingMessage(msg *auth.AuthMessage, req *http.Request, res http.ResponseWriter) (*auth.AuthMessage, error) {
-	if msg.Version != transport.AuthVersion {
-		return nil, errors.New("unsupported version")
-	}
-
-	switch msg.MessageType {
-	case auth.MessageTypeInitialRequest:
-		return t.handleInitialRequest(req.Context(), msg)
-	case auth.MessageTypeCertificateResponse:
-		result, err := t.handleCertificateResponse(msg, req, res)
-		if err == nil && result == nil {
-			return nil, nil
-		}
-
-		return result, err
-
-	case auth.MessageTypeInitialResponse, auth.MessageTypeCertificateRequest:
-		return nil, errors.New("not implemented")
-	case auth.MessageTypeGeneral:
-		return t.handleGeneralRequest(msg, req, res)
-	default:
-		return nil, errors.New("unsupported message type")
-	}
-}
-
-func (t *Transport) handleInitialRequest(ctx context.Context, msg *auth.AuthMessage) (*auth.AuthMessage, error) {
-	if msg.IdentityKey == nil && msg.InitialNonce == "" {
-		return nil, errors.New("missing required fields in initial request")
-	}
-
-	sessionNonce, err := sdkUtils.CreateNonce(ctx, t.wallet, wallet.Counterparty{Type: wallet.CounterpartyTypeSelf})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create session nonce, %w", err)
-	}
-
-	authenticated := false
-	if t.certificateRequirements == nil {
-		authenticated = true
-	}
-
-	session := &auth.PeerSession{
-		IsAuthenticated: authenticated,
-		SessionNonce:    sessionNonce,
-		PeerNonce:       msg.InitialNonce,
-		PeerIdentityKey: msg.IdentityKey,
-		LastUpdate:      time.Now().UnixMilli(),
-	}
-	err = t.sessionManager.AddSession(session)
-	if err != nil {
-		return nil, fmt.Errorf("failed to add session, %w", err)
-	}
-
-	signature, err := t.createNonGeneralAuthSignature(ctx, msg.InitialNonce, sessionNonce, msg.IdentityKey.ToDERHex())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create signature, %w", err)
-	}
-
-	identityKey, err := t.wallet.GetPublicKey(ctx, wallet.GetPublicKeyArgs{IdentityKey: true}, "")
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve identity key, %w", err)
-	}
-
-	initialResponseMessage := auth.AuthMessage{
-		Version:      transport.AuthVersion,
-		MessageType:  "initialResponse",
-		IdentityKey:  identityKey.PublicKey,
-		InitialNonce: sessionNonce,
-		YourNonce:    msg.InitialNonce,
-		Signature:    signature,
-	}
-
-	if t.certificateRequirements != nil {
-		initialResponseMessage.RequestedCertificates = *t.certificateRequirements
-	}
-
-	return &initialResponseMessage, nil
+	return t.messageCallback, nil
 }
 
 func (t *Transport) handleCertificateResponse(msg *auth.AuthMessage, req *http.Request, res http.ResponseWriter) (*auth.AuthMessage, error) {
