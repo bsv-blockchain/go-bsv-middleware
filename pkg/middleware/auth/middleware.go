@@ -3,14 +3,14 @@ package auth
 import (
 	"context"
 	"errors"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
-	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"log/slog"
 	"net/http"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
 	httptransport "github.com/bsv-blockchain/go-bsv-middleware/pkg/transport/http"
 	"github.com/bsv-blockchain/go-sdk/auth"
+	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
