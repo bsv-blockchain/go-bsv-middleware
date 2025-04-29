@@ -22,7 +22,6 @@ const (
 	nextKey     contextKey = "http_next_handler"
 )
 
-// Middleware implements BRC-103/104 authentication
 type Middleware struct {
 	wallet               wallet.AuthOperations
 	peer                 *auth.Peer
@@ -32,46 +31,54 @@ type Middleware struct {
 	logger               *slog.Logger
 }
 
-// New creates a new auth middleware
-func New(opts Config) (*Middleware, error) {
-	if opts.SessionManager == nil {
-		opts.SessionManager = auth.NewSessionManager()
-	}
-
-	if opts.Wallet == nil {
+func New(cfg Config) (*Middleware, error) {
+	if cfg.Wallet == nil {
 		return nil, errors.New("wallet is required")
 	}
 
-	if opts.Logger == nil {
-		opts.Logger = slog.New(slog.DiscardHandler)
+	logger := cfg.Logger
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
+	middlewareLogger := logging.Child(logger, "auth-middleware")
+
+	sessionManager := cfg.SessionManager
+	if sessionManager == nil {
+		sessionManager = auth.NewSessionManager()
 	}
 
-	middlewareLogger := logging.Child(opts.Logger, "auth-middleware")
-
-	if opts.OnCertificatesReceived == nil && opts.CertificatesToRequest != nil {
+	if cfg.OnCertificatesReceived == nil && cfg.CertificatesToRequest != nil {
 		return nil, errors.New("OnCertificatesReceived callback is required when certificates are requested")
 	}
 
-	if opts.OnCertificatesReceived != nil && opts.CertificatesToRequest == nil {
+	if cfg.OnCertificatesReceived != nil && cfg.CertificatesToRequest == nil {
 		return nil, errors.New("OnCertificatesReceived callback is set but no certificates are requested")
 	}
 
-	t := httptransport.New(opts.Wallet, opts.SessionManager, opts.AllowUnauthenticated, opts.Logger)
+	transportCfg := httptransport.TransportConfig{
+		Wallet:                 cfg.Wallet,
+		SessionManager:         sessionManager,
+		AllowUnauthenticated:   cfg.AllowUnauthenticated,
+		Logger:                 logger,
+		CertificatesToRequest:  cfg.CertificatesToRequest,
+		OnCertificatesReceived: cfg.OnCertificatesReceived,
+	}
+
+	t := httptransport.New(transportCfg)
+
 	peerCfg := &auth.PeerOptions{
-		Wallet:         opts.Wallet,
+		Wallet:         cfg.Wallet,
 		Transport:      t,
-		SessionManager: opts.SessionManager,
-		// TODO: add support for logger
-		//Logger: opts.Logger
+		SessionManager: sessionManager,
 	}
 	peer := auth.NewPeer(peerCfg)
 
 	return &Middleware{
 		peer:                 peer,
-		wallet:               opts.Wallet,
-		sessionManager:       opts.SessionManager,
+		wallet:               cfg.Wallet,
+		sessionManager:       sessionManager,
 		transport:            t,
-		allowUnauthenticated: opts.AllowUnauthenticated,
+		allowUnauthenticated: cfg.AllowUnauthenticated,
 		logger:               middlewareLogger,
 	}, nil
 }
@@ -83,7 +90,6 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 
 		ctx := context.WithValue(r.Context(), requestKey, r)
 		ctx = context.WithValue(ctx, responseKey, wrappedWriter)
-
 		ctx = context.WithValue(ctx, nextKey, func() {
 			next.ServeHTTP(wrappedWriter, r)
 		})
@@ -162,37 +168,4 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 			next.ServeHTTP(wrappedWriter, r)
 		}
 	})
-}
-
-// WithRequest adds a request to the context
-func WithRequest(ctx context.Context, r *http.Request) context.Context {
-	return context.WithValue(ctx, requestKey, r)
-}
-
-// GetRequest gets a request from the context
-func GetRequest(ctx context.Context) (*http.Request, bool) {
-	r, ok := ctx.Value(requestKey).(*http.Request)
-	return r, ok
-}
-
-// WithResponse adds a response writer to the context
-func WithResponse(ctx context.Context, w http.ResponseWriter) context.Context {
-	return context.WithValue(ctx, responseKey, w)
-}
-
-// GetResponse gets a response writer from the context
-func GetResponse(ctx context.Context) (http.ResponseWriter, bool) {
-	w, ok := ctx.Value(responseKey).(http.ResponseWriter)
-	return w, ok
-}
-
-// WithNext adds a next handler function to the context
-func WithNext(ctx context.Context, next func()) context.Context {
-	return context.WithValue(ctx, nextKey, next)
-}
-
-// GetNext gets a next handler function from the context
-func GetNext(ctx context.Context) (func(), bool) {
-	next, ok := ctx.Value(nextKey).(func())
-	return next, ok
 }

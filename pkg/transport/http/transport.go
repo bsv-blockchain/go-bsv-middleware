@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/bsv-blockchain/go-sdk/auth/certificates"
+	"github.com/bsv-blockchain/go-sdk/auth/utils"
 	"io"
 	"log/slog"
 	"net/http"
@@ -21,11 +23,9 @@ import (
 	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
-// contextKey is used for storing request/response in context
 type contextKey string
 
 const (
-	// Context keys
 	requestKey  contextKey = "http_request"
 	responseKey contextKey = "http_response"
 	nextKey     contextKey = "http_next_handler"
@@ -41,66 +41,76 @@ const (
 	requestIDHeader   = authHeaderPrefix + "request-id"
 )
 
-// ResponseRecorder wraps an http.ResponseWriter to track if a response has been written
-type ResponseRecorder struct {
+type responseRecorder struct {
 	http.ResponseWriter
 	written    bool
 	statusCode int
 }
 
-// WriteHeader records the status code and marks the response as written
-func (r *ResponseRecorder) WriteHeader(code int) {
+func (r *responseRecorder) WriteHeader(code int) {
 	r.statusCode = code
 	r.ResponseWriter.WriteHeader(code)
 	r.written = true
 }
 
-// Write records that the response has been written to
-func (r *ResponseRecorder) Write(b []byte) (int, error) {
+func (r *responseRecorder) Write(b []byte) (int, error) {
 	r.written = true
 	return r.ResponseWriter.Write(b)
 }
 
-// hasBeenWritten returns whether the response has been written to
-func (r *ResponseRecorder) hasBeenWritten() bool {
+func (r *responseRecorder) hasBeenWritten() bool {
 	return r.written
 }
 
-func WrapResponseWriter(w http.ResponseWriter) *ResponseRecorder {
-	return &ResponseRecorder{
+func WrapResponseWriter(w http.ResponseWriter) *responseRecorder {
+	return &responseRecorder{
 		ResponseWriter: w,
 		statusCode:     http.StatusOK,
 	}
 }
 
-// Transport implements the HTTP transport for BRC authentication
-type Transport struct {
-	wallet               wallet.AuthOperations
-	sessionManager       auth.SessionManager
-	allowUnauthenticated bool
-	logger               *slog.Logger
-	messageCallback      func(context.Context, *auth.AuthMessage) error
+// TransportConfig holds configuration for the HTTP transport
+type TransportConfig struct {
+	Wallet                 wallet.AuthOperations
+	SessionManager         auth.SessionManager
+	AllowUnauthenticated   bool
+	Logger                 *slog.Logger
+	CertificatesToRequest  *utils.RequestedCertificateSet
+	OnCertificatesReceived func(string, []*certificates.VerifiableCertificate, *http.Request, http.ResponseWriter, func())
 }
 
-// New creates a new HTTP transport
-func New(
-	wallet wallet.AuthOperations,
-	sessionManager auth.SessionManager,
-	allowUnauthenticated bool,
-	logger *slog.Logger,
-) auth.Transport {
-	transportLogger := logging.Child(logger, "http-transport")
-	transportLogger.Info(fmt.Sprintf("Creating HTTP transport with allowUnauthenticated = %t", allowUnauthenticated))
+type Transport struct {
+	wallet                 wallet.AuthOperations
+	sessionManager         auth.SessionManager
+	allowUnauthenticated   bool
+	logger                 *slog.Logger
+	messageCallback        func(context.Context, *auth.AuthMessage) error
+	certificatesToRequest  *utils.RequestedCertificateSet
+	onCertificatesReceived func(string, []*certificates.VerifiableCertificate, *http.Request, http.ResponseWriter, func())
+}
+
+func New(cfg TransportConfig) auth.Transport {
+	var logger *slog.Logger
+	if cfg.Logger != nil {
+		logger = logging.Child(cfg.Logger, "http-transport")
+	} else {
+		logger = slog.New(slog.DiscardHandler)
+	}
+
+	logger.Info(fmt.Sprintf("Creating HTTP transport with allowUnauthenticated = %t", cfg.AllowUnauthenticated))
 
 	return &Transport{
-		wallet:               wallet,
-		sessionManager:       sessionManager,
-		allowUnauthenticated: allowUnauthenticated,
-		logger:               transportLogger,
+		wallet:                 cfg.Wallet,
+		sessionManager:         cfg.SessionManager,
+		allowUnauthenticated:   cfg.AllowUnauthenticated,
+		logger:                 logger,
+		certificatesToRequest:  cfg.CertificatesToRequest,
+		onCertificatesReceived: cfg.OnCertificatesReceived,
 	}
 }
 
 // OnData registers a callback for incoming auth messages
+// Required by BRC-104 to handle message exchanges
 func (t *Transport) OnData(callback func(context.Context, *auth.AuthMessage) error) error {
 	if callback == nil {
 		return errors.New("callback cannot be nil")
@@ -111,7 +121,6 @@ func (t *Transport) OnData(callback func(context.Context, *auth.AuthMessage) err
 	return nil
 }
 
-// GetRegisteredOnData returns the currently registered data handler
 func (t *Transport) GetRegisteredOnData() (func(context.Context, *auth.AuthMessage) error, error) {
 	if t.messageCallback == nil {
 		return nil, errors.New("no callback registered")
@@ -121,6 +130,7 @@ func (t *Transport) GetRegisteredOnData() (func(context.Context, *auth.AuthMessa
 }
 
 // Send handles sending auth messages through HTTP
+// BRC-104 requires specific headers and formatting based on message type
 func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 	respVal := ctx.Value(responseKey)
 	if respVal == nil {
@@ -141,8 +151,8 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 		}
 	}
 
-	if message.MessageType == auth.MessageTypeInitialResponse ||
-		message.MessageType == auth.MessageTypeCertificateResponse {
+	switch message.MessageType {
+	case auth.MessageTypeInitialResponse, auth.MessageTypeCertificateResponse:
 		resp.Header().Set(versionHeader, message.Version)
 		resp.Header().Set(messageTypeHeader, string(message.MessageType))
 		resp.Header().Set(identityKeyHeader, message.IdentityKey.ToDERHex())
@@ -160,11 +170,9 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 		}
 
 		resp.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(resp).Encode(message); err != nil {
-			return fmt.Errorf("failed to encode response message: %w", err)
-		}
+		return json.NewEncoder(resp).Encode(message)
 
-	} else if message.MessageType == auth.MessageTypeGeneral {
+	case auth.MessageTypeGeneral:
 		req, _ := ctx.Value(requestKey).(*http.Request)
 		requestID := ""
 		if req != nil {
@@ -193,19 +201,19 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 		if next != nil {
 			next()
 		}
-	}
+		return nil
 
-	return nil
+	default:
+		return fmt.Errorf("unsupported message type: %s", message.MessageType)
+	}
 }
 
-// ParseAuthMessageFromRequest extracts an auth message from an HTTP request
 func ParseAuthMessageFromRequest(req *http.Request) (*auth.AuthMessage, error) {
 	if req.URL.Path == "/.well-known/auth" && req.Method == http.MethodPost {
 		var message auth.AuthMessage
 		if err := json.NewDecoder(req.Body).Decode(&message); err != nil {
 			return nil, fmt.Errorf("invalid request body: %w", err)
 		}
-
 		return &message, nil
 
 	} else {
@@ -256,6 +264,7 @@ func ParseAuthMessageFromRequest(req *http.Request) (*auth.AuthMessage, error) {
 }
 
 // BuildRequestPayload creates a payload byte array from the request
+// Format required by BRC-104 for consistent signing
 func BuildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 	writer := new(bytes.Buffer)
 
@@ -265,45 +274,43 @@ func BuildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 	}
 	writer.Write(requestIDBytes)
 
-	methodLen := len(req.Method)
-	err = WriteVarInt(writer, methodLen)
-	if err != nil {
-		return nil, fmt.Errorf("failed to write method length: %w", err)
+	write := func(n int, desc string) error {
+		if err := writeVarInt(writer, n); err != nil {
+			return fmt.Errorf("%s: %w", desc, err)
+		}
+		return nil
 	}
 
+	if err := write(len(req.Method), "method length"); err != nil {
+		return nil, err
+	}
 	writer.WriteString(req.Method)
 
 	path := req.URL.Path
 	if path == "" {
-		err = WriteVarInt(writer, -1)
-		if err != nil {
-			return nil, fmt.Errorf("failed to write path length: %w", err)
+		if err := write(-1, "empty path marker"); err != nil {
+			return nil, err
 		}
 	} else {
-		err = WriteVarInt(writer, len(path))
-		if err != nil {
-			return nil, fmt.Errorf("failed to write path length: %w", err)
+		if err := write(len(path), "path length"); err != nil {
+			return nil, err
 		}
-
 		writer.WriteString(path)
 	}
 
 	query := req.URL.RawQuery
 	if query == "" {
-		err = WriteVarInt(writer, -1)
-		if err != nil {
-			return nil, fmt.Errorf("failed to write query length: %w", err)
+		if err := write(-1, "empty query marker"); err != nil {
+			return nil, err
 		}
 	} else {
-		err = WriteVarInt(writer, len(query))
-		if err != nil {
-			return nil, fmt.Errorf("failed to write query length: %w", err)
+		if err := write(len(query), "query length"); err != nil {
+			return nil, err
 		}
-
 		writer.WriteString(query)
 	}
 
-	var includedHeaders [][]string
+	includedHeaders := [][]string{}
 	for k, v := range req.Header {
 		k = strings.ToLower(k)
 		if (strings.HasPrefix(k, "x-bsv-") || k == "content-type" || k == "authorization") &&
@@ -317,22 +324,19 @@ func BuildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 		return includedHeaders[i][0] < includedHeaders[j][0]
 	})
 
-	err = WriteVarInt(writer, len(includedHeaders))
-	if err != nil {
-		return nil, fmt.Errorf("failed to write headers length: %w", err)
+	if err := write(len(includedHeaders), "headers count"); err != nil {
+		return nil, err
 	}
+
 	for _, header := range includedHeaders {
-		err = WriteVarInt(writer, len(header[0]))
-		if err != nil {
-			return nil, fmt.Errorf("failed to write header key length: %w", err)
+		if err := write(len(header[0]), "header key length"); err != nil {
+			return nil, err
 		}
-
 		writer.WriteString(header[0])
-		err = WriteVarInt(writer, len(header[1]))
-		if err != nil {
-			return nil, fmt.Errorf("failed to write header value length: %w", err)
-		}
 
+		if err := write(len(header[1]), "header value length"); err != nil {
+			return nil, err
+		}
 		writer.WriteString(header[1])
 	}
 
@@ -341,42 +345,39 @@ func BuildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to read request body: %w", err)
 		}
+
 		req.Body = io.NopCloser(bytes.NewBuffer(body))
 
 		if len(body) > 0 {
-			err = WriteVarInt(writer, len(body))
-			if err != nil {
-				return nil, fmt.Errorf("failed to write body length: %w", err)
+			if err := write(len(body), "body length"); err != nil {
+				return nil, err
 			}
-
 			writer.Write(body)
 		} else {
-			err = WriteVarInt(writer, -1)
-			if err != nil {
-				return nil, fmt.Errorf("failed to write body length: %w", err)
+			if err := write(-1, "empty body marker"); err != nil {
+				return nil, err
 			}
 		}
 	} else {
-		err = WriteVarInt(writer, -1)
-		if err != nil {
-			return nil, fmt.Errorf("failed to write body length: %w", err)
+		if err := write(-1, "nil body marker"); err != nil {
+			return nil, err
 		}
 	}
 
 	return writer.Bytes(), nil
 }
 
-// WriteVarInt writes a variable integer to a buffer
-// Used for creating BRC-104 compatible payloads
-func WriteVarInt(w *bytes.Buffer, n int) error {
-	return binary.Write(w, binary.LittleEndian, int64(n))
+func writeVarInt(w *bytes.Buffer, n int) error {
+	err := binary.Write(w, binary.LittleEndian, int64(n))
+	if err != nil {
+		return fmt.Errorf("failed to write variable integer: %w", err)
+	}
+	return nil
 }
 
-// HasBeenWritten checks if a response writer has written a response
 func HasBeenWritten(w http.ResponseWriter) bool {
-	if rw, ok := w.(*ResponseRecorder); ok {
+	if rw, ok := w.(*responseRecorder); ok {
 		return rw.hasBeenWritten()
 	}
-
 	return false
 }
