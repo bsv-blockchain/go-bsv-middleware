@@ -4,103 +4,113 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
-	"net/http"
-	"time"
-
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/utils"
 	"github.com/bsv-blockchain/go-sdk/auth"
-	"github.com/bsv-blockchain/go-sdk/auth/certificates"
-	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/bsv-blockchain/go-sdk/wallet"
+	"io"
+	"log/slog"
+	"net/http"
+	"sort"
+	"strings"
 )
 
-var (
-	// DefaultAuthProtocol is the default protocol for authentication messages.
-	DefaultAuthProtocol = wallet.Protocol{SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty, Protocol: "auth message signature"}
-)
+// contextKey is used for storing request/response in context
+type contextKey string
 
-// Constants for the auth headers used in the authorization process
 const (
+	// Context keys
+	requestKey  contextKey = "http_request"
+	responseKey contextKey = "http_response"
+	nextKey     contextKey = "http_next_handler"
+
+	// HTTP headers - as specified in BRC-104
 	authHeaderPrefix  = "x-bsv-auth-"
-	requestIDHeader   = authHeaderPrefix + "request-id"
 	versionHeader     = authHeaderPrefix + "version"
+	messageTypeHeader = authHeaderPrefix + "message-type"
 	identityKeyHeader = authHeaderPrefix + "identity-key"
 	nonceHeader       = authHeaderPrefix + "nonce"
 	yourNonceHeader   = authHeaderPrefix + "your-nonce"
 	signatureHeader   = authHeaderPrefix + "signature"
-	messageTypeHeader = authHeaderPrefix + "message-type"
+	requestIDHeader   = authHeaderPrefix + "request-id"
 )
 
-// Transport implements the HTTP transport
+// ResponseRecorder wraps an http.ResponseWriter to track if a response has been written
+type ResponseRecorder struct {
+	http.ResponseWriter
+	written    bool
+	statusCode int
+}
+
+// WriteHeader records the status code and marks the response as written
+func (r *ResponseRecorder) WriteHeader(code int) {
+	r.statusCode = code
+	r.ResponseWriter.WriteHeader(code)
+	r.written = true
+}
+
+// Write records that the response has been written to
+func (r *ResponseRecorder) Write(b []byte) (int, error) {
+	r.written = true
+	return r.ResponseWriter.Write(b)
+}
+
+// hasBeenWritten returns whether the response has been written to
+func (r *ResponseRecorder) hasBeenWritten() bool {
+	return r.written
+}
+
+func WrapResponseWriter(w http.ResponseWriter) *ResponseRecorder {
+	return &ResponseRecorder{
+		ResponseWriter: w,
+		statusCode:     http.StatusOK,
+	}
+}
+
+// Transport implements the HTTP transport for BRC authentication
 type Transport struct {
-	wallet                  wallet.AuthOperations
-	sessionManager          auth.SessionManager
-	allowUnauthenticated    bool
-	logger                  *slog.Logger
-	certificateRequirements *sdkUtils.RequestedCertificateSet
-	onCertificatesReceived  func(
-		senderPublicKey string,
-		certs []*certificates.VerifiableCertificate,
-		req *http.Request,
-		res http.ResponseWriter,
-		next func(),
-	)
-	// TODO: consider changing name to onData
-	messageCallback func(ctx context.Context, message *auth.AuthMessage) error
-	responseMessage *auth.AuthMessage
+	wallet               wallet.AuthOperations
+	sessionManager       auth.SessionManager
+	allowUnauthenticated bool
+	logger               *slog.Logger
+	messageCallback      func(context.Context, *auth.AuthMessage) error
 }
 
 // New creates a new HTTP transport
 func New(
 	wallet wallet.AuthOperations,
 	sessionManager auth.SessionManager,
-	allowUnauthenticated bool, logger *slog.Logger,
-	reqCerts *sdkUtils.RequestedCertificateSet,
-	OnCertificatesReceived func(
-		senderPublicKey string,
-		certs []*certificates.VerifiableCertificate,
-		req *http.Request,
-		res http.ResponseWriter,
-		next func(),
-	)) auth.Transport {
+	allowUnauthenticated bool,
+	logger *slog.Logger,
+) auth.Transport {
 	transportLogger := logging.Child(logger, "http-transport")
 	transportLogger.Info(fmt.Sprintf("Creating HTTP transport with allowUnauthenticated = %t", allowUnauthenticated))
 
 	return &Transport{
-		wallet:                  wallet,
-		sessionManager:          sessionManager,
-		allowUnauthenticated:    allowUnauthenticated,
-		logger:                  transportLogger,
-		certificateRequirements: reqCerts,
-		onCertificatesReceived:  OnCertificatesReceived,
+		wallet:               wallet,
+		sessionManager:       sessionManager,
+		allowUnauthenticated: allowUnauthenticated,
+		logger:               transportLogger,
 	}
 }
 
-// OnData implement Transport TransportInterface
-// TODO: consider changing name to RegisterOnData <- need to be also changed in the interface
+// OnData registers a callback for incoming auth messages
 func (t *Transport) OnData(callback func(context.Context, *auth.AuthMessage) error) error {
+	if callback == nil {
+		return errors.New("callback cannot be nil")
+	}
+
 	t.messageCallback = callback
+	t.logger.Debug("Registered OnData callback")
 	return nil
 }
 
-// Send implement Transport TransportInterface
-func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
-	// get response from context
-	//
-
-	//nextFromCtx := ctx.Value(transport.Next).(func())
-
-	return nil
-}
-
+// GetRegisteredOnData returns the currently registered data handler
 func (t *Transport) GetRegisteredOnData() (func(context.Context, *auth.AuthMessage) error, error) {
 	if t.messageCallback == nil {
 		return nil, errors.New("no callback registered")
@@ -109,473 +119,263 @@ func (t *Transport) GetRegisteredOnData() (func(context.Context, *auth.AuthMessa
 	return t.messageCallback, nil
 }
 
-func (t *Transport) handleCertificateResponse(msg *auth.AuthMessage, req *http.Request, res http.ResponseWriter) (*auth.AuthMessage, error) {
-	valid, err := sdkUtils.VerifyNonce(req.Context(), msg.YourNonce, t.wallet, wallet.Counterparty{Type: wallet.CounterpartyTypeSelf})
-	if err != nil || !valid {
-		return nil, fmt.Errorf("unable to verify nonce, %w", err)
+// Send handles sending auth messages through HTTP
+func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
+	respVal := ctx.Value(responseKey)
+	if respVal == nil {
+		return errors.New("response writer not found in context")
 	}
 
-	if msg.Certificates == nil {
-		return nil, fmt.Errorf("failed to retrieve certificates")
+	resp, ok := respVal.(http.ResponseWriter)
+	if !ok {
+		return errors.New("invalid response writer type in context")
 	}
 
-	if msg.Nonce == "" {
-		return nil, fmt.Errorf("failed to retrieve nonce")
+	nextVal := ctx.Value(nextKey)
+	var next func()
+	if nextVal != nil {
+		next, ok = nextVal.(func())
+		if !ok {
+			t.logger.Warn("Next handler has invalid type in context")
+		}
 	}
 
-	payload, err := json.Marshal(msg.Certificates)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode certificates, %w", err)
-	}
+	if message.MessageType == auth.MessageTypeInitialResponse ||
+		message.MessageType == auth.MessageTypeCertificateResponse {
+		resp.Header().Set(versionHeader, message.Version)
+		resp.Header().Set(messageTypeHeader, string(message.MessageType))
+		resp.Header().Set(identityKeyHeader, message.IdentityKey.ToDERHex())
 
-	session, err := t.sessionManager.GetSession(msg.IdentityKey.ToDERHex())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get session, %w", err)
-	}
-	if session == nil {
-		return nil, fmt.Errorf("no session found for identity key")
-	}
-	if session.PeerIdentityKey == nil {
-		return nil, fmt.Errorf("failed to retrieve peer identity key")
-	}
-
-	signatureToVerify, err := ec.ParseSignature(msg.Signature)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse signature, %w", err)
-	}
-
-	key, err := ec.PublicKeyFromString(session.PeerIdentityKey.ToDERHex())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse identity key, %w", err)
-	}
-
-	baseArgs := wallet.EncryptionArgs{
-		ProtocolID: DefaultAuthProtocol,
-		KeyID:      fmt.Sprintf("%s %s", msg.Nonce, msg.YourNonce),
-		Counterparty: wallet.Counterparty{
-			Type:         wallet.CounterpartyTypeOther,
-			Counterparty: key,
-		},
-	}
-	args := wallet.VerifySignatureArgs{
-		EncryptionArgs: baseArgs,
-		Signature:      *signatureToVerify,
-		Data:           payload,
-	}
-	result, err := t.wallet.VerifySignature(req.Context(), args, "")
-	if err != nil || !result.Valid {
-		return nil, fmt.Errorf("unable to verify signature, %w", err)
-	}
-
-	var sessionAuthenticated bool
-	var authenticationDone bool
-
-	if t.onCertificatesReceived != nil {
-		authCallback := func() {
-			sessionAuthenticated = true
-			authenticationDone = true
+		if message.Nonce != "" {
+			resp.Header().Set(nonceHeader, message.Nonce)
 		}
 
-		t.onCertificatesReceived(
-			session.PeerIdentityKey.ToDERHex(),
-			msg.Certificates,
-			req,
-			res,
-			authCallback,
-		)
+		if message.YourNonce != "" {
+			resp.Header().Set(yourNonceHeader, message.YourNonce)
+		}
 
-		if !authenticationDone {
+		if message.Signature != nil {
+			resp.Header().Set(signatureHeader, hex.EncodeToString(message.Signature))
+		}
+
+		resp.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(resp).Encode(message); err != nil {
+			return fmt.Errorf("failed to encode response message: %w", err)
+		}
+
+	} else if message.MessageType == auth.MessageTypeGeneral {
+		req, _ := ctx.Value(requestKey).(*http.Request)
+		requestID := ""
+		if req != nil {
+			requestID = req.Header.Get(requestIDHeader)
+		}
+
+		resp.Header().Set(versionHeader, message.Version)
+		resp.Header().Set(identityKeyHeader, message.IdentityKey.ToDERHex())
+
+		if message.Nonce != "" {
+			resp.Header().Set(nonceHeader, message.Nonce)
+		}
+
+		if message.YourNonce != "" {
+			resp.Header().Set(yourNonceHeader, message.YourNonce)
+		}
+
+		if message.Signature != nil {
+			resp.Header().Set(signatureHeader, hex.EncodeToString(message.Signature))
+		}
+
+		if requestID != "" {
+			resp.Header().Set(requestIDHeader, requestID)
+		}
+
+		if next != nil {
+			next()
+		}
+	}
+
+	return nil
+}
+
+// ParseAuthMessageFromRequest extracts an auth message from an HTTP request
+func ParseAuthMessageFromRequest(req *http.Request) (*auth.AuthMessage, error) {
+	if req.URL.Path == "/.well-known/auth" && req.Method == http.MethodPost {
+		var message auth.AuthMessage
+		if err := json.NewDecoder(req.Body).Decode(&message); err != nil {
+			return nil, fmt.Errorf("invalid request body: %w", err)
+		}
+
+		return &message, nil
+
+	} else {
+		version := req.Header.Get(versionHeader)
+		if version == "" {
 			return nil, nil
 		}
 
-	} else {
-		sessionAuthenticated = true
-	}
-
-	if sessionAuthenticated {
-		session.IsAuthenticated = true
-		session.LastUpdate = time.Now().UnixMicro()
-		t.sessionManager.UpdateSession(session)
-		t.logger.Debug("Certificate verification successful")
-	}
-
-	nonce, err := sdkUtils.CreateNonce(req.Context(), t.wallet, wallet.Counterparty{Type: wallet.CounterpartyTypeSelf})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create nonce")
-	}
-
-	signature, err := t.createNonGeneralAuthSignature(req.Context(), msg.InitialNonce, session.SessionNonce, msg.IdentityKey.ToDERHex())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create signature, %w", err)
-	}
-
-	identityKey, err := t.wallet.GetPublicKey(req.Context(), wallet.GetPublicKeyArgs{IdentityKey: true}, "")
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve identity key, %w", err)
-	}
-
-	response := &auth.AuthMessage{
-		Version:     auth.AUTH_VERSION,
-		MessageType: auth.MessageTypeCertificateResponse,
-		IdentityKey: identityKey.PublicKey,
-		Nonce:       nonce,
-		YourNonce:   session.PeerNonce,
-		Signature:   signature,
-	}
-	return response, nil
-}
-
-func (t *Transport) handleGeneralRequest(msg *auth.AuthMessage, req *http.Request, _ http.ResponseWriter) (*auth.AuthMessage, error) {
-	valid, err := sdkUtils.VerifyNonce(req.Context(), msg.YourNonce, t.wallet, wallet.Counterparty{Type: wallet.CounterpartyTypeSelf})
-	if err != nil || !valid {
-		return nil, fmt.Errorf("unable to verify nonce, %w", err)
-	}
-
-	session, err := t.sessionManager.GetSession(msg.YourNonce)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get session, %w", err)
-	}
-
-	if session == nil {
-		return nil, errors.New("session not found")
-	}
-
-	if !session.IsAuthenticated && !t.allowUnauthenticated {
-		if t.certificateRequirements != nil {
-			// TODO code response should be set to 401
-			return nil, errors.New("no certificates provided")
+		identityKey := req.Header.Get(identityKeyHeader)
+		if identityKey == "" {
+			return nil, errors.New("missing identity key header")
 		}
-		return nil, errors.New("session not authenticated")
-	}
 
-	signature, err := ec.ParseSignature(msg.Signature)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse signature, %w", err)
-	}
+		nonce := req.Header.Get(nonceHeader)
+		yourNonce := req.Header.Get(yourNonceHeader)
+		signature := req.Header.Get(signatureHeader)
+		requestID := req.Header.Get(requestIDHeader)
 
-	baseArgs := wallet.EncryptionArgs{
-		ProtocolID: DefaultAuthProtocol,
-		KeyID:      fmt.Sprintf("%s %s", msg.Nonce, msg.YourNonce),
-		Counterparty: wallet.Counterparty{
-			Type:         wallet.CounterpartyTypeOther,
-			Counterparty: session.PeerIdentityKey,
-		},
-	}
-	verifySignatureArgs := wallet.VerifySignatureArgs{
-		EncryptionArgs: baseArgs,
-		Signature:      *signature,
-		Data:           msg.Payload,
-	}
+		pubKey, err := ec.PublicKeyFromString(identityKey)
+		if err != nil {
+			return nil, fmt.Errorf("invalid identity key format: %w", err)
+		}
 
-	result, err := t.wallet.VerifySignature(req.Context(), verifySignatureArgs, "")
-	if err != nil || !result.Valid {
-		return nil, fmt.Errorf("unable to verify signature, %w", err)
+		payload, err := BuildRequestPayload(req, requestID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build request payload: %w", err)
+		}
+
+		message := &auth.AuthMessage{
+			Version:     version,
+			MessageType: auth.MessageTypeGeneral,
+			IdentityKey: pubKey,
+			Nonce:       nonce,
+			YourNonce:   yourNonce,
+			Payload:     payload,
+		}
+
+		if signature != "" {
+			sigBytes, err := hex.DecodeString(signature)
+			if err != nil {
+				return nil, fmt.Errorf("invalid signature format: %w", err)
+			}
+			message.Signature = sigBytes
+		}
+
+		return message, nil
 	}
-
-	session.LastUpdate = time.Now().UnixMilli()
-	t.sessionManager.UpdateSession(session)
-
-	nonce, err := sdkUtils.CreateNonce(req.Context(), t.wallet, wallet.Counterparty{Type: wallet.CounterpartyTypeSelf})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create nonce, %w", err)
-	}
-
-	identityKey, err := t.wallet.GetPublicKey(req.Context(), wallet.GetPublicKeyArgs{IdentityKey: true}, "")
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve identity key, %w", err)
-	}
-
-	response := &auth.AuthMessage{
-		Version:     auth.AUTH_VERSION,
-		MessageType: "general",
-		IdentityKey: identityKey.PublicKey,
-		Nonce:       nonce,
-		YourNonce:   session.PeerNonce,
-	}
-
-	return response, nil
 }
 
-func (t *Transport) createNonGeneralAuthSignature(ctx context.Context, initialNonce, sessionNonce, identityKey string) ([]byte, error) {
-	combined := initialNonce + sessionNonce
-	base64Data := base64.StdEncoding.EncodeToString([]byte(combined))
-
-	signature, err := t.createSignature(ctx, identityKey, combined, []byte(base64Data))
-	if err != nil {
-		return nil, err
-	}
-
-	return signature, nil
-}
-
-func (t *Transport) createSignature(ctx context.Context, identityKey, keyID string, data []byte) ([]byte, error) {
-	key, err := ec.PublicKeyFromString(identityKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse identity key, %w", err)
-	}
-
-	baseArgs := wallet.EncryptionArgs{
-		ProtocolID: DefaultAuthProtocol,
-		Counterparty: wallet.Counterparty{
-			Type:         wallet.CounterpartyTypeOther,
-			Counterparty: key,
-		},
-		KeyID: keyID,
-	}
-	createSignatureArgs := wallet.CreateSignatureArgs{
-		EncryptionArgs: baseArgs,
-		Data:           data,
-	}
-
-	signature, err := t.wallet.CreateSignature(ctx, createSignatureArgs, "")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create signature, %w", err)
-	}
-
-	return signature.Signature.Serialize(), nil
-}
-
-// buildResponsePayload constructs the response payload for signing
-// The payload is constructed as follows:
-// - Request ID (Base64)
-// - Response status
-// - Number of headers
-// - Headers (key length, key, value length, value)
-// - Body length and content
-func buildResponsePayload(
-	requestID string,
-	responseStatus int,
-	responseBody []byte,
-) ([]byte, error) {
-	var writer bytes.Buffer
+// BuildRequestPayload creates a payload byte array from the request
+func BuildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
+	writer := new(bytes.Buffer)
 
 	requestIDBytes, err := base64.StdEncoding.DecodeString(requestID)
 	if err != nil {
-		return nil, errors.New("failed to decode request ID")
+		return nil, fmt.Errorf("invalid request ID format: %w", err)
 	}
 	writer.Write(requestIDBytes)
 
-	err = utils.WriteVarIntNum(&writer, responseStatus)
+	methodLen := len(req.Method)
+	err = WriteVarInt(writer, methodLen)
 	if err != nil {
-		return nil, errors.New("failed to write response status")
+		return nil, fmt.Errorf("failed to write method length: %w", err)
 	}
 
-	// TODO: #14 - Collect and sort headers
-	includedHeaders := make([][]string, 0)
-	//includedHeaders := utils.FilterAndSortHeaders(responseHeaders)
+	writer.WriteString(req.Method)
 
-	if len(includedHeaders) > 0 {
-		err = utils.WriteVarIntNum(&writer, len(includedHeaders))
+	path := req.URL.Path
+	if path == "" {
+		err = WriteVarInt(writer, -1)
 		if err != nil {
-			return nil, errors.New("failed to write headers length")
-		}
-
-		for _, header := range includedHeaders {
-			err = utils.WriteVarIntNum(&writer, len(header[0]))
-			if err != nil {
-				return nil, errors.New("failed to write header key length")
-			}
-			writer.WriteString(header[0])
-
-			err = utils.WriteVarIntNum(&writer, len(header[1]))
-			if err != nil {
-				return nil, errors.New("failed to write header value length")
-			}
-			writer.WriteString(header[1])
+			return nil, fmt.Errorf("failed to write path length: %w", err)
 		}
 	} else {
-		err = utils.WriteVarIntNum(&writer, -1)
+		err = WriteVarInt(writer, len(path))
 		if err != nil {
-			return nil, errors.New("failed to write -1 as headers length")
+			return nil, fmt.Errorf("failed to write path length: %w", err)
+		}
+
+		writer.WriteString(path)
+	}
+
+	query := req.URL.RawQuery
+	if query == "" {
+		err = WriteVarInt(writer, -1)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write query length: %w", err)
+		}
+	} else {
+		err = WriteVarInt(writer, len(query))
+		if err != nil {
+			return nil, fmt.Errorf("failed to write query length: %w", err)
+		}
+
+		writer.WriteString(query)
+	}
+
+	var includedHeaders [][]string
+	for k, v := range req.Header {
+		k = strings.ToLower(k)
+		if (strings.HasPrefix(k, "x-bsv-") || k == "content-type" || k == "authorization") &&
+			!strings.HasPrefix(k, "x-bsv-auth") {
+			includedHeaders = append(includedHeaders, []string{k, v[0]})
 		}
 	}
 
-	if len(responseBody) > 0 {
-		err = utils.WriteVarIntNum(&writer, len(responseBody))
+	// BRC-104 requires headers to be sorted lexicographically
+	sort.Slice(includedHeaders, func(i, j int) bool {
+		return includedHeaders[i][0] < includedHeaders[j][0]
+	})
+
+	err = WriteVarInt(writer, len(includedHeaders))
+	if err != nil {
+		return nil, fmt.Errorf("failed to write headers length: %w", err)
+	}
+	for _, header := range includedHeaders {
+		err = WriteVarInt(writer, len(header[0]))
 		if err != nil {
-			return nil, errors.New("failed to write body length")
+			return nil, fmt.Errorf("failed to write header key length: %w", err)
 		}
-		writer.Write(responseBody)
-	} else {
-		err = utils.WriteVarIntNum(&writer, -1)
+
+		writer.WriteString(header[0])
+		err = WriteVarInt(writer, len(header[1]))
 		if err != nil {
-			return nil, errors.New("failed to write -1 as body length")
+			return nil, fmt.Errorf("failed to write header value length: %w", err)
+		}
+
+		writer.WriteString(header[1])
+	}
+
+	if req.Body != nil {
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read request body: %w", err)
+		}
+		req.Body = io.NopCloser(bytes.NewBuffer(body))
+
+		if len(body) > 0 {
+			err = WriteVarInt(writer, len(body))
+			if err != nil {
+				return nil, fmt.Errorf("failed to write body length: %w", err)
+			}
+
+			writer.Write(body)
+		} else {
+			err = WriteVarInt(writer, -1)
+			if err != nil {
+				return nil, fmt.Errorf("failed to write body length: %w", err)
+			}
+		}
+	} else {
+		err = WriteVarInt(writer, -1)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write body length: %w", err)
 		}
 	}
 
 	return writer.Bytes(), nil
 }
 
-func setupHeaders(w http.ResponseWriter, response *auth.AuthMessage, requestID string) {
-	responseHeaders := map[string]string{
-		versionHeader:     response.Version,
-		messageTypeHeader: string(response.MessageType),
-		identityKeyHeader: response.IdentityKey.ToDERHex(),
-	}
-
-	if response.MessageType == auth.MessageTypeGeneral {
-		responseHeaders[requestIDHeader] = requestID
-	}
-
-	if response.Nonce != "" {
-		responseHeaders[nonceHeader] = response.Nonce
-	}
-
-	if response.YourNonce != "" {
-		responseHeaders[yourNonceHeader] = response.YourNonce
-	}
-
-	if response.Signature != nil {
-		responseHeaders[signatureHeader] = hex.EncodeToString(response.Signature)
-	}
-
-	for k, v := range responseHeaders {
-		w.Header().Set(k, v)
-	}
+// WriteVarInt writes a variable integer to a buffer
+// Used for creating BRC-104 compatible payloads
+func WriteVarInt(w *bytes.Buffer, n int) error {
+	return binary.Write(w, binary.LittleEndian, int64(n))
 }
 
-func setupContent(w http.ResponseWriter, response *auth.AuthMessage) {
-	w.Header().Set("Content-Type", "application/json")
-
-	b, err := json.Marshal(response)
-	if err != nil {
-		http.Error(w, "failed to marshal response", http.StatusInternalServerError)
-		return
+// HasBeenWritten checks if a response writer has written a response
+func HasBeenWritten(w http.ResponseWriter) bool {
+	if rw, ok := w.(*ResponseRecorder); ok {
+		return rw.hasBeenWritten()
 	}
 
-	_, err = w.Write(b)
-	if err != nil {
-		http.Error(w, "failed to write response", http.StatusInternalServerError)
-		return
-	}
-}
-
-func buildAuthMessageFromRequest(req *http.Request) (*auth.AuthMessage, error) {
-	var writer bytes.Buffer
-
-	requestNonce := req.Header.Get(requestIDHeader)
-	var requestNonceBytes []byte
-	if requestNonce != "" {
-		requestNonceBytes, _ = base64.StdEncoding.DecodeString(requestNonce)
-	}
-
-	writer.Write(requestNonceBytes)
-
-	err := utils.WriteRequestData(req, &writer)
-	if err != nil {
-		return nil, errors.New("failed to write request data")
-	}
-
-	payloadBytes := writer.Bytes()
-
-	pk, err := ec.PublicKeyFromString(req.Header.Get(identityKeyHeader))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse identity key, %w", err)
-	}
-
-	authMessage := &auth.AuthMessage{
-		MessageType: "general",
-		Version:     req.Header.Get(versionHeader),
-		IdentityKey: pk,
-		Payload:     payloadBytes,
-	}
-	if nonce := req.Header.Get(nonceHeader); nonce != "" {
-		authMessage.Nonce = nonce
-	}
-
-	if yourNonce := req.Header.Get(yourNonceHeader); yourNonce != "" {
-		authMessage.YourNonce = yourNonce
-	}
-
-	if signature := req.Header.Get(signatureHeader); signature != "" {
-		decodedBytes, err := hex.DecodeString(signature)
-		if err != nil {
-			return nil, errors.New("error decoding signature")
-		}
-
-		authMessage.Signature = decodedBytes
-	}
-
-	return authMessage, nil
-}
-
-func parseAuthMessage(req *http.Request) (*auth.AuthMessage, error) {
-	var requestData auth.AuthMessage
-	if err := json.NewDecoder(req.Body).Decode(&requestData); err != nil {
-		return nil, errors.New("failed to decode request body")
-	}
-	return &requestData, nil
-}
-
-func setupContext(req *http.Request, requestData *auth.AuthMessage, requestID string) *http.Request {
-	ctx := context.WithValue(req.Context(), transport.IdentityKey, requestData.IdentityKey)
-	ctx = context.WithValue(ctx, transport.RequestID, requestID)
-	req = req.WithContext(ctx)
-	return req
-}
-
-func getValuesFromContext(req *http.Request) (string, string, error) {
-	identityKey, ok := req.Context().Value(transport.IdentityKey).(string)
-	if !ok {
-		return "", "", errors.New("identity key not found in context")
-	}
-
-	requestID, ok := req.Context().Value(transport.RequestID).(string)
-	if !ok {
-		return "", "", errors.New("request ID not found in context")
-	}
-
-	return identityKey, requestID, nil
-}
-
-func checkHeaders(req *http.Request) error {
-	if req.Header.Get(versionHeader) == "" {
-		return errors.New("missing version header")
-	}
-
-	if req.Header.Get(identityKeyHeader) == "" {
-		return errors.New("missing identity key header")
-	}
-
-	if req.Header.Get(nonceHeader) == "" {
-		return errors.New("missing nonce header")
-	} else {
-		if err := validateBase64(req.Header.Get(nonceHeader)); err != nil {
-			return errors.New("invalid nonce header")
-		}
-	}
-
-	if req.Header.Get(yourNonceHeader) == "" {
-		return errors.New("missing your nonce header")
-	} else {
-		if err := validateBase64(req.Header.Get(yourNonceHeader)); err != nil {
-			return errors.New("invalid your nonce header")
-		}
-	}
-
-	if req.Header.Get(signatureHeader) == "" {
-		return errors.New("missing signature header")
-	} else {
-		if !isHex(req.Header.Get(signatureHeader)) {
-			return errors.New("invalid signature header")
-		}
-	}
-	return nil
-}
-
-func validateBase64(input string) error {
-	_, err := base64.StdEncoding.DecodeString(input)
-	if err != nil {
-		return fmt.Errorf("invalid base64 string: %w", err)
-	}
-	return nil
-}
-
-func isHex(s string) bool {
-	if len(s)%2 != 0 {
-		return false
-	}
-
-	_, err := hex.DecodeString(s)
-	return err == nil
+	return false
 }
