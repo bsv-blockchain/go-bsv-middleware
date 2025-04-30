@@ -5,10 +5,9 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/utils"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/wallet"
-
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/utils"
 )
 
 // Headers is a map of headers

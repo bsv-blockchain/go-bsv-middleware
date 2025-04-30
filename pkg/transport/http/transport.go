@@ -15,12 +15,11 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
+	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/auth/certificates"
 	"github.com/bsv-blockchain/go-sdk/auth/utils"
 	primitives "github.com/bsv-blockchain/go-sdk/primitives/ec"
-
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
-	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
