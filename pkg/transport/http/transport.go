@@ -15,20 +15,26 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
-	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/auth/certificates"
 	"github.com/bsv-blockchain/go-sdk/auth/utils"
-	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
+	primitives "github.com/bsv-blockchain/go-sdk/primitives/ec"
+
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
+	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
 type contextKey string
 
 const (
-	requestKey  contextKey = "http_request"
-	responseKey contextKey = "http_response"
-	nextKey     contextKey = "http_next_handler"
+	// IdentityKey is the key used to store the identity key in the context
+	IdentityKey contextKey = "identity_key"
+	// RequestKey is the key used to store the request in the context
+	RequestKey contextKey = "http_request"
+	// ResponseKey is the key used to store the response writer in the context
+	ResponseKey contextKey = "http_response"
+	// NextKey is the key used to store the next handler in the context
+	NextKey contextKey = "http_next_handler"
 
 	// HTTP headers - as specified in BRC-104
 	authHeaderPrefix  = "x-bsv-auth-"
@@ -132,7 +138,7 @@ func (t *Transport) GetRegisteredOnData() (func(context.Context, *auth.AuthMessa
 // Send handles sending auth messages through HTTP
 // BRC-104 requires specific headers and formatting based on message type
 func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
-	respVal := ctx.Value(responseKey)
+	respVal := ctx.Value(ResponseKey)
 	if respVal == nil {
 		return errors.New("response writer not found in context")
 	}
@@ -142,7 +148,7 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 		return errors.New("invalid response writer type in context")
 	}
 
-	nextVal := ctx.Value(nextKey)
+	nextVal := ctx.Value(NextKey)
 	var next func()
 	if nextVal != nil {
 		next, ok = nextVal.(func())
@@ -173,7 +179,7 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 		return json.NewEncoder(resp).Encode(message)
 
 	case auth.MessageTypeGeneral:
-		req, _ := ctx.Value(requestKey).(*http.Request)
+		req, _ := ctx.Value(RequestKey).(*http.Request)
 		requestID := ""
 		if req != nil {
 			requestID = req.Header.Get(requestIDHeader)
@@ -232,7 +238,7 @@ func ParseAuthMessageFromRequest(req *http.Request) (*auth.AuthMessage, error) {
 		signature := req.Header.Get(signatureHeader)
 		requestID := req.Header.Get(requestIDHeader)
 
-		pubKey, err := ec.PublicKeyFromString(identityKey)
+		pubKey, err := primitives.PublicKeyFromString(identityKey)
 		if err != nil {
 			return nil, fmt.Errorf("invalid identity key format: %w", err)
 		}

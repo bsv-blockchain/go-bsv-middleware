@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
 	httptransport "github.com/bsv-blockchain/go-bsv-middleware/pkg/transport/http"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
@@ -15,12 +14,6 @@ import (
 )
 
 type contextKey string
-
-const (
-	requestKey  contextKey = "http_request"
-	responseKey contextKey = "http_response"
-	nextKey     contextKey = "http_next_handler"
-)
 
 type Middleware struct {
 	wallet               wallet.AuthOperations
@@ -88,9 +81,9 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		wrappedWriter := httptransport.WrapResponseWriter(w)
 
-		ctx := context.WithValue(r.Context(), requestKey, r)
-		ctx = context.WithValue(ctx, responseKey, wrappedWriter)
-		ctx = context.WithValue(ctx, nextKey, func() {
+		ctx := context.WithValue(r.Context(), httptransport.RequestKey, r)
+		ctx = context.WithValue(ctx, httptransport.ResponseKey, wrappedWriter)
+		ctx = context.WithValue(ctx, httptransport.NextKey, func() {
 			next.ServeHTTP(wrappedWriter, r)
 		})
 
@@ -107,7 +100,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 
 		if authMsg == nil {
 			if m.allowUnauthenticated {
-				r = r.WithContext(context.WithValue(r.Context(), transport.IdentityKey, "unknown"))
+				r = r.WithContext(context.WithValue(r.Context(), httptransport.IdentityKey, "unknown"))
 				next.ServeHTTP(wrappedWriter, r)
 				return
 			} else {
@@ -162,7 +155,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 
 		if !httptransport.HasBeenWritten(wrappedWriter) {
 			if authMsg.IdentityKey != nil {
-				r = r.WithContext(context.WithValue(r.Context(), transport.IdentityKey, authMsg.IdentityKey.ToDERHex()))
+				r = r.WithContext(context.WithValue(r.Context(), httptransport.IdentityKey, authMsg.IdentityKey.ToDERHex()))
 			}
 
 			next.ServeHTTP(wrappedWriter, r)

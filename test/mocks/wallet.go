@@ -2,29 +2,30 @@ package mocks
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet"
-	walletFixtures "github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet/test"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
+	"github.com/bsv-blockchain/go-sdk/wallet"
 	"github.com/stretchr/testify/mock"
 )
 
-// CreateServerMockWallet returns a mock wallet for server with predefined keys.
-func CreateServerMockWallet(key *ec.PrivateKey) wallet.WalletInterface {
-	return wallet.NewMockWallet(key, walletFixtures.DefaultNonces...)
+// CreateServerMockWallet returns a mock wallet for server with predefined keys
+func CreateServerMockWallet(key *ec.PrivateKey) wallet.AuthOperations {
+	return NewMockWallet(key, DefaultNonces...)
 }
 
-// CreateClientMockWallet returns a mock wallet for server with predefined nonces.
-func CreateClientMockWallet() wallet.WalletInterface {
-	key, err := ec.PrivateKeyFromHex(walletFixtures.ClientPrivateKeyHex)
+// CreateClientMockWallet returns a mock wallet for client with predefined nonces
+func CreateClientMockWallet() wallet.AuthOperations {
+	key, err := ec.PrivateKeyFromHex(ClientPrivateKeyHex)
 	if err != nil {
 		panic(err)
 	}
-	return wallet.NewMockWallet(key, walletFixtures.ClientNonces...)
+	return NewMockWallet(key, ClientNonces...)
 }
 
-// MockableWallet is a mock implementation of the WalletInterface.
+// MockableWallet is a testify mock implementation for testing
 type MockableWallet struct {
 	mock.Mock
 }
@@ -34,8 +35,26 @@ func NewMockableWallet() *MockableWallet {
 	return &MockableWallet{}
 }
 
-// GetPublicKey return mocked public key value.
-func (m *MockableWallet) GetPublicKey(args *wallet.GetPublicKeyArgs, originator string) (*wallet.GetPublicKeyResult, error) {
+// Wallet is a simple implementation of wallet.AuthOperations
+type Wallet struct {
+	keyDeriver  *wallet.KeyDeriver
+	validNonces map[string]bool
+	nonces      []string
+}
+
+// NewMockWallet creates a new mock wallet with given privateKey and nonces
+func NewMockWallet(privateKey *ec.PrivateKey, nonces ...string) wallet.AuthOperations {
+	return &Wallet{
+		validNonces: make(map[string]bool),
+		nonces:      append([]string(nil), nonces...),
+		keyDeriver:  wallet.NewKeyDeriver(privateKey),
+	}
+}
+
+// MockableWallet methods - Key Operations
+
+// GetPublicKey returns a mocked public key
+func (m *MockableWallet) GetPublicKey(ctx context.Context, args wallet.GetPublicKeyArgs, originator string) (*wallet.GetPublicKeyResult, error) {
 	if !isExpectedMockCall(m.ExpectedCalls, "GetPublicKey", args, originator) {
 		return nil, errors.New("unexpected call to GetPublicKey")
 	}
@@ -43,8 +62,44 @@ func (m *MockableWallet) GetPublicKey(args *wallet.GetPublicKeyArgs, originator 
 	return call.Get(0).(*wallet.GetPublicKeyResult), call.Error(1)
 }
 
-// CreateSignature return mocked signature value.
-func (m *MockableWallet) CreateSignature(args *wallet.CreateSignatureArgs, originator string) (*wallet.CreateSignatureResult, error) {
+// Encrypt returns a mocked encryption result
+func (m *MockableWallet) Encrypt(ctx context.Context, args wallet.EncryptArgs, originator string) (*wallet.EncryptResult, error) {
+	if !isExpectedMockCall(m.ExpectedCalls, "Encrypt", args, originator) {
+		return nil, errors.New("unexpected call to Encrypt")
+	}
+	call := m.Called(args, originator)
+	return call.Get(0).(*wallet.EncryptResult), call.Error(1)
+}
+
+// Decrypt returns a mocked decryption result
+func (m *MockableWallet) Decrypt(ctx context.Context, args wallet.DecryptArgs, originator string) (*wallet.DecryptResult, error) {
+	if !isExpectedMockCall(m.ExpectedCalls, "Decrypt", args, originator) {
+		return nil, errors.New("unexpected call to Decrypt")
+	}
+	call := m.Called(args, originator)
+	return call.Get(0).(*wallet.DecryptResult), call.Error(1)
+}
+
+// CreateHmac returns a mocked HMAC result
+func (m *MockableWallet) CreateHmac(ctx context.Context, args wallet.CreateHmacArgs, originator string) (*wallet.CreateHmacResult, error) {
+	if !isExpectedMockCall(m.ExpectedCalls, "CreateHmac", args, originator) {
+		return nil, errors.New("unexpected call to CreateHmac")
+	}
+	call := m.Called(args, originator)
+	return call.Get(0).(*wallet.CreateHmacResult), call.Error(1)
+}
+
+// VerifyHmac returns a mocked HMAC verification result
+func (m *MockableWallet) VerifyHmac(ctx context.Context, args wallet.VerifyHmacArgs, originator string) (*wallet.VerifyHmacResult, error) {
+	if !isExpectedMockCall(m.ExpectedCalls, "VerifyHmac", args, originator) {
+		return nil, errors.New("unexpected call to VerifyHmac")
+	}
+	call := m.Called(args, originator)
+	return call.Get(0).(*wallet.VerifyHmacResult), call.Error(1)
+}
+
+// CreateSignature returns a mocked signature result
+func (m *MockableWallet) CreateSignature(ctx context.Context, args wallet.CreateSignatureArgs, originator string) (*wallet.CreateSignatureResult, error) {
 	if !isExpectedMockCall(m.ExpectedCalls, "CreateSignature", args, originator) {
 		return nil, errors.New("unexpected call to CreateSignature")
 	}
@@ -52,8 +107,8 @@ func (m *MockableWallet) CreateSignature(args *wallet.CreateSignatureArgs, origi
 	return call.Get(0).(*wallet.CreateSignatureResult), call.Error(1)
 }
 
-// VerifySignature return mocked verification value.
-func (m *MockableWallet) VerifySignature(args *wallet.VerifySignatureArgs) (*wallet.VerifySignatureResult, error) {
+// VerifySignature returns a mocked signature verification result
+func (m *MockableWallet) VerifySignature(ctx context.Context, args wallet.VerifySignatureArgs, originator string) (*wallet.VerifySignatureResult, error) {
 	if !isExpectedMockCall(m.ExpectedCalls, "VerifySignature", args) {
 		return nil, errors.New("unexpected call to VerifySignature")
 	}
@@ -61,73 +116,330 @@ func (m *MockableWallet) VerifySignature(args *wallet.VerifySignatureArgs) (*wal
 	return call.Get(0).(*wallet.VerifySignatureResult), call.Error(1)
 }
 
-// CreateNonce return mocked nonce value.
-func (m *MockableWallet) CreateNonce(ctx context.Context) (string, error) {
-	if !isExpectedMockCall(m.ExpectedCalls, "CreateNonce", ctx) {
-		return "", errors.New("unexpected call to CreateNonce")
+// MockableWallet methods - Certificate Operations
+
+// AcquireCertificate returns a mocked certificate
+func (m *MockableWallet) AcquireCertificate(ctx context.Context, args wallet.AcquireCertificateArgs, originator string) (*wallet.Certificate, error) {
+	if !isExpectedMockCall(m.ExpectedCalls, "AcquireCertificate", args, originator) {
+		return nil, errors.New("unexpected call to AcquireCertificate")
 	}
-	call := m.Called(ctx)
-	return call.String(0), call.Error(1)
+	call := m.Called(args, originator)
+	return call.Get(0).(*wallet.Certificate), call.Error(1)
 }
 
-// VerifyNonce return mocked verification value.
-func (m *MockableWallet) VerifyNonce(ctx context.Context, nonce string) (bool, error) {
-	if !isExpectedMockCall(m.ExpectedCalls, "VerifyNonce", ctx, nonce) {
-		return false, errors.New("unexpected call to VerifyNonce")
-	}
-	call := m.Called(ctx, nonce)
-	return call.Bool(0), call.Error(1)
-}
-
-// ListCertificates return mocked certificate list value.
-func (m *MockableWallet) ListCertificates(ctx context.Context, certifiers []string, types []string) ([]wallet.Certificate, error) {
-	if !isExpectedMockCall(m.ExpectedCalls, "ListCertificates", ctx, certifiers, types) {
+// ListCertificates returns mocked certificate list
+func (m *MockableWallet) ListCertificates(ctx context.Context, args wallet.ListCertificatesArgs, originator string) (*wallet.ListCertificatesResult, error) {
+	if !isExpectedMockCall(m.ExpectedCalls, "ListCertificates", args, originator) {
 		return nil, errors.New("unexpected call to ListCertificates")
 	}
-	call := m.Called(ctx, certifiers, types)
-	return call.Get(0).([]wallet.Certificate), call.Error(1)
+	call := m.Called(args, originator)
+	return call.Get(0).(*wallet.ListCertificatesResult), call.Error(1)
 }
 
-// ProveCertificate return mocked certificate proof value.
-func (m *MockableWallet) ProveCertificate(ctx context.Context, cert wallet.Certificate, verifier string, fieldsToReveal []string) (map[string]string, error) {
-	if !isExpectedMockCall(m.ExpectedCalls, "ProveCertificate", ctx, cert, verifier, fieldsToReveal) {
+// ProveCertificate returns a mocked certificate proof
+func (m *MockableWallet) ProveCertificate(ctx context.Context, args wallet.ProveCertificateArgs, originator string) (*wallet.ProveCertificateResult, error) {
+	if !isExpectedMockCall(m.ExpectedCalls, "ProveCertificate", args, originator) {
 		return nil, errors.New("unexpected call to ProveCertificate")
 	}
-	call := m.Called(ctx, cert, verifier, fieldsToReveal)
-	return call.Get(0).(map[string]string), call.Error(1)
+	call := m.Called(args, originator)
+	return call.Get(0).(*wallet.ProveCertificateResult), call.Error(1)
 }
 
-// OnGetPublicKeyOnce sets up a one-time expectation for GetPublicKey.
+// RelinquishCertificate returns a mocked relinquish result
+func (m *MockableWallet) RelinquishCertificate(ctx context.Context, args wallet.RelinquishCertificateArgs, originator string) (*wallet.RelinquishCertificateResult, error) {
+	if !isExpectedMockCall(m.ExpectedCalls, "RelinquishCertificate", args, originator) {
+		return nil, errors.New("unexpected call to RelinquishCertificate")
+	}
+	call := m.Called(args, originator)
+	return call.Get(0).(*wallet.RelinquishCertificateResult), call.Error(1)
+}
+
+// MockableWallet helper methods for test expectations
+
+// OnGetPublicKeyOnce sets up a one-time expectation for GetPublicKey
 func (m *MockableWallet) OnGetPublicKeyOnce(result *wallet.GetPublicKeyResult, err error) *mock.Call {
 	return m.On("GetPublicKey", mock.Anything, mock.Anything).Return(result, err).Once()
 }
 
-// OnCreateSignatureOnce sets up a one-time expectation for CreateSignature.
+// OnEncryptOnce sets up a one-time expectation for Encrypt
+func (m *MockableWallet) OnEncryptOnce(result *wallet.EncryptResult, err error) *mock.Call {
+	return m.On("Encrypt", mock.Anything, mock.Anything).Return(result, err).Once()
+}
+
+// OnDecryptOnce sets up a one-time expectation for Decrypt
+func (m *MockableWallet) OnDecryptOnce(result *wallet.DecryptResult, err error) *mock.Call {
+	return m.On("Decrypt", mock.Anything, mock.Anything).Return(result, err).Once()
+}
+
+// OnCreateHmacOnce sets up a one-time expectation for CreateHmac
+func (m *MockableWallet) OnCreateHmacOnce(result *wallet.CreateHmacResult, err error) *mock.Call {
+	return m.On("CreateHmac", mock.Anything, mock.Anything).Return(result, err).Once()
+}
+
+// OnVerifyHmacOnce sets up a one-time expectation for VerifyHmac
+func (m *MockableWallet) OnVerifyHmacOnce(result *wallet.VerifyHmacResult, err error) *mock.Call {
+	return m.On("VerifyHmac", mock.Anything, mock.Anything).Return(result, err).Once()
+}
+
+// OnCreateSignatureOnce sets up a one-time expectation for CreateSignature
 func (m *MockableWallet) OnCreateSignatureOnce(result *wallet.CreateSignatureResult, err error) *mock.Call {
 	return m.On("CreateSignature", mock.Anything, mock.Anything).Return(result, err).Once()
 }
 
-// OnVerifySignatureOnce sets up a one-time expectation for VerifySignature.
+// OnVerifySignatureOnce sets up a one-time expectation for VerifySignature
 func (m *MockableWallet) OnVerifySignatureOnce(result *wallet.VerifySignatureResult, err error) *mock.Call {
 	return m.On("VerifySignature", mock.Anything).Return(result, err).Once()
 }
 
-// OnCreateNonceOnce sets up a one-time expectation for CreateNonce.
+// OnAcquireCertificateOnce sets up a one-time expectation for AcquireCertificate
+func (m *MockableWallet) OnAcquireCertificateOnce(result *wallet.Certificate, err error) *mock.Call {
+	return m.On("AcquireCertificate", mock.Anything, mock.Anything).Return(result, err).Once()
+}
+
+// OnListCertificatesOnce sets up a one-time expectation for ListCertificates
+func (m *MockableWallet) OnListCertificatesOnce(result *wallet.ListCertificatesResult, err error) *mock.Call {
+	return m.On("ListCertificates", mock.Anything, mock.Anything).Return(result, err).Once()
+}
+
+// OnProveCertificateOnce sets up a one-time expectation for ProveCertificate
+func (m *MockableWallet) OnProveCertificateOnce(result *wallet.ProveCertificateResult, err error) *mock.Call {
+	return m.On("ProveCertificate", mock.Anything, mock.Anything).Return(result, err).Once()
+}
+
+// OnRelinquishCertificateOnce sets up a one-time expectation for RelinquishCertificate
+func (m *MockableWallet) OnRelinquishCertificateOnce(result *wallet.RelinquishCertificateResult, err error) *mock.Call {
+	return m.On("RelinquishCertificate", mock.Anything, mock.Anything).Return(result, err).Once()
+}
+
+// OnCreateNonceOnce sets up a one-time expectation for CreateNonce
 func (m *MockableWallet) OnCreateNonceOnce(nonce string, err error) *mock.Call {
 	return m.On("CreateNonce", mock.Anything).Return(nonce, err).Once()
 }
 
-// OnVerifyNonceOnce sets up a one-time expectation for VerifyNonce.
+// OnVerifyNonceOnce sets up a one-time expectation for VerifyNonce
 func (m *MockableWallet) OnVerifyNonceOnce(isValid bool, err error) *mock.Call {
 	return m.On("VerifyNonce", mock.Anything, mock.Anything).Return(isValid, err).Once()
 }
 
-// OnListCertificatesOnce sets up a one-time expectation for ListCertificates.
-func (m *MockableWallet) OnListCertificatesOnce(certifiers, types []string, certs []wallet.Certificate, err error) *mock.Call {
-	return m.On("ListCertificates", mock.Anything, certifiers, types).Return(certs, err).Once()
+// GetPublicKey retrieves the public key based on the provided arguments
+func (w *Wallet) GetPublicKey(ctx context.Context, args wallet.GetPublicKeyArgs, _ string) (*wallet.GetPublicKeyResult, error) {
+	if args.IdentityKey {
+		counterparty := wallet.Counterparty{
+			Type: wallet.CounterpartyTypeSelf,
+		}
+
+		protocol := wallet.Protocol{
+			SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty,
+			Protocol:      "identity",
+		}
+
+		pubKey, err := w.keyDeriver.DerivePublicKey(
+			protocol,
+			"identity",
+			counterparty,
+			true,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to derive identity key: %w", err)
+		}
+
+		return &wallet.GetPublicKeyResult{
+			PublicKey: pubKey,
+		}, nil
+	}
+
+	if args.ProtocolID.Protocol == "" || args.KeyID == "" {
+		return nil, errors.New("protocolID and keyID are required if identityKey is false")
+	}
+
+	counterparty := args.Counterparty
+	if counterparty.Type == wallet.CounterpartyUninitialized {
+		counterparty = wallet.Counterparty{
+			Type: wallet.CounterpartyTypeSelf,
+		}
+	}
+
+	pubKey, err := w.keyDeriver.DerivePublicKey(
+		args.ProtocolID,
+		args.KeyID,
+		counterparty,
+		args.ForSelf,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &wallet.GetPublicKeyResult{
+		PublicKey: pubKey,
+	}, nil
 }
 
-// OnProveCertificateOnce sets up a one-time expectation for ProveCertificate.
-func (m *MockableWallet) OnProveCertificateOnce(cert wallet.Certificate, verifier string, fieldsToReveal []string, result map[string]string, err error) *mock.Call {
-	return m.On("ProveCertificate", mock.Anything, cert, verifier, fieldsToReveal).Return(result, err).Once()
+// Encrypt provides a minimal implementation of encryption
+func (w *Wallet) Encrypt(ctx context.Context, args wallet.EncryptArgs, _ string) (*wallet.EncryptResult, error) {
+	return &wallet.EncryptResult{
+		Ciphertext: args.Plaintext,
+	}, nil
+}
+
+// Decrypt provides a minimal implementation of decryption
+func (w *Wallet) Decrypt(ctx context.Context, args wallet.DecryptArgs, _ string) (*wallet.DecryptResult, error) {
+	return &wallet.DecryptResult{
+		Plaintext: args.Ciphertext,
+	}, nil
+}
+
+// CreateHmac provides a minimal implementation for HMAC creation
+func (w *Wallet) CreateHmac(ctx context.Context, args wallet.CreateHmacArgs, _ string) (*wallet.CreateHmacResult, error) {
+	sum := sha256.Sum256(args.Data)
+	return &wallet.CreateHmacResult{
+		Hmac: sum[:],
+	}, nil
+}
+
+// VerifyHmac provides a minimal HMAC verification
+func (w *Wallet) VerifyHmac(ctx context.Context, args wallet.VerifyHmacArgs, _ string) (*wallet.VerifyHmacResult, error) {
+	return &wallet.VerifyHmacResult{
+		Valid: true,
+	}, nil
+}
+
+// CreateSignature creates a digital signature
+func (w *Wallet) CreateSignature(ctx context.Context, args wallet.CreateSignatureArgs, _ string) (*wallet.CreateSignatureResult, error) {
+	var hash []byte
+	if len(args.HashToDirectlySign) > 0 {
+		hash = args.HashToDirectlySign
+	} else {
+		sum := sha256.Sum256(args.Data)
+		hash = sum[:]
+	}
+
+	counterparty := args.Counterparty
+	if counterparty.Type == wallet.CounterpartyUninitialized {
+		counterparty = wallet.Counterparty{
+			Type: wallet.CounterpartyTypeAnyone,
+		}
+	}
+
+	privKey, err := w.keyDeriver.DerivePrivateKey(
+		args.ProtocolID,
+		args.KeyID,
+		counterparty,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive private key: %w", err)
+	}
+
+	signature, err := privKey.Sign(hash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create signature: %w", err)
+	}
+
+	return &wallet.CreateSignatureResult{
+		Signature: *signature,
+	}, nil
+}
+
+// VerifySignature checks the validity of a cryptographic signature
+func (w *Wallet) VerifySignature(ctx context.Context, args wallet.VerifySignatureArgs, _ string) (*wallet.VerifySignatureResult, error) {
+	var hash []byte
+	if len(args.HashToDirectlyVerify) > 0 {
+		hash = args.HashToDirectlyVerify
+	} else {
+		sum := sha256.Sum256(args.Data)
+		hash = sum[:]
+	}
+
+	counterparty := args.Counterparty
+	if counterparty.Type == wallet.CounterpartyUninitialized {
+		counterparty = wallet.Counterparty{
+			Type: wallet.CounterpartyTypeSelf,
+		}
+	}
+
+	pubKey, err := w.keyDeriver.DerivePublicKey(
+		args.ProtocolID,
+		args.KeyID,
+		counterparty,
+		args.ForSelf,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive public key: %w", err)
+	}
+
+	valid := args.Signature.Verify(hash, pubKey)
+	return &wallet.VerifySignatureResult{
+		Valid: valid,
+	}, nil
+}
+
+// AcquireCertificate is a simplified mock implementation
+func (w *Wallet) AcquireCertificate(ctx context.Context, args wallet.AcquireCertificateArgs, originator string) (*wallet.Certificate, error) {
+	if args.Type == "" || args.Certifier == "" {
+		return nil, errors.New("missing required fields")
+	}
+
+	return &wallet.Certificate{
+		Type:         args.Type,
+		SerialNumber: args.SerialNumber,
+		Fields:       args.Fields,
+		Signature:    args.Signature,
+	}, nil
+}
+
+// ListCertificates returns a minimal certificate list
+func (w *Wallet) ListCertificates(ctx context.Context, args wallet.ListCertificatesArgs, _ string) (*wallet.ListCertificatesResult, error) {
+	return &wallet.ListCertificatesResult{
+		TotalCertificates: 0,
+		Certificates:      []wallet.CertificateResult{},
+	}, nil
+}
+
+// ProveCertificate provides a minimal certificate proof
+func (w *Wallet) ProveCertificate(ctx context.Context, args wallet.ProveCertificateArgs, _ string) (*wallet.ProveCertificateResult, error) {
+	keyring := make(map[string]string)
+	for _, field := range args.FieldsToReveal {
+		keyring[field] = "mock-key-" + field
+	}
+
+	return &wallet.ProveCertificateResult{
+		KeyringForVerifier: keyring,
+	}, nil
+}
+
+// RelinquishCertificate provides a minimal certificate relinquishment
+func (w *Wallet) RelinquishCertificate(ctx context.Context, args wallet.RelinquishCertificateArgs, _ string) (*wallet.RelinquishCertificateResult, error) {
+	return &wallet.RelinquishCertificateResult{
+		Relinquished: true,
+	}, nil
+}
+
+// CreateNonce generates a deterministic nonce
+func (w *Wallet) CreateNonce(ctx context.Context) (string, error) {
+	if ctx.Err() != nil {
+		return "", fmt.Errorf("ctx err: %w", ctx.Err())
+	}
+
+	newNonce := MockNonce
+
+	if len(w.nonces) != 0 {
+		newNonce = w.nonces[0]
+		w.nonces = w.nonces[1:]
+
+		if len(w.nonces) == 0 {
+			w.nonces = append([]string(nil), DefaultNonces...)
+		}
+	}
+
+	w.validNonces[newNonce] = true
+	return newNonce, nil
+}
+
+// VerifyNonce checks if the nonce exists
+func (w *Wallet) VerifyNonce(ctx context.Context, nonce string) (bool, error) {
+	if ctx.Err() != nil {
+		return false, fmt.Errorf("ctx err: %w", ctx.Err())
+	}
+
+	_, exists := w.validNonces[nonce]
+	return exists, nil
 }

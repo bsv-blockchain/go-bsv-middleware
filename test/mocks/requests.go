@@ -1,11 +1,13 @@
 package mocks
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
+	"github.com/bsv-blockchain/go-sdk/auth"
+	"github.com/bsv-blockchain/go-sdk/wallet"
+
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/utils"
 )
 
@@ -13,7 +15,7 @@ import (
 type Headers map[string]string
 
 // RequestBody is a placeholder for transport.AuthMessage
-type RequestBody transport.AuthMessage
+type RequestBody auth.AuthMessage
 
 // WithWrongVersion adds a wrong version to the headers
 func WithWrongVersion(h map[string]string) {
@@ -36,7 +38,7 @@ func WithWrongNonce(h map[string]string) {
 }
 
 // NewRequestBody creates a new RequestBody from an AuthMessage
-func NewRequestBody(msg transport.AuthMessage) *RequestBody {
+func NewRequestBody(msg auth.AuthMessage) *RequestBody {
 	rb := RequestBody(msg)
 	return &rb
 }
@@ -49,7 +51,7 @@ func (rb *RequestBody) WithWrongVersion() *RequestBody {
 
 // WithoutIdentityKey removes the identity key from the request body
 func (rb *RequestBody) WithoutIdentityKey() *RequestBody {
-	rb.IdentityKey = ""
+	rb.IdentityKey = nil
 	return rb
 }
 
@@ -61,7 +63,7 @@ func (rb *RequestBody) WithoutInitialNonce() *RequestBody {
 
 // WithoutIdentityKeyAndNonce removes the identity key and nonce from the request body
 func (rb *RequestBody) WithoutIdentityKeyAndNonce() *RequestBody {
-	rb.IdentityKey = ""
+	rb.IdentityKey = nil
 	rb.InitialNonce = ""
 	return rb
 }
@@ -73,44 +75,49 @@ func (rb *RequestBody) WithInvalidNonceFormat() *RequestBody {
 }
 
 // AuthMessage returns the request body as an AuthMessage
-func (rb *RequestBody) AuthMessage() *transport.AuthMessage {
-	return (*transport.AuthMessage)(rb)
+func (rb *RequestBody) AuthMessage() *auth.AuthMessage {
+	return (*auth.AuthMessage)(rb)
 }
 
 // PrepareInitialRequestBody prepares the initial request body
-func PrepareInitialRequestBody(mockedWallet wallet.WalletInterface) *RequestBody {
-	initialRequest := utils.PrepareInitialRequestBody(mockedWallet)
+func PrepareInitialRequestBody(ctx context.Context, mockedWallet wallet.AuthOperations) *RequestBody {
+	initialRequest := utils.PrepareInitialRequestBody(ctx, mockedWallet)
 
 	return NewRequestBody(initialRequest)
 }
 
 // PrepareGeneralRequestHeaders prepares the general request headers
-func PrepareGeneralRequestHeaders(mockedWallet wallet.WalletInterface, previousResponse *transport.AuthMessage, request *http.Request, opts ...func(m map[string]string)) error {
+func PrepareGeneralRequestHeaders(
+	ctx context.Context,
+	mockedWallet wallet.AuthOperations,
+	previousResponse *auth.AuthMessage,
+	request *http.Request,
+	opts ...func(m map[string]string)) error {
 	if previousResponse == nil {
 		return errors.New("previous response is nil")
 	}
 
-	if previousResponse.IdentityKey == "" {
+	if previousResponse.IdentityKey == nil {
 		return errors.New("previous response missing identity key")
 	}
 
 	yourNonce := previousResponse.InitialNonce
-	if yourNonce == "" && previousResponse.Nonce != nil {
-		yourNonce = *previousResponse.Nonce
+	if yourNonce == "" && previousResponse.Nonce != "" {
+		yourNonce = previousResponse.Nonce
 	}
 
 	if yourNonce == "" {
 		return errors.New("previous response has no nonce to use")
 	}
 
-	normalizedResponse := &transport.AuthMessage{
+	normalizedResponse := &auth.AuthMessage{
 		Version:      previousResponse.Version,
 		MessageType:  previousResponse.MessageType,
 		IdentityKey:  previousResponse.IdentityKey,
 		InitialNonce: yourNonce,
 	}
 
-	headers, err := utils.PrepareGeneralRequestHeaders(mockedWallet, normalizedResponse, utils.RequestData{Request: request})
+	headers, err := utils.PrepareGeneralRequestHeaders(ctx, mockedWallet, normalizedResponse, utils.RequestData{Request: request})
 	if err != nil {
 		return errors.New("failed to prepare general request headers: " + err.Error())
 	}

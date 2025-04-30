@@ -28,7 +28,7 @@ type RequestData struct {
 }
 
 // PrepareInitialRequestBody prepares the initial request body
-func PrepareInitialRequestBody(ctx context.Context, walletInstance wallet.KeyOperations) auth.AuthMessage {
+func PrepareInitialRequestBody(ctx context.Context, walletInstance wallet.AuthOperations) auth.AuthMessage {
 	args := wallet.GetPublicKeyArgs{IdentityKey: true}
 	clientIdentityKey, err := walletInstance.GetPublicKey(ctx, args, "")
 	if err != nil {
@@ -51,7 +51,7 @@ func PrepareInitialRequestBody(ctx context.Context, walletInstance wallet.KeyOpe
 }
 
 // PrepareGeneralRequestHeaders prepares the general request headers
-func PrepareGeneralRequestHeaders(ctx context.Context, walletInstance wallet.KeyOperations, previousResponse *auth.AuthMessage, requestData RequestData) (map[string]string, error) {
+func PrepareGeneralRequestHeaders(ctx context.Context, walletInstance wallet.AuthOperations, previousResponse *auth.AuthMessage, requestData RequestData) (map[string]string, error) {
 	serverIdentityKey := previousResponse.IdentityKey
 	serverNonce := previousResponse.InitialNonce
 
