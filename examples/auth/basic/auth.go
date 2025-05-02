@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"log/slog"
@@ -9,13 +10,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/auth"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet"
-	walletFixtures "github.com/bsv-blockchain/go-bsv-middleware/pkg/temporary/wallet/test"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
+	middleware "github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/auth"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/utils"
+	"github.com/bsv-blockchain/go-sdk/auth"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
+	"github.com/bsv-blockchain/go-sdk/wallet"
 	"github.com/go-resty/resty/v2"
+)
+
+const (
+	serverPrivateKeyHex = "5a4d867377bd44eba1cecd0806c16f24e293f7e218c162b1177571edaeeaecef"
+	clientPrivateKeyHex = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+	serverPort          = ":8080"
 )
 
 func main() {
@@ -23,29 +29,29 @@ func main() {
 	logHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
 	logger := slog.New(logHandler)
 
-	sPrivKey, err := ec.PrivateKeyFromHex(walletFixtures.ServerPrivateKeyHex)
+	sPrivKey, err := ec.PrivateKeyFromHex(serverPrivateKeyHex)
 	if err != nil {
 		panic(err)
 	}
 
-	serverMockedWallet := wallet.NewMockWallet(sPrivKey, walletFixtures.DefaultNonces...)
-	fmt.Println("✓ Server mockWallet created")
+	serverWallet, err := wallet.NewProtoWallet(wallet.ProtoWalletArgs{
+		Type:       wallet.ProtoWalletArgsTypePrivateKey,
+		PrivateKey: sPrivKey,
+	})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("✓ Server wallet created")
 
-	// Create authentication middleware with:
-	// - authentication enabled
-	// - custom logger
-	// - mocked wallet with predefined nonces
-	// - server private key
-	opts := auth.Config{
+	opts := middleware.Config{
 		AllowUnauthenticated: false,
 		Logger:               logger,
-		Wallet:               serverMockedWallet,
+		Wallet:               serverWallet,
 	}
-	middleware, err := auth.New(opts)
+	middleware, err := middleware.New(opts)
 	if err != nil {
 		panic(err)
 	}
-
 	fmt.Println("✓ Auth middleware created")
 
 	mux := http.NewServeMux()
@@ -53,7 +59,7 @@ func main() {
 	mux.Handle("/ping", middleware.Handler(http.HandlerFunc(pingHandler)))
 
 	srv := &http.Server{
-		Addr:    ":8080",
+		Addr:    serverPort,
 		Handler: mux,
 	}
 
@@ -64,44 +70,59 @@ func main() {
 		}
 	}()
 	time.Sleep(1 * time.Second)
-
 	fmt.Println("✓ HTTP Server started")
 
-	// Create mocked client wallet with predefined client nonces and client identity key
-	cPrivKey, err := ec.PrivateKeyFromHex(walletFixtures.ServerPrivateKeyHex)
+	cPrivKey, err := ec.PrivateKeyFromHex(clientPrivateKeyHex)
 	if err != nil {
 		panic(err)
 	}
-	mockedWallet := wallet.NewMockWallet(cPrivKey, walletFixtures.ClientNonces...)
-	fmt.Println("✓ Client mockWallet created")
+	clientWallet, err := wallet.NewProtoWallet(wallet.ProtoWalletArgs{
+		Type:       wallet.ProtoWalletArgsTypePrivateKey,
+		PrivateKey: cPrivKey,
+	})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("✓ Client wallet created")
 
 	fmt.Println("\n📡 STEP 1: Sending non general request to /.well-known/auth endpoint")
-	responseData := callInitialRequest(mockedWallet)
+	responseData := callInitialRequest(clientWallet)
 	fmt.Println("✓ Auth completed")
 
 	fmt.Println("\n📡 STEP 2: Sending general request to test authorization")
-	callPingEndpoint(mockedWallet, responseData)
+	callPingEndpoint(clientWallet, responseData)
 	fmt.Println("✓ General request completed")
+
+	time.Sleep(2 * time.Second)
+	fmt.Println("\n✅ Demo completed successfully")
 }
 
+// HTTP handler for ping requests
 func pingHandler(w http.ResponseWriter, r *http.Request) {
+	identityKey, ok := middleware.GetIdentityFromContext(r.Context())
+	if !ok {
+		log.Printf("Warning: No identity key in context")
+	} else {
+		log.Printf("Request from identity: %s", identityKey)
+	}
 	_, err := w.Write([]byte("Pong!"))
 	if err != nil {
 		log.Printf("Error writing ping response: %v", err)
 	}
 }
 
-func callInitialRequest(mockedWallet wallet.WalletInterface) *transport.AuthMessage {
-	requestData := utils.PrepareInitialRequestBody(mockedWallet)
-	url := "http://localhost:8080/.well-known/auth"
+// Makes the initial authentication request
+func callInitialRequest(clientWallet wallet.AuthOperations) *auth.AuthMessage {
+	initialRequest := utils.PrepareInitialRequestBody(context.Background(), clientWallet)
+	url := "http://localhost" + serverPort + "/.well-known/auth"
 
 	client := resty.New()
-	var result transport.AuthMessage
+	var result auth.AuthMessage
 	var errMsg any
 
 	resp, err := client.R().
 		SetHeader("Content-Type", "application/json").
-		SetBody(requestData).
+		SetBody(initialRequest).
 		SetResult(&result).
 		SetError(&errMsg).
 		Post(url)
@@ -127,14 +148,16 @@ func callInitialRequest(mockedWallet wallet.WalletInterface) *transport.AuthMess
 	return &result
 }
 
-func callPingEndpoint(mockedWallet wallet.WalletInterface, response *transport.AuthMessage) {
-	url := "http://localhost:8080/ping"
+// Makes an authenticated request to the ping endpoint
+func callPingEndpoint(clientWallet wallet.AuthOperations, response *auth.AuthMessage) {
+	url := "http://localhost" + serverPort + "/ping"
 
 	requestData := utils.RequestData{
 		Method: http.MethodGet,
 		URL:    url,
 	}
-	headers, err := utils.PrepareGeneralRequestHeaders(mockedWallet, response, requestData)
+
+	headers, err := utils.PrepareGeneralRequestHeaders(context.Background(), clientWallet, response, requestData)
 	if err != nil {
 		log.Fatalf("Failed to prepare general request headers: %v", err)
 	}
