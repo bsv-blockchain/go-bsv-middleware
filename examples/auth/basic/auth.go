@@ -152,12 +152,15 @@ func callInitialRequest(clientWallet wallet.AuthOperations) *auth.AuthMessage {
 func callPingEndpoint(clientWallet wallet.AuthOperations, response *auth.AuthMessage) {
 	url := "http://localhost" + serverPort + "/ping"
 
+	modifiedResponse := *response
+	modifiedResponse.InitialNonce = response.Nonce
+
 	requestData := utils.RequestData{
 		Method: http.MethodGet,
 		URL:    url,
 	}
 
-	headers, err := utils.PrepareGeneralRequestHeaders(context.Background(), clientWallet, response, requestData)
+	headers, err := utils.PrepareGeneralRequestHeaders(context.Background(), clientWallet, &modifiedResponse, requestData)
 	if err != nil {
 		log.Fatalf("Failed to prepare general request headers: %v", err)
 	}

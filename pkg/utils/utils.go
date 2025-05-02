@@ -79,7 +79,7 @@ func PrepareGeneralRequestHeaders(ctx context.Context, walletInstance wallet.Aut
 		return nil, err
 	}
 
-	protocol := wallet.Protocol{SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty, Protocol: "auth message signature"}
+	protocol := wallet.Protocol{SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty, Protocol: auth.AUTH_PROTOCOL_ID}
 
 	baseArgs := wallet.EncryptionArgs{
 		ProtocolID: protocol,
