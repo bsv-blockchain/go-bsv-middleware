@@ -12,6 +12,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	middleware "github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/auth"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
 	"github.com/bsv-blockchain/go-sdk/auth"
@@ -41,7 +42,7 @@ type MockHTTPHandler struct {
 
 // CreateMockHTTPServer creates a new mock HTTP server
 func CreateMockHTTPServer(
-	wallet wallet.AuthOperations,
+	wallet interfaces.Wallet,
 	sessionManager auth.SessionManager,
 	opts ...func(s *MockHTTPServer) *MockHTTPServer) *MockHTTPServer {
 
@@ -109,7 +110,7 @@ func (s *MockHTTPServer) SendGeneralRequest(t *testing.T, request *http.Request)
 }
 
 // SendCertificateResponse sends a certificate response to the server
-func (s *MockHTTPServer) SendCertificateResponse(t *testing.T, clientWallet wallet.AuthOperations, certificates []*certificates.VerifiableCertificate) (*http.Response, error) {
+func (s *MockHTTPServer) SendCertificateResponse(t *testing.T, clientWallet interfaces.Wallet, certificates []*certificates.VerifiableCertificate) (*http.Response, error) {
 	initialRequest := PrepareInitialRequestBody(t.Context(), clientWallet)
 	response, err := s.SendNonGeneralRequest(t, initialRequest.AuthMessage())
 	require.NoError(t, err)
@@ -167,7 +168,7 @@ func (s *MockHTTPServer) SendCertificateResponse(t *testing.T, clientWallet wall
 	return resp, nil
 }
 
-func (s *MockHTTPServer) createMiddleware(wallet wallet.AuthOperations, sessionManager auth.SessionManager) {
+func (s *MockHTTPServer) createMiddleware(wallet interfaces.Wallet, sessionManager auth.SessionManager) {
 	if s.logger == nil {
 		s.logger = slog.New(slog.DiscardHandler)
 	}

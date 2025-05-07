@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
 	"github.com/bsv-blockchain/go-sdk/wallet"
@@ -28,7 +29,7 @@ type RequestData struct {
 }
 
 // PrepareInitialRequestBody prepares the initial request body
-func PrepareInitialRequestBody(ctx context.Context, walletInstance wallet.AuthOperations) auth.AuthMessage {
+func PrepareInitialRequestBody(ctx context.Context, walletInstance interfaces.Wallet) auth.AuthMessage {
 	args := wallet.GetPublicKeyArgs{IdentityKey: true}
 	clientIdentityKey, err := walletInstance.GetPublicKey(ctx, args, "")
 	if err != nil {
@@ -51,7 +52,7 @@ func PrepareInitialRequestBody(ctx context.Context, walletInstance wallet.AuthOp
 }
 
 // PrepareGeneralRequestHeaders prepares the general request headers
-func PrepareGeneralRequestHeaders(ctx context.Context, walletInstance wallet.AuthOperations, previousResponse *auth.AuthMessage, requestData RequestData) (map[string]string, error) {
+func PrepareGeneralRequestHeaders(ctx context.Context, walletInstance interfaces.Wallet, previousResponse *auth.AuthMessage, requestData RequestData) (map[string]string, error) {
 	serverIdentityKey := previousResponse.IdentityKey
 	serverNonce := previousResponse.InitialNonce
 

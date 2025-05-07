@@ -10,11 +10,12 @@ import (
 	"strings"
 	"time"
 
+	exampleWallet "github.com/bsv-blockchain/go-bsv-middleware-examples/example-wallet"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	middleware "github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/auth"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/utils"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
-	"github.com/bsv-blockchain/go-sdk/wallet"
 	"github.com/go-resty/resty/v2"
 )
 
@@ -34,13 +35,14 @@ func main() {
 		panic(err)
 	}
 
-	serverWallet, err := wallet.NewProtoWallet(wallet.ProtoWalletArgs{
-		Type:       wallet.ProtoWalletArgsTypePrivateKey,
+	serverWallet, err := exampleWallet.NewExampleWallet(exampleWallet.ExampleWalletArgs{
+		Type:       exampleWallet.ExampleWalletArgsTypePrivateKey,
 		PrivateKey: sPrivKey,
 	})
 	if err != nil {
 		panic(err)
 	}
+
 	fmt.Println("✓ Server wallet created")
 
 	opts := middleware.Config{
@@ -76,10 +78,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	clientWallet, err := wallet.NewProtoWallet(wallet.ProtoWalletArgs{
-		Type:       wallet.ProtoWalletArgsTypePrivateKey,
+
+	clientWallet, err := exampleWallet.NewExampleWallet(exampleWallet.ExampleWalletArgs{
+		Type:       exampleWallet.ExampleWalletArgsTypePrivateKey,
 		PrivateKey: cPrivKey,
 	})
+
 	if err != nil {
 		panic(err)
 	}
@@ -112,7 +116,7 @@ func pingHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Makes the initial authentication request
-func callInitialRequest(clientWallet wallet.AuthOperations) *auth.AuthMessage {
+func callInitialRequest(clientWallet interfaces.Wallet) *auth.AuthMessage {
 	initialRequest := utils.PrepareInitialRequestBody(context.Background(), clientWallet)
 	url := "http://localhost" + serverPort + "/.well-known/auth"
 
@@ -149,7 +153,7 @@ func callInitialRequest(clientWallet wallet.AuthOperations) *auth.AuthMessage {
 }
 
 // Makes an authenticated request to the ping endpoint
-func callPingEndpoint(clientWallet wallet.AuthOperations, response *auth.AuthMessage) {
+func callPingEndpoint(clientWallet interfaces.Wallet, response *auth.AuthMessage) {
 	url := "http://localhost" + serverPort + "/ping"
 
 	modifiedResponse := *response

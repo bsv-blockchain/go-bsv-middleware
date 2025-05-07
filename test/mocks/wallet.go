@@ -6,18 +6,19 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 	"github.com/stretchr/testify/mock"
 )
 
 // CreateServerMockWallet returns a mock wallet for server with predefined keys
-func CreateServerMockWallet(key *ec.PrivateKey) wallet.AuthOperations {
+func CreateServerMockWallet(key *ec.PrivateKey) interfaces.Wallet {
 	return NewMockWallet(key, DefaultNonces...)
 }
 
 // CreateClientMockWallet returns a mock wallet for client with predefined nonces
-func CreateClientMockWallet() wallet.AuthOperations {
+func CreateClientMockWallet() interfaces.Wallet {
 	key, err := ec.PrivateKeyFromHex(ClientPrivateKeyHex)
 	if err != nil {
 		panic(err)
@@ -35,7 +36,7 @@ func NewMockableWallet() *MockableWallet {
 	return &MockableWallet{}
 }
 
-// Wallet is a simple implementation of wallet.AuthOperations
+// Wallet is a simple implementation of interfaces.Wallet
 type Wallet struct {
 	keyDeriver  *wallet.KeyDeriver
 	validNonces map[string]bool
@@ -43,7 +44,7 @@ type Wallet struct {
 }
 
 // NewMockWallet creates a new mock wallet with given privateKey and nonces
-func NewMockWallet(privateKey *ec.PrivateKey, nonces ...string) wallet.AuthOperations {
+func NewMockWallet(privateKey *ec.PrivateKey, nonces ...string) interfaces.Wallet {
 	return &Wallet{
 		validNonces: make(map[string]bool),
 		nonces:      append([]string(nil), nonces...),

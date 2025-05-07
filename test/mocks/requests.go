@@ -5,9 +5,9 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/utils"
 	"github.com/bsv-blockchain/go-sdk/auth"
-	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
 // Headers is a map of headers
@@ -79,7 +79,7 @@ func (rb *RequestBody) AuthMessage() *auth.AuthMessage {
 }
 
 // PrepareInitialRequestBody prepares the initial request body
-func PrepareInitialRequestBody(ctx context.Context, mockedWallet wallet.AuthOperations) *RequestBody {
+func PrepareInitialRequestBody(ctx context.Context, mockedWallet interfaces.Wallet) *RequestBody {
 	initialRequest := utils.PrepareInitialRequestBody(ctx, mockedWallet)
 
 	return NewRequestBody(initialRequest)
@@ -88,7 +88,7 @@ func PrepareInitialRequestBody(ctx context.Context, mockedWallet wallet.AuthOper
 // PrepareGeneralRequestHeaders prepares the general request headers
 func PrepareGeneralRequestHeaders(
 	ctx context.Context,
-	mockedWallet wallet.AuthOperations,
+	mockedWallet interfaces.Wallet,
 	previousResponse *auth.AuthMessage,
 	request *http.Request,
 	opts ...func(m map[string]string)) error {
