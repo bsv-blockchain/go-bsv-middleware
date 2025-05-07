@@ -15,12 +15,12 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/auth/certificates"
 	"github.com/bsv-blockchain/go-sdk/auth/utils"
 	primitives "github.com/bsv-blockchain/go-sdk/primitives/ec"
-	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
 type contextKey string
@@ -76,7 +76,7 @@ func WrapResponseWriter(w http.ResponseWriter) *responseRecorder {
 
 // TransportConfig holds configuration for the HTTP transport
 type TransportConfig struct {
-	Wallet                 wallet.AuthOperations
+	Wallet                 interfaces.Wallet
 	SessionManager         auth.SessionManager
 	AllowUnauthenticated   bool
 	Logger                 *slog.Logger
@@ -85,7 +85,7 @@ type TransportConfig struct {
 }
 
 type Transport struct {
-	wallet                 wallet.AuthOperations
+	wallet                 interfaces.Wallet
 	sessionManager         auth.SessionManager
 	allowUnauthenticated   bool
 	logger                 *slog.Logger

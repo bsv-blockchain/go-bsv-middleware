@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-bsv-middleware/test/assert"
 	"github.com/bsv-blockchain/go-bsv-middleware/test/mocks"
 	"github.com/bsv-blockchain/go-sdk/auth"
@@ -310,7 +311,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 func prepareInitialRequest(
 	t *testing.T,
 	serverWallet *mocks.MockableWallet,
-	clientWallet wallet.AuthOperations,
+	clientWallet interfaces.Wallet,
 	server *mocks.MockHTTPServer) *auth.AuthMessage {
 
 	// given

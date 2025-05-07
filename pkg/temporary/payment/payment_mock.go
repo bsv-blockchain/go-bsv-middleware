@@ -3,6 +3,7 @@ package payment
 import (
 	"context"
 
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-bsv-middleware/test/mocks"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/bsv-blockchain/go-sdk/wallet"
@@ -12,7 +13,7 @@ import (
 
 // MockPaymentWallet implements wallet.PaymentInterface for testing
 type MockPaymentWallet struct {
-	Wallet wallet.AuthOperations
+	Wallet interfaces.Wallet
 
 	InternalizeActionCalled bool
 	InternalizeActionArgs   wallet.InternalizeActionArgs

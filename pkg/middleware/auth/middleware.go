@@ -6,17 +6,17 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 	httptransport "github.com/bsv-blockchain/go-bsv-middleware/pkg/transport/http"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
-	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
 type contextKey string
 
 type Middleware struct {
-	wallet               wallet.AuthOperations
+	wallet               interfaces.Wallet
 	peer                 *auth.Peer
 	sessionManager       auth.SessionManager
 	transport            auth.Transport
