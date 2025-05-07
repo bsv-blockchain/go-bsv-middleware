@@ -13,8 +13,8 @@ import (
 	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
+// ExampleWallet is a mock implementation of the wallet interface
 type ExampleWallet struct {
-	// The underlying key deriver
 	keyDeriver *KeyDeriver
 }
 type ExampleWalletArgsType string

@@ -91,10 +91,6 @@ func main() {
 		PrivateKey: cPrivKey,
 	})
 
-	// clientWallet, err := wallet.NewProtoWallet(wallet.ProtoWalletArgs{
-	// 	Type:       wallet.ProtoWalletArgsTypePrivateKey,
-	// 	PrivateKey: cPrivKey,
-	// })
 	if err != nil {
 		panic(err)
 	}
