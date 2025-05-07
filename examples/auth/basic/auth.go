@@ -43,13 +43,6 @@ func main() {
 		panic(err)
 	}
 
-	// serverWallet, err := wallet.NewProtoWallet(wallet.ProtoWalletArgs{
-	// 	Type:       wallet.ProtoWalletArgsTypePrivateKey,
-	// 	PrivateKey: sPrivKey,
-	// })
-	// if err != nil {
-	// 	panic(err)
-	// }
 	fmt.Println("✓ Server wallet created")
 
 	opts := middleware.Config{

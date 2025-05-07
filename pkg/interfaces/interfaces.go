@@ -22,6 +22,7 @@ type Wallet interface {
 	RelinquishCertificate(ctx context.Context, args wallet.RelinquishCertificateArgs, originator string) (*wallet.RelinquishCertificateResult, error)
 }
 
+// Payment defines the payment operations required by the payment middleware.
 type Payment interface {
 	Wallet
 	InternalizeAction(ctx context.Context, args wallet.InternalizeActionArgs, originator string) (*wallet.InternalizeActionResult, error)
