@@ -4,15 +4,15 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/auth/certificates"
 	"github.com/bsv-blockchain/go-sdk/auth/utils"
+	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
 // Config configures the auth middleware
 type Config struct {
-	Wallet                 interfaces.Wallet
+	Wallet                 wallet.Interface
 	SessionManager         auth.SessionManager
 	AllowUnauthenticated   bool
 	Logger                 *slog.Logger

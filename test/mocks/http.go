@@ -42,7 +42,7 @@ type MockHTTPHandler struct {
 
 // CreateMockHTTPServer creates a new mock HTTP server
 func CreateMockHTTPServer(
-	wallet interfaces.Wallet,
+	wallet wallet.Interface,
 	sessionManager auth.SessionManager,
 	opts ...func(s *MockHTTPServer) *MockHTTPServer) *MockHTTPServer {
 
@@ -168,7 +168,7 @@ func (s *MockHTTPServer) SendCertificateResponse(t *testing.T, clientWallet inte
 	return resp, nil
 }
 
-func (s *MockHTTPServer) createMiddleware(wallet interfaces.Wallet, sessionManager auth.SessionManager) {
+func (s *MockHTTPServer) createMiddleware(wallet wallet.Interface, sessionManager auth.SessionManager) {
 	if s.logger == nil {
 		s.logger = slog.New(slog.DiscardHandler)
 	}
