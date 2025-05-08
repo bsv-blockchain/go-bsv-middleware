@@ -529,3 +529,87 @@ func (p *ExampleWallet) RelinquishCertificate(ctx context.Context, args wallet.R
 		Relinquished: true,
 	}, nil
 }
+
+func CreateAction(ctx context.Context, args wallet.CreateActionArgs, originator string) (*wallet.CreateActionResult, error) {
+	return nil, errors.New("CreateAction not implemented in ExampleWallet")
+}
+
+func SignAction(ctx context.Context, args wallet.SignActionArgs, originator string) (*wallet.SignActionResult, error) {
+	return nil, errors.New("SignAction not implemented in ExampleWallet")
+}
+
+func AbortAction(ctx context.Context, args wallet.AbortActionArgs, originator string) (*wallet.AbortActionResult, error) {
+	return nil, errors.New("AbortAction not implemented in ExampleWallet")
+}
+
+func ListActions(ctx context.Context, args wallet.ListActionsArgs, originator string) (*wallet.ListActionsResult, error) {
+	return nil, errors.New("ListActions not implemented in ExampleWallet")
+}
+
+func InternalizeAction(ctx context.Context, args wallet.InternalizeActionArgs, originator string) (*wallet.InternalizeActionResult, error) {
+	return nil, errors.New("InternalizeAction not implemented in ExampleWallet")
+}
+
+func ListOutputs(ctx context.Context, args wallet.ListOutputsArgs, originator string) (*wallet.ListOutputsResult, error) {
+	return nil, errors.New("ListOutputs not implemented in ExampleWallet")
+}
+
+func RelinquishOutput(ctx context.Context, args wallet.RelinquishOutputArgs, originator string) (*wallet.RelinquishOutputResult, error) {
+	return nil, errors.New("RelinquishOutput not implemented in ExampleWallet")
+}
+
+func RevealCounterpartyKeyLinkage(ctx context.Context, args wallet.RevealCounterpartyKeyLinkageArgs, originator string) (*wallet.RevealCounterpartyKeyLinkageResult, error) {
+	return nil, errors.New("RevealCounterpartyKeyLinkage not implemented in ExampleWallet")
+}
+
+func RevealSpecificKeyLinkage(ctx context.Context, args wallet.RevealSpecificKeyLinkageArgs, originator string) (*wallet.RevealSpecificKeyLinkageResult, error) {
+	return nil, errors.New("RevealSpecificKeyLinkage not implemented in ExampleWallet")
+}
+
+func AcquireCertificate(ctx context.Context, args wallet.AcquireCertificateArgs, originator string) (*wallet.Certificate, error) {
+	return nil, errors.New("AcquireCertificate not implemented in ExampleWallet")
+}
+
+func ListCertificates(ctx context.Context, args wallet.ListCertificatesArgs, originator string) (*wallet.ListCertificatesResult, error) {
+	return nil, errors.New("ListCertificates not implemented in ExampleWallet")
+}
+
+func ProveCertificate(ctx context.Context, args wallet.ProveCertificateArgs, originator string) (*wallet.ProveCertificateResult, error) {
+	return nil, errors.New("ProveCertificate not implemented in ExampleWallet")
+}
+
+func RelinquishCertificate(ctx context.Context, args wallet.RelinquishCertificateArgs, originator string) (*wallet.RelinquishCertificateResult, error) {
+	return nil, errors.New("RelinquishCertificate not implemented in ExampleWallet")
+}
+
+func DiscoverByIdentityKey(ctx context.Context, args wallet.DiscoverByIdentityKeyArgs, originator string) (*wallet.DiscoverCertificatesResult, error) {
+	return nil, errors.New("DiscoverByIdentityKey not implemented in ExampleWallet")
+}
+
+func DiscoverByAttributes(ctx context.Context, args wallet.DiscoverByAttributesArgs, originator string) (*wallet.DiscoverCertificatesResult, error) {
+	return nil, errors.New("DiscoverByAttributes not implemented in ExampleWallet")
+}
+
+func IsAuthenticated(ctx context.Context, args any, originator string) (*wallet.AuthenticatedResult, error) {
+	return nil, errors.New("IsAuthenticated not implemented in ExampleWallet")
+}
+
+func WaitForAuthentication(ctx context.Context, args any, originator string) (*wallet.AuthenticatedResult, error) {
+	return nil, errors.New("WaitForAuthentication not implemented in ExampleWallet")
+}
+
+func GetHeight(ctx context.Context, args any, originator string) (*wallet.GetHeightResult, error) {
+	return nil, errors.New("GetHeight not implemented in ExampleWallet")
+}
+
+func GetHeaderForHeight(ctx context.Context, args wallet.GetHeaderArgs, originator string) (*wallet.GetHeaderResult, error) {
+	return nil, errors.New("GetHeaderForHeight not implemented in ExampleWallet")
+}
+
+func GetNetwork(ctx context.Context, args any, originator string) (*wallet.GetNetworkResult, error) {
+	return nil, errors.New("GetNetwork not implemented in ExampleWallet")
+}
+
+func GetVersion(ctx context.Context, args any, originator string) (*wallet.GetVersionResult, error) {
+	return nil, errors.New("GetVersion not implemented in ExampleWallet")
+}
