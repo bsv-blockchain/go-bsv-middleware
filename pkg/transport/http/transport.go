@@ -67,6 +67,7 @@ func (r *responseRecorder) hasBeenWritten() bool {
 	return r.written
 }
 
+// WrapResponseWriter wraps the http.ResponseWriter to capture the status code and written state
 func WrapResponseWriter(w http.ResponseWriter) *responseRecorder {
 	return &responseRecorder{
 		ResponseWriter: w,
@@ -84,6 +85,7 @@ type TransportConfig struct {
 	OnCertificatesReceived func(string, []*certificates.VerifiableCertificate, *http.Request, http.ResponseWriter, func())
 }
 
+// Transport implements the auth.Transport interface for HTTP transport
 type Transport struct {
 	wallet                 interfaces.Wallet
 	sessionManager         auth.SessionManager
@@ -94,6 +96,7 @@ type Transport struct {
 	onCertificatesReceived func(string, []*certificates.VerifiableCertificate, *http.Request, http.ResponseWriter, func())
 }
 
+// New creates a new HTTP transport instance with the provided configuration
 func New(cfg TransportConfig) auth.Transport {
 	var logger *slog.Logger
 	if cfg.Logger != nil {
@@ -126,6 +129,7 @@ func (t *Transport) OnData(callback func(context.Context, *auth.AuthMessage) err
 	return nil
 }
 
+// GetRegisteredOnData retrieves the registered callback for incoming auth messages
 func (t *Transport) GetRegisteredOnData() (func(context.Context, *auth.AuthMessage) error, error) {
 	if t.messageCallback == nil {
 		return nil, errors.New("no callback registered")
@@ -213,6 +217,7 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 	}
 }
 
+// ParseAuthMessageFromRequest parses the auth message from the HTTP request
 func ParseAuthMessageFromRequest(req *http.Request) (*auth.AuthMessage, error) {
 	if req.URL.Path == "/.well-known/auth" && req.Method == http.MethodPost {
 		var message auth.AuthMessage
@@ -380,6 +385,7 @@ func writeVarInt(w *bytes.Buffer, n int) error {
 	return nil
 }
 
+// HasBeenWritten checks if the response writer has been written to
 func HasBeenWritten(w http.ResponseWriter) bool {
 	if rw, ok := w.(*responseRecorder); ok {
 		return rw.hasBeenWritten()

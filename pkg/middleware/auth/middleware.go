@@ -13,8 +13,7 @@ import (
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )
 
-type contextKey string
-
+// Middleware is a struct that holds the configuration for the BRC authentication middleware
 type Middleware struct {
 	wallet               interfaces.Wallet
 	peer                 *auth.Peer
@@ -24,6 +23,7 @@ type Middleware struct {
 	logger               *slog.Logger
 }
 
+// New creates a new instance of the BRC authentication middleware
 func New(cfg Config) (*Middleware, error) {
 	if cfg.Wallet == nil {
 		return nil, errors.New("wallet is required")
