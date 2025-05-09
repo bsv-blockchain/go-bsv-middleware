@@ -51,7 +51,6 @@ func New(cfg Config) (*Middleware, error) {
 	transportCfg := httptransport.TransportConfig{
 		Wallet:                 cfg.Wallet,
 		SessionManager:         sessionManager,
-		AllowUnauthenticated:   cfg.AllowUnauthenticated,
 		Logger:                 logger,
 		CertificatesToRequest:  cfg.CertificatesToRequest,
 		OnCertificatesReceived: cfg.OnCertificatesReceived,
@@ -60,9 +59,10 @@ func New(cfg Config) (*Middleware, error) {
 	t := httptransport.New(transportCfg)
 
 	peerCfg := &auth.PeerOptions{
-		Wallet:         cfg.Wallet,
-		Transport:      t,
-		SessionManager: sessionManager,
+		Wallet:                cfg.Wallet,
+		Transport:             t,
+		SessionManager:        sessionManager,
+		CertificatesToRequest: cfg.CertificatesToRequest,
 	}
 	peer := auth.NewPeer(peerCfg)
 

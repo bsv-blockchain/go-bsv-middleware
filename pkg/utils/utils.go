@@ -112,6 +112,101 @@ func PrepareGeneralRequestHeaders(ctx context.Context, walletInstance interfaces
 	return headers, nil
 }
 
+// PrepareGeneralRequestHeaders prepares the general request headers
+func PrepareCertificateResponseHeaders(ctx context.Context, walletInstance interfaces.Wallet, previousResponse *auth.AuthMessage, requestData RequestData) (map[string]string, error) {
+	serverIdentityKey := previousResponse.IdentityKey
+	serverNonce := previousResponse.InitialNonce
+
+	opts := wallet.GetPublicKeyArgs{IdentityKey: true}
+	clientIdentityKey, err := walletInstance.GetPublicKey(ctx, opts, "")
+	if err != nil {
+		return nil, errors.New("failed to get client identity key")
+	}
+
+	requestID := generateRandom()
+	encodedRequestID := base64.StdEncoding.EncodeToString(requestID)
+
+	newNonce, err := sdkUtils.CreateNonce(ctx, walletInstance, wallet.Counterparty{Type: wallet.CounterpartyTypeSelf})
+	if err != nil {
+		return nil, errors.New("failed to create new nonce")
+	}
+
+	var writer bytes.Buffer
+
+	writer.Write(requestID)
+
+	request := getOrPrepareTempRequest(requestData)
+	err = WriteRequestData(request, &writer)
+	if err != nil {
+		return nil, err
+	}
+
+	protocol := wallet.Protocol{SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty, Protocol: auth.AUTH_PROTOCOL_ID}
+
+	baseArgs := wallet.EncryptionArgs{
+		ProtocolID: protocol,
+		Counterparty: wallet.Counterparty{
+			Type:         wallet.CounterpartyTypeOther,
+			Counterparty: serverIdentityKey,
+		},
+		KeyID: fmt.Sprintf("%s %s", newNonce, serverNonce),
+	}
+	createSignatureArgs := wallet.CreateSignatureArgs{
+		EncryptionArgs: baseArgs,
+		Data:           writer.Bytes(),
+	}
+
+	signature, err := walletInstance.CreateSignature(ctx, createSignatureArgs, "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create signature, %w", err)
+	}
+	headers := map[string]string{
+		"x-bsv-auth-version":      "0.1",
+		"x-bsv-auth-identity-key": clientIdentityKey.PublicKey.ToDERHex(),
+		"x-bsv-auth-nonce":        newNonce,
+		"x-bsv-auth-your-nonce":   serverNonce,
+		"x-bsv-auth-signature":    hex.EncodeToString(signature.Signature.Serialize()),
+		"x-bsv-auth-request-id":   encodedRequestID,
+		"x-bsv-auth-message-type": "certificateResponse",
+	}
+
+	return headers, nil
+
+	// key, err := ec.PublicKeyFromString(serverIdentityKey)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to parse identity key, %w", err)
+	// }
+
+	// baseArgs := wallet.EncryptionArgs{
+	// 	ProtocolID: wallet.DefaultAuthProtocol,
+	// 	Counterparty: wallet.Counterparty{
+	// 		Type:         wallet.CounterpartyTypeOther,
+	// 		Counterparty: key,
+	// 	},
+	// 	KeyID: fmt.Sprintf("%s %s", newNonce, serverNonce),
+	// }
+	// createSignatureArgs := &wallet.CreateSignatureArgs{
+	// 	EncryptionArgs: baseArgs,
+	// 	Data:           writer.Bytes(),
+	// }
+
+	// signature, err := walletInstance.CreateSignature(createSignatureArgs, "")
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to create signature, %w", err)
+	// }
+
+	// headers := map[string]string{
+	// 	"x-bsv-auth-version":      "0.1",
+	// 	"x-bsv-auth-identity-key": clientIdentityKey.PublicKey.ToDERHex(),
+	// 	"x-bsv-auth-nonce":        newNonce,
+	// 	"x-bsv-auth-your-nonce":   serverNonce,
+	// 	"x-bsv-auth-signature":    hex.EncodeToString(signature.Signature.Serialize()),
+	// 	"x-bsv-auth-request-id":   encodedRequestID,
+	// }
+
+	// return headers, nil
+}
+
 // WriteRequestData writes the request data into a buffer
 func WriteRequestData(request *http.Request, writer *bytes.Buffer) error {
 	err := WriteVarIntNum(writer, len(request.Method))

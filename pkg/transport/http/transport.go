@@ -79,7 +79,6 @@ func WrapResponseWriter(w http.ResponseWriter) *responseRecorder {
 type TransportConfig struct {
 	Wallet                 interfaces.Wallet
 	SessionManager         auth.SessionManager
-	AllowUnauthenticated   bool
 	Logger                 *slog.Logger
 	CertificatesToRequest  *utils.RequestedCertificateSet
 	OnCertificatesReceived func(string, []*certificates.VerifiableCertificate, *http.Request, http.ResponseWriter, func())
@@ -89,7 +88,6 @@ type TransportConfig struct {
 type Transport struct {
 	wallet                 interfaces.Wallet
 	sessionManager         auth.SessionManager
-	allowUnauthenticated   bool
 	logger                 *slog.Logger
 	messageCallback        func(context.Context, *auth.AuthMessage) error
 	certificatesToRequest  *utils.RequestedCertificateSet
@@ -105,12 +103,9 @@ func New(cfg TransportConfig) auth.Transport {
 		logger = slog.New(slog.DiscardHandler)
 	}
 
-	logger.Info(fmt.Sprintf("Creating HTTP transport with allowUnauthenticated = %t", cfg.AllowUnauthenticated))
-
 	return &Transport{
 		wallet:                 cfg.Wallet,
 		sessionManager:         cfg.SessionManager,
-		allowUnauthenticated:   cfg.AllowUnauthenticated,
 		logger:                 logger,
 		certificatesToRequest:  cfg.CertificatesToRequest,
 		onCertificatesReceived: cfg.OnCertificatesReceived,
