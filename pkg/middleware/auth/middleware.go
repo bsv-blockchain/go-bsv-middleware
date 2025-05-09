@@ -3,13 +3,16 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 	httptransport "github.com/bsv-blockchain/go-bsv-middleware/pkg/transport/http"
 	"github.com/bsv-blockchain/go-sdk/auth"
+	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )
 
@@ -138,6 +141,9 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 			case errors.Is(err, auth.ErrNotAuthenticated):
 				statusCode = http.StatusUnauthorized
 				errMsg = "Authentication failed"
+			case errors.Is(err, auth.ErrMissingCertificate):
+				statusCode = http.StatusBadRequest
+				errMsg = prepareMissingCertificateTypesErrorMsg(m.peer.CertificatesToRequest.CertificateTypes)
 			case errors.Is(err, auth.ErrInvalidNonce):
 				statusCode = http.StatusBadRequest
 				errMsg = "Invalid nonce"
@@ -161,4 +167,50 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 			next.ServeHTTP(wrappedWriter, r)
 		}
 	})
+}
+
+// prepareMissingCertificateTypesError creates a formatted error message for missing certificate types
+// It accepts a RequestedCertificateTypeIDAndFieldList (map of type -> fields) and formats it into a readable error
+func prepareMissingCertificateTypesErrorMsg(missingCertTypes sdkUtils.RequestedCertificateTypeIDAndFieldList) string {
+	if len(missingCertTypes) == 0 {
+		return ""
+	}
+
+	var typesWithFields []string
+	var typesWithoutFields []string
+
+	// Iterate through the map of certificate types and their fields
+	for certType, fields := range missingCertTypes {
+		typeName := getReadableCertTypeName(certType)
+
+		if len(fields) > 0 {
+			fieldStr := fmt.Sprintf("%s (fields: %s)", typeName, strings.Join(fields, ", "))
+			typesWithFields = append(typesWithFields, fieldStr)
+		} else {
+			typesWithoutFields = append(typesWithoutFields, typeName)
+		}
+	}
+
+	// Use a more detailed message if we have field information
+	if len(typesWithFields) > 0 {
+		if len(typesWithoutFields) > 0 {
+			// Combine types with fields and types without fields
+			allMissing := append(typesWithFields, typesWithoutFields...)
+			return fmt.Sprintf("Missing required certificates: %s", strings.Join(allMissing, "; "))
+		}
+		return fmt.Sprintf("Missing required certificates with fields: %s", strings.Join(typesWithFields, "; "))
+	}
+
+	// Simple message when no field information is available
+	return fmt.Sprintf("Missing required certificates: %s", strings.Join(typesWithoutFields, ", "))
+}
+
+// getReadableCertTypeName returns a more readable version of certificate type ID
+// Certificate type IDs are often base64 encoded and difficult to read
+func getReadableCertTypeName(certTypeID string) string {
+	// If the certificate type ID looks like a base64 string, use a shortened version
+	if len(certTypeID) > 16 && !strings.Contains(certTypeID, " ") {
+		return certTypeID[:8] + "..." + certTypeID[len(certTypeID)-8:]
+	}
+	return certTypeID
 }
