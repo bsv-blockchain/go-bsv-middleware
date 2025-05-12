@@ -130,7 +130,8 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 			return
 		}
 
-		err = callback(ctx, authMsg)
+		//err = callback(ctx, authMsg)
+		err = callback(context.WithoutCancel(ctx), authMsg)
 		if err != nil {
 			m.logger.Error("Failed to process auth message", slog.String("error", err.Error()))
 
