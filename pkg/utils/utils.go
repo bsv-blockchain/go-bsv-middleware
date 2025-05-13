@@ -171,40 +171,6 @@ func PrepareCertificateResponseHeaders(ctx context.Context, walletInstance inter
 	}
 
 	return headers, nil
-
-	// key, err := ec.PublicKeyFromString(serverIdentityKey)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to parse identity key, %w", err)
-	// }
-
-	// baseArgs := wallet.EncryptionArgs{
-	// 	ProtocolID: wallet.DefaultAuthProtocol,
-	// 	Counterparty: wallet.Counterparty{
-	// 		Type:         wallet.CounterpartyTypeOther,
-	// 		Counterparty: key,
-	// 	},
-	// 	KeyID: fmt.Sprintf("%s %s", newNonce, serverNonce),
-	// }
-	// createSignatureArgs := &wallet.CreateSignatureArgs{
-	// 	EncryptionArgs: baseArgs,
-	// 	Data:           writer.Bytes(),
-	// }
-
-	// signature, err := walletInstance.CreateSignature(createSignatureArgs, "")
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to create signature, %w", err)
-	// }
-
-	// headers := map[string]string{
-	// 	"x-bsv-auth-version":      "0.1",
-	// 	"x-bsv-auth-identity-key": clientIdentityKey.PublicKey.ToDERHex(),
-	// 	"x-bsv-auth-nonce":        newNonce,
-	// 	"x-bsv-auth-your-nonce":   serverNonce,
-	// 	"x-bsv-auth-signature":    hex.EncodeToString(signature.Signature.Serialize()),
-	// 	"x-bsv-auth-request-id":   encodedRequestID,
-	// }
-
-	// return headers, nil
 }
 
 // WriteRequestData writes the request data into a buffer
