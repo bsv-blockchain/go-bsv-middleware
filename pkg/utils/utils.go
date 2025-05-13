@@ -72,7 +72,10 @@ func PrepareGeneralRequestHeaders(ctx context.Context, walletInstance interfaces
 
 	var writer bytes.Buffer
 
-	writer.Write(requestID)
+	_, err = writer.Write(requestID)
+	if err != nil {
+		return nil, errors.New("failed to write request ID")
+	}
 
 	request := getOrPrepareTempRequest(requestData)
 	err = WriteRequestData(request, &writer)
@@ -112,7 +115,7 @@ func PrepareGeneralRequestHeaders(ctx context.Context, walletInstance interfaces
 	return headers, nil
 }
 
-// PrepareGeneralRequestHeaders prepares the general request headers
+// PrepareCertificateResponseHeaders prepares the general request headers
 func PrepareCertificateResponseHeaders(ctx context.Context, walletInstance interfaces.Wallet, previousResponse *auth.AuthMessage, requestData RequestData) (map[string]string, error) {
 	serverIdentityKey := previousResponse.IdentityKey
 	serverNonce := previousResponse.InitialNonce
@@ -133,7 +136,10 @@ func PrepareCertificateResponseHeaders(ctx context.Context, walletInstance inter
 
 	var writer bytes.Buffer
 
-	writer.Write(requestID)
+	_, err = writer.Write(requestID)
+	if err != nil {
+		return nil, errors.New("failed to write request ID")
+	}
 
 	request := getOrPrepareTempRequest(requestData)
 	err = WriteRequestData(request, &writer)
@@ -179,13 +185,19 @@ func WriteRequestData(request *http.Request, writer *bytes.Buffer) error {
 	if err != nil {
 		return errors.New("failed to write method length")
 	}
-	writer.Write([]byte(request.Method))
+	_, err = writer.Write([]byte(request.Method))
+	if err != nil {
+		return errors.New("failed to write method")
+	}
 
 	err = WriteVarIntNum(writer, len(request.URL.Path))
 	if err != nil {
 		return errors.New("failed to write path length")
 	}
-	writer.Write([]byte(request.URL.Path))
+	_, err = writer.Write([]byte(request.URL.Path))
+	if err != nil {
+		return errors.New("failed to write path")
+	}
 
 	query := request.URL.RawQuery
 	if len(query) > 0 {
@@ -194,7 +206,10 @@ func WriteRequestData(request *http.Request, writer *bytes.Buffer) error {
 		if err != nil {
 			return errors.New("failed to write query length")
 		}
-		writer.Write([]byte(query))
+		_, err = writer.Write([]byte(query))
+		if err != nil {
+			return errors.New("failed to write query")
+		}
 	} else {
 		err = WriteVarIntNum(writer, -1)
 		if err != nil {
@@ -214,14 +229,22 @@ func WriteRequestData(request *http.Request, writer *bytes.Buffer) error {
 		if err != nil {
 			return errors.New("failed to write header key length")
 		}
-		writer.Write(headerKeyBytes)
+
+		_, err = writer.Write(headerKeyBytes)
+		if err != nil {
+			return errors.New("failed to write header key")
+		}
 
 		headerValueBytes := []byte(header[1])
 		err = WriteVarIntNum(writer, len(headerValueBytes))
 		if err != nil {
 			return errors.New("failed to write header value length")
 		}
-		writer.Write(headerValueBytes)
+
+		_, err = writer.Write(headerValueBytes)
+		if err != nil {
+			return errors.New("failed to write header value")
+		}
 	}
 
 	err = WriteBodyToBuffer(request, writer)
@@ -286,7 +309,12 @@ func WriteBodyToBuffer(req *http.Request, buf *bytes.Buffer) error {
 		if err != nil {
 			return errors.New("failed to write body length")
 		}
-		buf.Write(body)
+
+		_, err = buf.Write(body)
+		if err != nil {
+			return errors.New("failed to write body")
+		}
+
 		return nil
 	}
 

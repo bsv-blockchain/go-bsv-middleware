@@ -60,7 +60,11 @@ func (r *responseRecorder) WriteHeader(code int) {
 
 func (r *responseRecorder) Write(b []byte) (int, error) {
 	r.written = true
-	return r.ResponseWriter.Write(b)
+	n, err := r.ResponseWriter.Write(b)
+	if err != nil {
+		return n, fmt.Errorf("failed to write response: %w", err)
+	}
+	return n, nil
 }
 
 func (r *responseRecorder) hasBeenWritten() bool {
@@ -174,7 +178,11 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 		}
 
 		resp.Header().Set("Content-Type", "application/json")
-		return json.NewEncoder(resp).Encode(message)
+		if err := json.NewEncoder(resp).Encode(message); err != nil {
+			return fmt.Errorf("failed to encode message to JSON: %w", err)
+		}
+
+		return nil
 
 	case auth.MessageTypeGeneral:
 		req, _ := ctx.Value(RequestKey).(*http.Request)
@@ -206,6 +214,9 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 			next()
 		}
 		return nil
+
+	case auth.MessageTypeCertificateRequest, auth.MessageTypeInitialRequest:
+		panic("CertificateRequest and InitialRequest are not supported in Send method")
 
 	default:
 		return fmt.Errorf("unsupported message type: %s", message.MessageType)
@@ -277,7 +288,10 @@ func BuildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid request ID format: %w", err)
 	}
-	writer.Write(requestIDBytes)
+	_, err = writer.Write(requestIDBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write request ID: %w", err)
+	}
 
 	write := func(n int, desc string) error {
 		if err := writeVarInt(writer, n); err != nil {
@@ -289,7 +303,11 @@ func BuildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 	if err := write(len(req.Method), "method length"); err != nil {
 		return nil, err
 	}
-	writer.WriteString(req.Method)
+
+	_, err = writer.WriteString(req.Method)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write method: %w", err)
+	}
 
 	path := req.URL.Path
 	if path == "" {
@@ -300,7 +318,11 @@ func BuildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 		if err := write(len(path), "path length"); err != nil {
 			return nil, err
 		}
-		writer.WriteString(path)
+
+		_, err = writer.WriteString(path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write path: %w", err)
+		}
 	}
 
 	query := req.URL.RawQuery
@@ -312,7 +334,11 @@ func BuildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 		if err := write(len(query), "query length"); err != nil {
 			return nil, err
 		}
-		writer.WriteString(query)
+
+		_, err = writer.WriteString(query)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write query: %w", err)
+		}
 	}
 
 	includedHeaders := [][]string{}
@@ -337,12 +363,20 @@ func BuildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 		if err := write(len(header[0]), "header key length"); err != nil {
 			return nil, err
 		}
-		writer.WriteString(header[0])
+
+		_, err = writer.WriteString(header[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to write header key: %w", err)
+		}
 
 		if err := write(len(header[1]), "header value length"); err != nil {
 			return nil, err
 		}
-		writer.WriteString(header[1])
+
+		_, err = writer.WriteString(header[1])
+		if err != nil {
+			return nil, fmt.Errorf("failed to write header value: %w", err)
+		}
 	}
 
 	if req.Body != nil {
@@ -357,7 +391,11 @@ func BuildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 			if err := write(len(body), "body length"); err != nil {
 				return nil, err
 			}
-			writer.Write(body)
+
+			_, err = writer.Write(body)
+			if err != nil {
+				return nil, fmt.Errorf("failed to write body: %w", err)
+			}
 		} else {
 			if err := write(-1, "empty body marker"); err != nil {
 				return nil, err
