@@ -22,4 +22,4 @@ require (
 // Temporary until we publish the module in stable version
 replace github.com/bsv-blockchain/go-bsv-middleware => ../
 
-replace github.com/bsv-blockchain/go-sdk => ../../gorilla/go-sdk
+replace github.com/bsv-blockchain/go-sdk => github.com/b-open-io/go-sdk v1.1.25-0.20250512182945-5fe49978cd05
