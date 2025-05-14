@@ -58,7 +58,10 @@ func (m *MockableSessionManager) UpdateSession(session *auth.PeerSession) {
 		return
 	}
 
-	m.AddSession(session)
+	err := m.AddSession(session)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // GetSession return mocked value or get a session from the manager.

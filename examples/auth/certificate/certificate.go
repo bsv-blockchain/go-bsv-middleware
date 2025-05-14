@@ -17,6 +17,7 @@ import (
 	exampleWallet "github.com/bsv-blockchain/go-bsv-middleware-examples/example-wallet"
 	middleware "github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/auth"
 
+
 	"github.com/bsv-blockchain/go-sdk/auth/certificates"
 	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
 	"github.com/bsv-blockchain/go-sdk/wallet"

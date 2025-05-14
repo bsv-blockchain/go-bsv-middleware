@@ -37,12 +37,15 @@ func TestAuthMiddleware_CertificateHandling(t *testing.T) {
 
 		onCertificatesReceived := func(senderPublicKey string, certs []*certificates.VerifiableCertificate, req *http.Request, res http.ResponseWriter, next func()) {
 
-			if certs != nil && len(certs) > 0 && next != nil {
+			if len(certs) > 0 && next != nil {
 				next()
 			} else {
 				res.Header().Set("Content-Type", "text/plain")
 				res.WriteHeader(http.StatusForbidden)
-				res.Write([]byte("Invalid certificate"))
+				_, err = res.Write([]byte("Invalid certificate"))
+				if err != nil {
+					t.Errorf("Failed to write response: %v", err)
+				}
 			}
 		}
 
@@ -81,7 +84,7 @@ func TestAuthMiddleware_CertificateHandling(t *testing.T) {
 
 		onCertificatesReceived := func(senderPublicKey string, certs []*certificates.VerifiableCertificate, req *http.Request, res http.ResponseWriter, next func()) {
 
-			if certs != nil && len(certs) > 0 && next != nil {
+			if len(certs) > 0 && next != nil {
 				next()
 			} else {
 				res.Header().Set("Content-Type", "text/plain")
@@ -126,7 +129,7 @@ func TestAuthMiddleware_CertificateHandling(t *testing.T) {
 		onCertificatesReceived := func(senderPublicKey string, certs []*certificates.VerifiableCertificate, req *http.Request, res http.ResponseWriter, next func()) {
 			receivedCertificateFlag = true
 
-			if certs != nil && len(certs) > 0 && next != nil {
+			if len(certs) > 0 && next != nil {
 				next()
 			} else {
 				res.Header().Set("Content-Type", "text/plain")
@@ -244,7 +247,7 @@ func TestAuthMiddleware_InvalidCertificateHandling(t *testing.T) {
 	}
 
 	onCertificatesReceived := func(senderPublicKey string, certs []*certificates.VerifiableCertificate, req *http.Request, res http.ResponseWriter, next func()) {
-		if certs == nil || len(certs) == 0 {
+		if len(certs) == 0 {
 			res.Header().Set("Content-Type", "text/plain")
 			res.WriteHeader(http.StatusForbidden)
 			res.Write([]byte("No valid certificates"))
