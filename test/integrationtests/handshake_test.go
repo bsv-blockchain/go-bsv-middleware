@@ -2,11 +2,9 @@ package integrationtests
 
 import (
 	"errors"
-
+	"io"
 	"net/http"
 	"testing"
-
-	"io"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/test/assert"
 	"github.com/bsv-blockchain/go-bsv-middleware/test/mocks"
