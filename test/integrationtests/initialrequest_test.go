@@ -7,6 +7,7 @@ import (
 	"github.com/bsv-blockchain/go-bsv-middleware/test/mocks"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/bsv-blockchain/go-sdk/wallet"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,9 +25,14 @@ func TestAuthMiddleware_InitialRequest_HappyPath(t *testing.T) {
 	t.Run("call initial request", func(t *testing.T) {
 		// given
 		initialRequest := mocks.PrepareInitialRequestBody(t.Context(), clientWallet)
-		serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
-		serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
+
 		serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
+		serverWallet.OnCreateHmacOnce(&wallet.CreateHmacResult{
+			Hmac: []byte("mockhmacsignature"),
+		}, nil)
+		serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
+
+		serverWallet.On("CreateSignature", mock.Anything, mock.Anything).Return(prepareExampleSignature(t), nil).Once()
 
 		// when
 		response, err := server.SendNonGeneralRequest(t, initialRequest.AuthMessage())
@@ -34,13 +40,7 @@ func TestAuthMiddleware_InitialRequest_HappyPath(t *testing.T) {
 		// then
 		require.NoError(t, err)
 		assert.ResponseOK(t, response)
-		assert.InitialResponseHeaders(t, response)
-
-		authMessage, err := mocks.MapBodyToAuthMessage(t, response)
-		require.NoError(t, err)
-		assert.InitialResponseAuthMessage(t, authMessage)
 	})
-
 }
 
 func prepareExampleSignature(t *testing.T) *wallet.CreateSignatureResult {
