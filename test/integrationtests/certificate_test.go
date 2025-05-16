@@ -413,7 +413,6 @@ func TestAuthMiddleware_CertificateHandling(t *testing.T) {
 		require.Equal(t, http.StatusOK, certResponse.StatusCode, "Certificate submission should return 200 OK")
 		require.True(t, receivedCertificateFlag, "Certificate received callback should be called")
 
-
 		request, err := http.NewRequest(http.MethodGet, server.URL()+"/ping", nil)
 		require.NoError(t, err)
 		err = mocks.PrepareGeneralRequestHeaders(t.Context(), clientWallet, authMessage, request)
