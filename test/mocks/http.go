@@ -168,6 +168,7 @@ func (s *MockHTTPServer) SendCertificateResponse(t *testing.T, clientWallet inte
 	return resp, nil
 }
 
+// SendCertificateResponseWithSetNonces sends a certificate response with set nonces to the server
 func (s *MockHTTPServer) SendCertificateResponseWithSetNonces(t *testing.T, clientWallet interfaces.Wallet, certificates []*certificates.VerifiableCertificate, nonce, yourNonce string) (*http.Response, error) {
 	initialRequest := PrepareInitialRequestBody(t.Context(), clientWallet)
 	response, err := s.SendNonGeneralRequest(t, initialRequest.AuthMessage())

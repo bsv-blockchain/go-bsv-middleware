@@ -4,17 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/test/mocks"
 	"github.com/stretchr/testify/require"
-)
-
-var (
-	initialResponseHeaders = map[string]string{
-		"x-bsv-auth-version":      "0.1",
-		"x-bsv-auth-message-type": "initialResponse",
-		"x-bsv-auth-identity-key": mocks.ServerIdentityKey,
-		"x-bsv-auth-your-nonce":   mocks.ClientNonces[0],
-	}
 )
 
 // InitialResponseHeaders checks if the response headers are correct for the initial response.

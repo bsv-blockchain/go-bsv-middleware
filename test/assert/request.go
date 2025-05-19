@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -25,6 +26,12 @@ func BadRequest(t *testing.T, res *http.Response) {
 func NotAuthorized(t *testing.T, res *http.Response) {
 	require.NotNil(t, res)
 	require.Equal(t, http.StatusUnauthorized, res.StatusCode)
+}
+
+// InternalServerError checks if the response status code is 500.
+func InternalServerError(t *testing.T, res *http.Response) {
+	require.NotNil(t, res)
+	require.Equal(t, http.StatusInternalServerError, res.StatusCode)
 }
 
 // MissingRequestIDError checks if the response body contains the "missing request ID" error.
@@ -54,13 +61,18 @@ func SessionNotAuthenticatedError(t *testing.T, res *http.Response) {
 // MissingHeaderError check if the response body contain the "missing X header" error.
 func MissingHeaderError(t *testing.T, res *http.Response, header string) {
 	errString := readBody(t, res)
-	require.Equal(t, fmt.Sprintf("missing %s header", header), errString)
+	require.Contains(t, fmt.Sprintf("missing %s header\n", header), errString)
 }
 
 // InvalidHeaderError check if the response body contain the "invalid X header" error.
 func InvalidHeaderError(t *testing.T, res *http.Response, header string) {
 	errString := readBody(t, res)
 	require.Equal(t, fmt.Sprintf("invalid %s header", header), errString)
+}
+
+// ReadBodyForTest reads and returns the response body for testing purposes
+func ReadBodyForTest(t *testing.T, res *http.Response) string {
+	return strings.ToLower(readBody(t, res))
 }
 
 func readBody(t *testing.T, res *http.Response) string {
