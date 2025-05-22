@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/test/assert"
-	"github.com/bsv-blockchain/go-bsv-middleware/test/mocks"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/test/mocks"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/test/testutils"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 	"github.com/stretchr/testify/require"
 )
@@ -35,7 +35,7 @@ func TestHandshake_HappyPath(t *testing.T) {
 
 	// then
 	require.NoError(t, err)
-	assert.ResponseOK(t, response)
+	testutils.ResponseOK(t, response)
 }
 
 func TestHandshake_MissingInitialNonce(t *testing.T) {

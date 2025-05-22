@@ -14,7 +14,6 @@ import (
 	httptransport "github.com/bsv-blockchain/go-bsv-middleware/pkg/transport/http"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
-	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )
 
 // Middleware is an HTTP middleware that handles authentication messages.
@@ -114,21 +113,12 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 			}
 		}
 
+		// At this point, authMsg.IdentityKey should always be set by ParseAuthMessageFromRequest
+		// If it's not set, that's an internal error
 		if authMsg.IdentityKey == nil {
-			identityKeyHeader := r.Header.Get(constants.HeaderIdentityKey)
-			if identityKeyHeader != "" {
-				pubKey, err := ec.PublicKeyFromString(identityKeyHeader)
-				if err != nil {
-					m.logger.Error("Failed to parse identity key", slog.String("error", err.Error()))
-					http.Error(wrappedWriter, "Invalid identity key format", http.StatusBadRequest)
-					return
-				}
-				authMsg.IdentityKey = pubKey
-			} else {
-				m.logger.Error("Auth message present but missing identity key")
-				http.Error(wrappedWriter, "Missing identity key in authentication", http.StatusBadRequest)
-				return
-			}
+			m.logger.Error("Internal error: ParseAuthMessageFromRequest returned message with nil IdentityKey")
+			http.Error(wrappedWriter, "Internal authentication error", http.StatusInternalServerError)
+			return
 		}
 
 		callback, err := m.transport.GetRegisteredOnData()

@@ -216,6 +216,20 @@ func ParseAuthMessageFromRequest(req *http.Request) (*auth.AuthMessage, error) {
 		if err := json.NewDecoder(req.Body).Decode(&message); err != nil {
 			return nil, fmt.Errorf("invalid request body: %w", err)
 		}
+
+		if message.IdentityKey == nil {
+			identityKeyHeader := req.Header.Get(constants.HeaderIdentityKey)
+			if identityKeyHeader != "" {
+				pubKey, err := primitives.PublicKeyFromString(identityKeyHeader)
+				if err != nil {
+					return nil, fmt.Errorf("invalid identity key format in header: %w", err)
+				}
+				message.IdentityKey = pubKey
+			} else {
+				return nil, errors.New("missing identity key in both request body and header")
+			}
+		}
+
 		return &message, nil
 	}
 

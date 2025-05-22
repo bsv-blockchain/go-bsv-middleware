@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/test/assert"
-	"github.com/bsv-blockchain/go-bsv-middleware/test/mocks"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/test/mocks"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/test/testutils"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/auth/certificates"
 	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
@@ -221,7 +221,7 @@ func TestAuthMiddleware_InvalidCertificateHandling(t *testing.T) {
 			require.NoError(t, err)
 			response, err := server.SendGeneralRequest(t, request)
 			require.NoError(t, err)
-			assert.NotAuthorized(t, response)
+			testutils.NotAuthorized(t, response)
 		})
 	}
 }
@@ -326,7 +326,7 @@ func TestAuthMiddleware_CertificateHandling(t *testing.T) {
 
 		response, err = server.SendGeneralRequest(t, request)
 		require.NoError(t, err)
-		assert.BadRequest(t, response)
+		testutils.BadRequest(t, response)
 	})
 
 	t.Run("send certificate and gain access", func(t *testing.T) {

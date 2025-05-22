@@ -3,8 +3,8 @@ package integrationtests
 import (
 	"testing"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/test/assert"
-	"github.com/bsv-blockchain/go-bsv-middleware/test/mocks"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/test/mocks"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/test/testutils"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 	"github.com/stretchr/testify/mock"
@@ -39,7 +39,7 @@ func TestAuthMiddleware_InitialRequest_HappyPath(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assert.ResponseOK(t, response)
+		testutils.ResponseOK(t, response)
 	})
 }
 

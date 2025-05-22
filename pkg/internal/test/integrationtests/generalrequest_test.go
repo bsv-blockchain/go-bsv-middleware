@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/constants"
-	"github.com/bsv-blockchain/go-bsv-middleware/test/assert"
-	"github.com/bsv-blockchain/go-bsv-middleware/test/mocks"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/test/mocks"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/test/testutils"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 	"github.com/stretchr/testify/require"
@@ -33,7 +33,7 @@ func TestAuthMiddleware_GeneralRequest_AllowUnauthenticated(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assert.NotAuthorized(t, response)
+		testutils.NotAuthorized(t, response)
 	})
 
 	t.Run("call general request without auth headers - allowUnauthenticated=true", func(t *testing.T) {
@@ -52,7 +52,7 @@ func TestAuthMiddleware_GeneralRequest_AllowUnauthenticated(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assert.ResponseOK(t, response)
+		testutils.ResponseOK(t, response)
 	})
 }
 
@@ -77,7 +77,7 @@ func TestAuthMiddleware_GeneralRequest_Signature(t *testing.T) {
 
 	response, err := server.SendNonGeneralRequest(t, initialRequest.AuthMessage())
 	require.NoError(t, err)
-	assert.ResponseOK(t, response)
+	testutils.ResponseOK(t, response)
 
 	authMessage, err := mocks.MapBodyToAuthMessage(t, response)
 	require.NoError(t, err)
@@ -100,8 +100,8 @@ func TestAuthMiddleware_GeneralRequest_Signature(t *testing.T) {
 
 	// then
 	require.NoError(t, err)
-	assert.InternalServerError(t, response)
-	require.Contains(t, assert.ReadBodyForTest(t, response), "invalid signature in general message")
+	testutils.InternalServerError(t, response)
+	require.Contains(t, testutils.ReadBodyForTest(t, response), "invalid signature in general message")
 }
 
 func TestAuthMiddleware_GeneralRequest_SessionManager(t *testing.T) {
@@ -126,7 +126,7 @@ func TestAuthMiddleware_GeneralRequest_SessionManager(t *testing.T) {
 
 		response, err := server.SendNonGeneralRequest(t, initialRequest.AuthMessage())
 		require.NoError(t, err)
-		assert.ResponseOK(t, response)
+		testutils.ResponseOK(t, response)
 
 		authMessage, err := mocks.MapBodyToAuthMessage(t, response)
 		require.NoError(t, err)
@@ -143,8 +143,8 @@ func TestAuthMiddleware_GeneralRequest_SessionManager(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assert.NotAuthorized(t, response)
-		require.Contains(t, assert.ReadBodyForTest(t, response), "session not found")
+		testutils.NotAuthorized(t, response)
+		require.Contains(t, testutils.ReadBodyForTest(t, response), "session not found")
 	})
 
 	t.Run("session not authenticated", func(t *testing.T) {
@@ -168,7 +168,7 @@ func TestAuthMiddleware_GeneralRequest_SessionManager(t *testing.T) {
 
 		response, err := server.SendNonGeneralRequest(t, initialRequest.AuthMessage())
 		require.NoError(t, err)
-		assert.ResponseOK(t, response)
+		testutils.ResponseOK(t, response)
 
 		authMessage, err := mocks.MapBodyToAuthMessage(t, response)
 		require.NoError(t, err)
@@ -191,8 +191,8 @@ func TestAuthMiddleware_GeneralRequest_SessionManager(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assert.NotAuthorized(t, response)
-		require.Contains(t, assert.ReadBodyForTest(t, response), "authentication failed")
+		testutils.NotAuthorized(t, response)
+		require.Contains(t, testutils.ReadBodyForTest(t, response), "authentication failed")
 
 	})
 }
@@ -232,7 +232,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		response, err := server.SendNonGeneralRequest(t, initialRequest.AuthMessage())
 		require.NoError(t, err)
-		assert.ResponseOK(t, response)
+		testutils.ResponseOK(t, response)
 
 		authMessage, err := mocks.MapBodyToAuthMessage(t, response)
 		require.NoError(t, err)
@@ -258,8 +258,8 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assert.NotAuthorized(t, response)
-		require.Contains(t, assert.ReadBodyForTest(t, response), "authentication required")
+		testutils.NotAuthorized(t, response)
+		require.Contains(t, testutils.ReadBodyForTest(t, response), "authentication required")
 	})
 
 	t.Run("no identity key", func(t *testing.T) {
@@ -283,7 +283,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		response, err := server.SendNonGeneralRequest(t, initialRequest.AuthMessage())
 		require.NoError(t, err)
-		assert.ResponseOK(t, response)
+		testutils.ResponseOK(t, response)
 
 		authMessage, err := mocks.MapBodyToAuthMessage(t, response)
 		require.NoError(t, err)
@@ -309,8 +309,8 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assert.BadRequest(t, response)
-		assert.MissingHeaderError(t, response, "identity key")
+		testutils.BadRequest(t, response)
+		testutils.MissingHeaderError(t, response, "identity key")
 	})
 
 	t.Run("no nonce", func(t *testing.T) {
@@ -334,7 +334,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		response, err := server.SendNonGeneralRequest(t, initialRequest.AuthMessage())
 		require.NoError(t, err)
-		assert.ResponseOK(t, response)
+		testutils.ResponseOK(t, response)
 
 		authMessage, err := mocks.MapBodyToAuthMessage(t, response)
 		require.NoError(t, err)
@@ -360,8 +360,8 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assert.NotAuthorized(t, response)
-		require.Contains(t, assert.ReadBodyForTest(t, response), "authentication failed")
+		testutils.NotAuthorized(t, response)
+		require.Contains(t, testutils.ReadBodyForTest(t, response), "authentication failed")
 	})
 
 	t.Run("no your nonce", func(t *testing.T) {
@@ -385,7 +385,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		response, err := server.SendNonGeneralRequest(t, initialRequest.AuthMessage())
 		require.NoError(t, err)
-		assert.ResponseOK(t, response)
+		testutils.ResponseOK(t, response)
 
 		authMessage, err := mocks.MapBodyToAuthMessage(t, response)
 		require.NoError(t, err)
@@ -411,8 +411,8 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assert.NotAuthorized(t, response)
-		require.Contains(t, assert.ReadBodyForTest(t, response), "authentication failed")
+		testutils.NotAuthorized(t, response)
+		require.Contains(t, testutils.ReadBodyForTest(t, response), "authentication failed")
 	})
 
 	t.Run("no signature", func(t *testing.T) {
@@ -436,7 +436,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		response, err := server.SendNonGeneralRequest(t, initialRequest.AuthMessage())
 		require.NoError(t, err)
-		assert.ResponseOK(t, response)
+		testutils.ResponseOK(t, response)
 
 		authMessage, err := mocks.MapBodyToAuthMessage(t, response)
 		require.NoError(t, err)
@@ -462,8 +462,8 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assert.NotAuthorized(t, response)
-		require.Contains(t, assert.ReadBodyForTest(t, response), "authentication failed")
+		testutils.NotAuthorized(t, response)
+		require.Contains(t, testutils.ReadBodyForTest(t, response), "authentication failed")
 	})
 
 	t.Run("wrong signature format", func(t *testing.T) {
@@ -487,7 +487,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		response, err := server.SendNonGeneralRequest(t, initialRequest.AuthMessage())
 		require.NoError(t, err)
-		assert.ResponseOK(t, response)
+		testutils.ResponseOK(t, response)
 
 		authMessage, err := mocks.MapBodyToAuthMessage(t, response)
 		require.NoError(t, err)
@@ -512,8 +512,8 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assert.BadRequest(t, response)
-		require.Contains(t, assert.ReadBodyForTest(t, response), "invalid signature format")
+		testutils.BadRequest(t, response)
+		require.Contains(t, testutils.ReadBodyForTest(t, response), "invalid signature format")
 	})
 
 	t.Run("wrong nonce format", func(t *testing.T) {
@@ -537,7 +537,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		response, err := server.SendNonGeneralRequest(t, initialRequest.AuthMessage())
 		require.NoError(t, err)
-		assert.ResponseOK(t, response)
+		testutils.ResponseOK(t, response)
 
 		authMessage, err := mocks.MapBodyToAuthMessage(t, response)
 		require.NoError(t, err)
@@ -562,8 +562,8 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assert.NotAuthorized(t, response)
-		require.Contains(t, assert.ReadBodyForTest(t, response), "authentication failed")
+		testutils.NotAuthorized(t, response)
+		require.Contains(t, testutils.ReadBodyForTest(t, response), "authentication failed")
 	})
 
 	t.Run("wrong your nonce format", func(t *testing.T) {
@@ -587,7 +587,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		response, err := server.SendNonGeneralRequest(t, initialRequest.AuthMessage())
 		require.NoError(t, err)
-		assert.ResponseOK(t, response)
+		testutils.ResponseOK(t, response)
 
 		authMessage, err := mocks.MapBodyToAuthMessage(t, response)
 		require.NoError(t, err)
@@ -612,8 +612,8 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assert.NotAuthorized(t, response)
-		require.Contains(t, assert.ReadBodyForTest(t, response), "authentication failed")
+		testutils.NotAuthorized(t, response)
+		require.Contains(t, testutils.ReadBodyForTest(t, response), "authentication failed")
 	})
 
 	t.Run("wrong version format", func(t *testing.T) {
@@ -637,7 +637,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		response, err := server.SendNonGeneralRequest(t, initialRequest.AuthMessage())
 		require.NoError(t, err)
-		assert.ResponseOK(t, response)
+		testutils.ResponseOK(t, response)
 
 		authMessage, err := mocks.MapBodyToAuthMessage(t, response)
 		require.NoError(t, err)
@@ -662,7 +662,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assert.InternalServerError(t, response)
-		require.Contains(t, assert.ReadBodyForTest(t, response), "invalid or unsupported message auth version")
+		testutils.InternalServerError(t, response)
+		require.Contains(t, testutils.ReadBodyForTest(t, response), "invalid or unsupported message auth version")
 	})
 }

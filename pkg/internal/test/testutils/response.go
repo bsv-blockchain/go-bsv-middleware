@@ -1,4 +1,4 @@
-package assert
+package testutils
 
 import (
 	"net/http"

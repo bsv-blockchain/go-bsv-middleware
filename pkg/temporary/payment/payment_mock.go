@@ -4,8 +4,6 @@ import (
 	"context"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
-	"github.com/bsv-blockchain/go-bsv-middleware/test/mocks"
-	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
@@ -22,14 +20,15 @@ type MockPaymentWallet struct {
 }
 
 // NewMockPaymentWallet creates a new payment-capable mock wallet
-func NewMockPaymentWallet(key *ec.PrivateKey) *MockPaymentWallet {
-	return &MockPaymentWallet{
-		Wallet: mocks.NewMockWallet(key),
-		InternalizeActionResult: wallet.InternalizeActionResult{
-			Accepted: true,
-		},
-	}
-}
+// Will be fixed when the wallet interface is replaced with go-sdk equivalents
+// func NewMockPaymentWallet(key *ec.PrivateKey) *MockPaymentWallet {
+// 	return &MockPaymentWallet{
+// 		Wallet: mocks.NewMockWallet(key),
+// 		InternalizeActionResult: wallet.InternalizeActionResult{
+// 			Accepted: true,
+// 		},
+// 	}
+// }
 
 // InternalizeAction implements wallet.PaymentInterface
 func (m *MockPaymentWallet) InternalizeAction(ctx context.Context, args wallet.InternalizeActionArgs) (wallet.InternalizeActionResult, error) {
