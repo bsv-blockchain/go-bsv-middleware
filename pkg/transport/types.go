@@ -12,4 +12,5 @@ var (
 	DefaultAuthProtocol = wallet.Protocol{SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty, Protocol: auth.AUTH_PROTOCOL_ID}
 )
 
+// AuthMessageHandler is a function type that handles authentication messages.
 type AuthMessageHandler func(context.Context, *auth.AuthMessage) error

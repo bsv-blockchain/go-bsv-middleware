@@ -25,12 +25,17 @@ import (
 
 type contextKey string
 
-const (
-	IdentityKey contextKey = "identity_key"
-	RequestKey  contextKey = "http_request"
-	ResponseKey contextKey = "http_response"
-	NextKey     contextKey = "http_next_handler"
-)
+// IdentityKey stores identity in context.
+const IdentityKey contextKey = "identity_key"
+
+// RequestKey stores request in context.
+const RequestKey contextKey = "http_request"
+
+// ResponseKey stores response writer in context.
+const ResponseKey contextKey = "http_response"
+
+// NextKey stores the next handler in context.
+const NextKey contextKey = "http_next_handler"
 
 type responseRecorder struct {
 	http.ResponseWriter
@@ -57,6 +62,7 @@ func (r *responseRecorder) hasBeenWritten() bool {
 	return r.written
 }
 
+// WrapResponseWriter wraps and tracks write status.
 func WrapResponseWriter(w http.ResponseWriter) *responseRecorder {
 	return &responseRecorder{
 		ResponseWriter: w,
@@ -64,6 +70,15 @@ func WrapResponseWriter(w http.ResponseWriter) *responseRecorder {
 	}
 }
 
+// HasBeenWritten checks if a response was written.
+func HasBeenWritten(w http.ResponseWriter) bool {
+	if rw, ok := w.(*responseRecorder); ok {
+		return rw.hasBeenWritten()
+	}
+	return false
+}
+
+// TransportConfig config for Transport.
 type TransportConfig struct {
 	Wallet                 interfaces.Wallet
 	SessionManager         auth.SessionManager
@@ -72,6 +87,7 @@ type TransportConfig struct {
 	OnCertificatesReceived auth.OnCertificateReceivedCallback
 }
 
+// Transport is an HTTP-based auth transport.
 type Transport struct {
 	wallet                 interfaces.Wallet
 	sessionManager         auth.SessionManager
@@ -81,6 +97,7 @@ type Transport struct {
 	onCertificatesReceived auth.OnCertificateReceivedCallback
 }
 
+// New creates a new Transport.
 func New(cfg TransportConfig) auth.Transport {
 	var logger *slog.Logger
 	if cfg.Logger != nil {
@@ -98,6 +115,7 @@ func New(cfg TransportConfig) auth.Transport {
 	}
 }
 
+// OnData sets callback for received messages.
 func (t *Transport) OnData(callback func(context.Context, *auth.AuthMessage) error) error {
 	if callback == nil {
 		return errors.New("callback cannot be nil")
@@ -112,6 +130,7 @@ func (t *Transport) OnData(callback func(context.Context, *auth.AuthMessage) err
 	return nil
 }
 
+// GetRegisteredOnData returns the current callback.
 func (t *Transport) GetRegisteredOnData() (func(context.Context, *auth.AuthMessage) error, error) {
 	if t.messageCallback == nil {
 		return nil, errors.New("no callback registered")
@@ -120,6 +139,7 @@ func (t *Transport) GetRegisteredOnData() (func(context.Context, *auth.AuthMessa
 	return t.messageCallback, nil
 }
 
+// Send writes an auth message via HTTP.
 func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 	if message.IdentityKey == nil {
 		return errors.New("message identity key cannot be nil")
@@ -210,6 +230,7 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 	}
 }
 
+// ParseAuthMessageFromRequest parses auth message from HTTP request.
 func ParseAuthMessageFromRequest(req *http.Request) (*auth.AuthMessage, error) {
 	if req.URL.Path == constants.WellKnownAuthPath && req.Method == http.MethodPost {
 		var message auth.AuthMessage
@@ -394,11 +415,4 @@ func writeVarInt(w *bytes.Buffer, n int) error {
 		return fmt.Errorf("failed to write variable integer: %w", err)
 	}
 	return nil
-}
-
-func HasBeenWritten(w http.ResponseWriter) bool {
-	if rw, ok := w.(*responseRecorder); ok {
-		return rw.hasBeenWritten()
-	}
-	return false
 }
