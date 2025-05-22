@@ -257,13 +257,13 @@ func createCertificateResponse(ctx context.Context, clientWallet wallet.Interfac
 	}
 	identityKey := identityPubKey.PublicKey
 
-	certificates, err := createVerifiableCertificates(identityKey)
+	certs, err := createVerifiableCertificates(identityKey)
 	if err != nil {
 		log.Printf("Failed to create certificates: %v", err)
 		return nil, err
 	}
 
-	certBytes, err := json.Marshal(certificates)
+	certBytes, err := json.Marshal(certs)
 	if err != nil {
 		log.Printf("Failed to marshal certificates: %v", err)
 		return nil, err
@@ -282,7 +282,7 @@ func createCertificateResponse(ctx context.Context, clientWallet wallet.Interfac
 		IdentityKey:  identityKey,
 		Nonce:        newNonce,
 		YourNonce:    authResponse.Nonce,
-		Certificates: certificates,
+		Certificates: certs,
 		Signature:    signature,
 	}, nil
 }
@@ -440,7 +440,8 @@ func onCertificatesReceivedFunc(
 			continue
 		}
 
-		if cert.Certificate.Type != "YWdlLXZlcmlmaWNhdGlvbg==" { // base64 encoded "age-verification"
+		// base64 encoded "age-verification"
+		if cert.Certificate.Type != "YWdlLXZlcmlmaWNhdGlvbg==" {
 			log.Printf("Unexpected certificate type: %s", cert.Certificate.Type)
 			continue
 		}

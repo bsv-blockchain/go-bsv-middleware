@@ -35,7 +35,7 @@ func New(cfg Config) (*Middleware, error) {
 
 	logger := cfg.Logger
 	if logger == nil {
-		logger = slog.New(slog.DiscardHandler)
+		logger = slog.Default()
 	}
 	middlewareLogger := logging.Child(logger, "auth-middleware")
 
@@ -105,7 +105,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 
 		if authMsg == nil {
 			if m.allowUnauthenticated {
-				r = r.WithContext(context.WithValue(r.Context(), httptransport.IdentityKey, "unknown"))
+				r = r.WithContext(context.WithValue(r.Context(), httptransport.IdentityKey, constants.UnknownParty))
 				next.ServeHTTP(wrappedWriter, r)
 				return
 			} else {

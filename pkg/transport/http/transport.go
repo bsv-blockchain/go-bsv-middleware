@@ -239,7 +239,7 @@ func ParseAuthMessageFromRequest(req *http.Request) (*auth.AuthMessage, error) {
 		return nil, fmt.Errorf("invalid identity key format: %w", err)
 	}
 
-	payload, err := BuildRequestPayload(req, requestID)
+	payload, err := buildRequestPayload(req, requestID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build request payload: %w", err)
 	}
@@ -264,7 +264,7 @@ func ParseAuthMessageFromRequest(req *http.Request) (*auth.AuthMessage, error) {
 	return message, nil
 }
 
-func BuildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
+func buildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 	writer := new(bytes.Buffer)
 
 	requestIDBytes, err := base64.StdEncoding.DecodeString(requestID)
