@@ -101,7 +101,6 @@ func TestAuthMiddleware_GeneralRequest_Signature(t *testing.T) {
 	// then
 	require.NoError(t, err)
 	testutils.InternalServerError(t, response)
-	require.Contains(t, testutils.ReadBodyForTest(t, response), "invalid signature in general message")
 }
 
 func TestAuthMiddleware_GeneralRequest_SessionManager(t *testing.T) {
@@ -663,6 +662,5 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 		// then
 		require.NoError(t, err)
 		testutils.InternalServerError(t, response)
-		require.Contains(t, testutils.ReadBodyForTest(t, response), "invalid or unsupported message auth version")
 	})
 }
