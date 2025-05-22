@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"log"
 	"log/slog"
 	"net/http"
@@ -26,39 +26,36 @@ const (
 )
 
 func main() {
-	fmt.Println("BSV Auth middleware - Demo")
+	log.Println("BSV Auth middleware - Demo")
 	logHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
 	logger := slog.New(logHandler)
 
 	sPrivKey, err := ec.PrivateKeyFromHex(serverPrivateKeyHex)
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to create server private key: %v", err)
 	}
 
-	serverWallet, err := exampleWallet.NewExampleWallet(exampleWallet.ExampleWalletArgs{
-		Type:       exampleWallet.ExampleWalletArgsTypePrivateKey,
-		PrivateKey: sPrivKey,
-	})
+	serverWallet, err := exampleWallet.NewExtendedProtoWallet(sPrivKey)
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to create server wallet: %v", err)
 	}
 
-	fmt.Println("✓ Server wallet created")
+	log.Println("✓ Server wallet created")
 
 	opts := middleware.Config{
 		AllowUnauthenticated: false,
 		Logger:               logger,
 		Wallet:               serverWallet,
 	}
-	middleware, err := middleware.New(opts)
+	midd, err := middleware.New(opts)
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to create middleware: %v", err)
 	}
-	fmt.Println("✓ Auth middleware created")
+	log.Println("✓ Auth middleware created")
 
 	mux := http.NewServeMux()
-	mux.Handle("/", middleware.Handler(http.HandlerFunc(pingHandler)))
-	mux.Handle("/ping", middleware.Handler(http.HandlerFunc(pingHandler)))
+	mux.Handle("/", midd.Handler(http.HandlerFunc(pingHandler)))
+	mux.Handle("/ping", midd.Handler(http.HandlerFunc(pingHandler)))
 
 	srv := &http.Server{
 		Addr:    serverPort,
@@ -72,36 +69,36 @@ func main() {
 		}
 	}()
 	time.Sleep(1 * time.Second)
-	fmt.Println("✓ HTTP Server started")
+	log.Println("✓ HTTP Server started")
 
 	cPrivKey, err := ec.PrivateKeyFromHex(clientPrivateKeyHex)
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to create client private key: %v", err)
 	}
 
-	clientWallet, err := exampleWallet.NewExampleWallet(exampleWallet.ExampleWalletArgs{
-		Type:       exampleWallet.ExampleWalletArgsTypePrivateKey,
-		PrivateKey: cPrivKey,
-	})
-
+	clientWallet, err := exampleWallet.NewExtendedProtoWallet(cPrivKey)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
-	fmt.Println("✓ Client wallet created")
 
-	fmt.Println("\n📡 STEP 1: Sending non general request to /.well-known/auth endpoint")
-	responseData := callInitialRequest(clientWallet)
-	fmt.Println("✓ Auth completed")
+	log.Println("✓ Client wallet created")
+	log.Println("\n📡 STEP 1: Sending non general request to /.well-known/auth endpoint")
+	responseData, err := callInitialRequest(clientWallet)
+	if err != nil {
+		log.Fatalf("Failed to call initial request: %v", err)
+	}
 
-	fmt.Println("\n📡 STEP 2: Sending general request to test authorization")
+	log.Println("✓ Auth completed")
+
+	log.Println("\n📡 STEP 2: Sending general request to test authorization")
 	callPingEndpoint(clientWallet, responseData)
-	fmt.Println("✓ General request completed")
+	log.Println("✓ General request completed")
 
 	time.Sleep(2 * time.Second)
-	fmt.Println("\n✅ Demo completed successfully")
+	log.Println("\n✅ Demo completed successfully")
 }
 
-// HTTP handler for ping requests
+// pingHandler handles the ping requests
 func pingHandler(w http.ResponseWriter, r *http.Request) {
 	identityKey, ok := middleware.GetIdentityFromContext(r.Context())
 	if !ok {
@@ -115,44 +112,45 @@ func pingHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Makes the initial authentication request
-func callInitialRequest(clientWallet wallet.Interface) *auth.AuthMessage {
+// callInitialRequest sends a request to the /.well-known/auth endpoint
+func callInitialRequest(clientWallet wallet.Interface) (*auth.AuthMessage, error) {
 	initialRequest := utils.PrepareInitialRequestBody(context.Background(), clientWallet)
 	url := "http://localhost" + serverPort + "/.well-known/auth"
 
 	client := resty.New()
 	var result auth.AuthMessage
-	var errMsg any
 
 	resp, err := client.R().
 		SetHeader("Content-Type", "application/json").
 		SetBody(initialRequest).
 		SetResult(&result).
-		SetError(&errMsg).
 		Post(url)
 
 	if err != nil {
-		log.Fatalf("Request failed: %v", err)
+		log.Printf("Request failed: %v", err)
+		return nil, err
 	}
 
 	if resp.IsError() {
-		log.Fatalf("Request failed: Status %d, Body: %s", resp.StatusCode(), resp.String())
+		errMsg := resp.String()
+		log.Printf("Server returned error (%d): %s", resp.StatusCode(), errMsg)
+		return nil, errors.New("server error occurred")
 	}
 
-	fmt.Println("Response from server: ", resp.String())
+	log.Println("Response from server: ", resp.String())
 
-	fmt.Println("🔑 Response Headers:")
+	log.Println("🔑 Response Headers:")
 	for key, value := range resp.Header() {
 		lowerKey := strings.ToLower(key)
 		if strings.Contains(lowerKey, "x-bsv-auth") {
-			fmt.Println(lowerKey, strings.Join(value, ", "))
+			log.Println(lowerKey, strings.Join(value, ", "))
 		}
 	}
 
-	return &result
+	return &result, nil
 }
 
-// Makes an authenticated request to the ping endpoint
+// callPingEndpoint sends a request to the /ping endpoint
 func callPingEndpoint(clientWallet wallet.Interface, response *auth.AuthMessage) {
 	url := "http://localhost" + serverPort + "/ping"
 
@@ -169,9 +167,9 @@ func callPingEndpoint(clientWallet wallet.Interface, response *auth.AuthMessage)
 		log.Fatalf("Failed to prepare general request headers: %v", err)
 	}
 
-	fmt.Println("🔑 Request headers")
+	log.Println("🔑 Request headers")
 	for key, value := range headers {
-		fmt.Println(key, value)
+		log.Println(key, value)
 	}
 
 	client := resty.New()
@@ -185,11 +183,11 @@ func callPingEndpoint(clientWallet wallet.Interface, response *auth.AuthMessage)
 
 	log.Printf("Response from server: %s", resp.String())
 
-	fmt.Println("🔑 Response Headers:")
+	log.Println("🔑 Response Headers:")
 	for key, value := range resp.Header() {
 		lowerKey := strings.ToLower(key)
 		if strings.Contains(lowerKey, "x-bsv-auth") {
-			fmt.Println(lowerKey, strings.Join(value, ", "))
+			log.Println(lowerKey, strings.Join(value, ", "))
 		}
 	}
 

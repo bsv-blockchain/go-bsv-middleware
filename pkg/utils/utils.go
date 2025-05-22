@@ -108,8 +108,11 @@ func PrepareGeneralRequestHeaders(ctx context.Context, walletInstance interfaces
 		"x-bsv-auth-identity-key": clientIdentityKey.PublicKey.ToDERHex(),
 		"x-bsv-auth-nonce":        newNonce,
 		"x-bsv-auth-your-nonce":   serverNonce,
-		"x-bsv-auth-signature":    hex.EncodeToString(signature.Signature.Serialize()),
 		"x-bsv-auth-request-id":   encodedRequestID,
+	}
+
+	if signature != nil {
+		headers["x-bsv-auth-signature"] = hex.EncodeToString(signature.Signature.Serialize())
 	}
 
 	return headers, nil
