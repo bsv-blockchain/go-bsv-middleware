@@ -26,14 +26,10 @@ import (
 type contextKey string
 
 const (
-	// IdentityKey is the key used to store the identity key in the context
 	IdentityKey contextKey = "identity_key"
-	// RequestKey is the key used to store the request in the context
-	RequestKey contextKey = "http_request"
-	// ResponseKey is the key used to store the response writer in the context
+	RequestKey  contextKey = "http_request"
 	ResponseKey contextKey = "http_response"
-	// NextKey is the key used to store the next handler in the context
-	NextKey contextKey = "http_next_handler"
+	NextKey     contextKey = "http_next_handler"
 )
 
 type responseRecorder struct {
@@ -49,11 +45,11 @@ func (r *responseRecorder) WriteHeader(code int) {
 }
 
 func (r *responseRecorder) Write(b []byte) (int, error) {
-	r.written = true
 	n, err := r.ResponseWriter.Write(b)
 	if err != nil {
 		return n, fmt.Errorf("failed to write response: %w", err)
 	}
+	r.written = true
 	return n, nil
 }
 
@@ -61,7 +57,6 @@ func (r *responseRecorder) hasBeenWritten() bool {
 	return r.written
 }
 
-// WrapResponseWriter wraps the http.ResponseWriter to capture the status code and written state
 func WrapResponseWriter(w http.ResponseWriter) *responseRecorder {
 	return &responseRecorder{
 		ResponseWriter: w,
@@ -69,7 +64,6 @@ func WrapResponseWriter(w http.ResponseWriter) *responseRecorder {
 	}
 }
 
-// TransportConfig holds configuration for the HTTP transport
 type TransportConfig struct {
 	Wallet                 interfaces.Wallet
 	SessionManager         auth.SessionManager
@@ -78,7 +72,6 @@ type TransportConfig struct {
 	OnCertificatesReceived auth.OnCertificateReceivedCallback
 }
 
-// Transport implements the auth.Transport interface for HTTP transport
 type Transport struct {
 	wallet                 interfaces.Wallet
 	sessionManager         auth.SessionManager
@@ -88,7 +81,6 @@ type Transport struct {
 	onCertificatesReceived auth.OnCertificateReceivedCallback
 }
 
-// New creates a new HTTP transport instance with the provided configuration
 func New(cfg TransportConfig) auth.Transport {
 	var logger *slog.Logger
 	if cfg.Logger != nil {
@@ -106,11 +98,13 @@ func New(cfg TransportConfig) auth.Transport {
 	}
 }
 
-// OnData registers a callback for incoming auth messages
-// Required by BRC-104 to handle message exchanges
 func (t *Transport) OnData(callback func(context.Context, *auth.AuthMessage) error) error {
 	if callback == nil {
 		return errors.New("callback cannot be nil")
+	}
+
+	if t.messageCallback != nil {
+		t.logger.Warn("OnData callback is overriding an already registered message callback")
 	}
 
 	t.messageCallback = callback
@@ -118,7 +112,6 @@ func (t *Transport) OnData(callback func(context.Context, *auth.AuthMessage) err
 	return nil
 }
 
-// GetRegisteredOnData retrieves the registered callback for incoming auth messages
 func (t *Transport) GetRegisteredOnData() (func(context.Context, *auth.AuthMessage) error, error) {
 	if t.messageCallback == nil {
 		return nil, errors.New("no callback registered")
@@ -127,9 +120,11 @@ func (t *Transport) GetRegisteredOnData() (func(context.Context, *auth.AuthMessa
 	return t.messageCallback, nil
 }
 
-// Send handles sending auth messages through HTTP
-// BRC-104 requires specific headers and formatting based on message type
 func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
+	if message.IdentityKey == nil {
+		return errors.New("message identity key cannot be nil")
+	}
+
 	respVal := ctx.Value(ResponseKey)
 	if respVal == nil {
 		return errors.New("response writer not found in context")
@@ -138,15 +133,6 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 	resp, ok := respVal.(http.ResponseWriter)
 	if !ok {
 		return errors.New("invalid response writer type in context")
-	}
-
-	nextVal := ctx.Value(NextKey)
-	var next func()
-	if nextVal != nil {
-		next, ok = nextVal.(func())
-		if !ok {
-			t.logger.Warn("Next handler has invalid type in context")
-		}
 	}
 
 	switch message.MessageType {
@@ -175,13 +161,18 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 		return nil
 
 	case auth.MessageTypeGeneral:
-		req, _ := ctx.Value(RequestKey).(*http.Request)
+		req, ok := ctx.Value(RequestKey).(*http.Request)
+		if !ok {
+			return errors.New("invalid request type in context")
+		}
+
 		requestID := ""
 		if req != nil {
 			requestID = req.Header.Get(constants.HeaderRequestID)
 		}
 
 		resp.Header().Set(constants.HeaderVersion, message.Version)
+		resp.Header().Set(constants.HeaderMessageType, string(message.MessageType))
 		resp.Header().Set(constants.HeaderIdentityKey, message.IdentityKey.ToDERHex())
 
 		if message.Nonce != "" {
@@ -200,77 +191,79 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 			resp.Header().Set(constants.HeaderRequestID, requestID)
 		}
 
-		if next != nil {
-			next()
+		nextVal := ctx.Value(NextKey)
+		if nextVal != nil {
+			if next, ok := nextVal.(func()); ok {
+				next()
+			} else {
+				t.logger.Warn("Next handler has invalid type in context")
+			}
 		}
+
 		return nil
 
 	case auth.MessageTypeCertificateRequest, auth.MessageTypeInitialRequest:
-		panic("CertificateRequest and InitialRequest are not supported in Send method")
+		return fmt.Errorf("message type %s is not supported in Send method", message.MessageType)
 
 	default:
 		return fmt.Errorf("unsupported message type: %s", message.MessageType)
 	}
 }
 
-// ParseAuthMessageFromRequest parses the auth message from the HTTP request
 func ParseAuthMessageFromRequest(req *http.Request) (*auth.AuthMessage, error) {
-	if req.URL.Path == "/.well-known/auth" && req.Method == http.MethodPost {
+	if req.URL.Path == constants.WellKnownAuthPath && req.Method == http.MethodPost {
 		var message auth.AuthMessage
 		if err := json.NewDecoder(req.Body).Decode(&message); err != nil {
 			return nil, fmt.Errorf("invalid request body: %w", err)
 		}
 		return &message, nil
-
-	} else {
-		version := req.Header.Get(constants.HeaderVersion)
-		if version == "" {
-			return nil, nil
-		}
-
-		identityKey := req.Header.Get(constants.HeaderIdentityKey)
-		if identityKey == "" {
-			return nil, errors.New("missing identity key header")
-		}
-
-		nonce := req.Header.Get(constants.HeaderNonce)
-		yourNonce := req.Header.Get(constants.HeaderYourNonce)
-		signature := req.Header.Get(constants.HeaderSignature)
-		requestID := req.Header.Get(constants.HeaderRequestID)
-
-		pubKey, err := primitives.PublicKeyFromString(identityKey)
-		if err != nil {
-			return nil, fmt.Errorf("invalid identity key format: %w", err)
-		}
-
-		payload, err := BuildRequestPayload(req, requestID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to build request payload: %w", err)
-		}
-
-		message := &auth.AuthMessage{
-			Version:     version,
-			MessageType: auth.MessageTypeGeneral,
-			IdentityKey: pubKey,
-			Nonce:       nonce,
-			YourNonce:   yourNonce,
-			Payload:     payload,
-		}
-
-		if signature != "" {
-			sigBytes, err := hex.DecodeString(signature)
-			if err != nil {
-				return nil, fmt.Errorf("invalid signature format: %w", err)
-			}
-			message.Signature = sigBytes
-		}
-
-		return message, nil
 	}
+
+	version := req.Header.Get(constants.HeaderVersion)
+	if version == "" {
+		return nil, nil
+	}
+
+	identityKey := req.Header.Get(constants.HeaderIdentityKey)
+	if identityKey == "" {
+		return nil, errors.New("missing identity key header")
+	}
+
+	nonce := req.Header.Get(constants.HeaderNonce)
+	yourNonce := req.Header.Get(constants.HeaderYourNonce)
+	signature := req.Header.Get(constants.HeaderSignature)
+	requestID := req.Header.Get(constants.HeaderRequestID)
+
+	pubKey, err := primitives.PublicKeyFromString(identityKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity key format: %w", err)
+	}
+
+	payload, err := BuildRequestPayload(req, requestID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build request payload: %w", err)
+	}
+
+	message := &auth.AuthMessage{
+		Version:     version,
+		MessageType: auth.MessageTypeGeneral,
+		IdentityKey: pubKey,
+		Nonce:       nonce,
+		YourNonce:   yourNonce,
+		Payload:     payload,
+	}
+
+	if signature != "" {
+		sigBytes, err := hex.DecodeString(signature)
+		if err != nil {
+			return nil, fmt.Errorf("invalid signature format: %w", err)
+		}
+		message.Signature = sigBytes
+	}
+
+	return message, nil
 }
 
-// BuildRequestPayload creates a payload byte array from the request
-// Format required by BRC-104 for consistent signing
 func BuildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 	writer := new(bytes.Buffer)
 
@@ -283,88 +276,39 @@ func BuildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to write request ID: %w", err)
 	}
 
-	write := func(n int, desc string) error {
-		if err := writeVarInt(writer, n); err != nil {
-			return fmt.Errorf("%s: %w", desc, err)
-		}
-		return nil
+	if err = writeString(writer, req.Method); err != nil {
+		return nil, fmt.Errorf("failed to write request method: %w", err)
 	}
 
-	if err := write(len(req.Method), "method length"); err != nil {
-		return nil, err
+	if err = writeOptionalString(writer, req.URL.Path); err != nil {
+		return nil, fmt.Errorf("failed to write request path: %w", err)
 	}
 
-	_, err = writer.WriteString(req.Method)
-	if err != nil {
-		return nil, fmt.Errorf("failed to write method: %w", err)
+	if err = writeOptionalString(writer, req.URL.RawQuery); err != nil {
+		return nil, fmt.Errorf("failed to write request query: %w", err)
 	}
 
-	path := req.URL.Path
-	if path == "" {
-		if err := write(-1, "empty path marker"); err != nil {
-			return nil, err
-		}
-	} else {
-		if err := write(len(path), "path length"); err != nil {
-			return nil, err
-		}
-
-		_, err = writer.WriteString(path)
-		if err != nil {
-			return nil, fmt.Errorf("failed to write path: %w", err)
-		}
-	}
-
-	query := req.URL.RawQuery
-	if query == "" {
-		if err := write(-1, "empty query marker"); err != nil {
-			return nil, err
-		}
-	} else {
-		if err := write(len(query), "query length"); err != nil {
-			return nil, err
-		}
-
-		_, err = writer.WriteString(query)
-		if err != nil {
-			return nil, fmt.Errorf("failed to write query: %w", err)
-		}
-	}
-
-	includedHeaders := [][]string{}
+	var includedHeaders [][]string
 	for k, v := range req.Header {
-		k = strings.ToLower(k)
-		if (strings.HasPrefix(k, "x-bsv-") || k == "content-type" || k == "authorization") &&
-			!strings.HasPrefix(k, constants.AuthHeaderPrefix) {
-			includedHeaders = append(includedHeaders, []string{k, v[0]})
+		if isIncludedHeader(k) {
+			includedHeaders = append(includedHeaders, []string{strings.ToLower(k), v[0]})
 		}
 	}
 
-	// BRC-104 requires headers to be sorted lexicographically
 	sort.Slice(includedHeaders, func(i, j int) bool {
 		return includedHeaders[i][0] < includedHeaders[j][0]
 	})
 
-	if err := write(len(includedHeaders), "headers count"); err != nil {
-		return nil, err
+	if err := writeVarInt(writer, len(includedHeaders)); err != nil {
+		return nil, fmt.Errorf("failed to write headers count: %w", err)
 	}
 
 	for _, header := range includedHeaders {
-		if err := write(len(header[0]), "header key length"); err != nil {
-			return nil, err
-		}
-
-		_, err = writer.WriteString(header[0])
-		if err != nil {
+		if err := writeString(writer, header[0]); err != nil {
 			return nil, fmt.Errorf("failed to write header key: %w", err)
 		}
 
-		if err := write(len(header[1]), "header value length"); err != nil {
-			return nil, err
-		}
-
-		_, err = writer.WriteString(header[1])
-		if err != nil {
+		if err := writeString(writer, header[1]); err != nil {
 			return nil, fmt.Errorf("failed to write header value: %w", err)
 		}
 	}
@@ -378,8 +322,8 @@ func BuildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 		req.Body = io.NopCloser(bytes.NewBuffer(body))
 
 		if len(body) > 0 {
-			if err := write(len(body), "body length"); err != nil {
-				return nil, err
+			if err := writeVarInt(writer, len(body)); err != nil {
+				return nil, fmt.Errorf("failed to write body length: %w", err)
 			}
 
 			_, err = writer.Write(body)
@@ -387,17 +331,47 @@ func BuildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 				return nil, fmt.Errorf("failed to write body: %w", err)
 			}
 		} else {
-			if err := write(-1, "empty body marker"); err != nil {
-				return nil, err
+			if err := writeVarInt(writer, -1); err != nil {
+				return nil, fmt.Errorf("failed to write empty body marker: %w", err)
 			}
 		}
 	} else {
-		if err := write(-1, "nil body marker"); err != nil {
-			return nil, err
+		if err := writeVarInt(writer, -1); err != nil {
+			return nil, fmt.Errorf("failed to write nil body marker: %w", err)
 		}
 	}
 
 	return writer.Bytes(), nil
+}
+
+func isIncludedHeader(headerKey string) bool {
+	k := strings.ToLower(headerKey)
+	return (strings.HasPrefix(k, "x-bsv-") || k == "content-type" || k == "authorization") &&
+		!strings.HasPrefix(k, constants.AuthHeaderPrefix)
+}
+
+func writeString(writer *bytes.Buffer, str string) error {
+	if err := writeVarInt(writer, len(str)); err != nil {
+		return fmt.Errorf("failed to write string length: %w", err)
+	}
+	if _, err := writer.WriteString(str); err != nil {
+		return fmt.Errorf("failed to write string: %w", err)
+	}
+	return nil
+}
+
+func writeOptionalString(writer *bytes.Buffer, str string) error {
+	if str == "" {
+		if err := writeVarInt(writer, -1); err != nil {
+			return fmt.Errorf("failed to write empty string placeholder: %w", err)
+		}
+		return nil
+	}
+
+	if err := writeString(writer, str); err != nil {
+		return fmt.Errorf("failed to write optional string: %w", err)
+	}
+	return nil
 }
 
 func writeVarInt(w *bytes.Buffer, n int) error {
@@ -408,7 +382,6 @@ func writeVarInt(w *bytes.Buffer, n int) error {
 	return nil
 }
 
-// HasBeenWritten checks if the response writer has been written to
 func HasBeenWritten(w http.ResponseWriter) bool {
 	if rw, ok := w.(*responseRecorder); ok {
 		return rw.hasBeenWritten()

@@ -60,7 +60,11 @@ func PrepareGeneralRequestHeaders(ctx context.Context, walletInstance interfaces
 	opts := wallet.GetPublicKeyArgs{IdentityKey: true}
 	clientIdentityKey, err := walletInstance.GetPublicKey(ctx, opts, "")
 	if err != nil {
-		return nil, errors.New("failed to get client identity key")
+		return nil, fmt.Errorf("failed to get client identity key: %w", err)
+	}
+
+	if clientIdentityKey.PublicKey == nil {
+		return nil, errors.New("client identity key is nil")
 	}
 
 	requestID := generateRandom()
@@ -68,20 +72,20 @@ func PrepareGeneralRequestHeaders(ctx context.Context, walletInstance interfaces
 
 	newNonce, err := sdkUtils.CreateNonce(ctx, walletInstance, wallet.Counterparty{Type: wallet.CounterpartyTypeSelf})
 	if err != nil {
-		return nil, errors.New("failed to create new nonce")
+		return nil, fmt.Errorf("failed to create new nonce: %w", err)
 	}
 
 	var writer bytes.Buffer
 
 	_, err = writer.Write(requestID)
 	if err != nil {
-		return nil, errors.New("failed to write request ID")
+		return nil, fmt.Errorf("failed to write request ID: %w", err)
 	}
 
 	request := getOrPrepareTempRequest(requestData)
 	err = WriteRequestData(request, &writer)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write request data: %w", err)
 	}
 
 	protocol := wallet.Protocol{SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty, Protocol: auth.AUTH_PROTOCOL_ID}
@@ -101,7 +105,7 @@ func PrepareGeneralRequestHeaders(ctx context.Context, walletInstance interfaces
 
 	signature, err := walletInstance.CreateSignature(ctx, createSignatureArgs, "")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create signature, %w", err)
+		return nil, fmt.Errorf("failed to create signature: %w", err)
 	}
 
 	headers := map[string]string{
@@ -119,7 +123,7 @@ func PrepareGeneralRequestHeaders(ctx context.Context, walletInstance interfaces
 	return headers, nil
 }
 
-// PrepareCertificateResponseHeaders prepares the general request headers
+// PrepareCertificateResponseHeaders prepares the certificate response headers
 func PrepareCertificateResponseHeaders(ctx context.Context, walletInstance interfaces.Wallet, previousResponse *auth.AuthMessage, requestData RequestData) (map[string]string, error) {
 	serverIdentityKey := previousResponse.IdentityKey
 	serverNonce := previousResponse.InitialNonce
@@ -127,7 +131,11 @@ func PrepareCertificateResponseHeaders(ctx context.Context, walletInstance inter
 	opts := wallet.GetPublicKeyArgs{IdentityKey: true}
 	clientIdentityKey, err := walletInstance.GetPublicKey(ctx, opts, "")
 	if err != nil {
-		return nil, errors.New("failed to get client identity key")
+		return nil, fmt.Errorf("failed to get client identity key: %w", err)
+	}
+
+	if clientIdentityKey.PublicKey == nil {
+		return nil, errors.New("client identity key is nil")
 	}
 
 	requestID := generateRandom()
@@ -135,20 +143,20 @@ func PrepareCertificateResponseHeaders(ctx context.Context, walletInstance inter
 
 	newNonce, err := sdkUtils.CreateNonce(ctx, walletInstance, wallet.Counterparty{Type: wallet.CounterpartyTypeSelf})
 	if err != nil {
-		return nil, errors.New("failed to create new nonce")
+		return nil, fmt.Errorf("failed to create new nonce: %w", err)
 	}
 
 	var writer bytes.Buffer
 
 	_, err = writer.Write(requestID)
 	if err != nil {
-		return nil, errors.New("failed to write request ID")
+		return nil, fmt.Errorf("failed to write request ID: %w", err)
 	}
 
 	request := getOrPrepareTempRequest(requestData)
 	err = WriteRequestData(request, &writer)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write request data: %w", err)
 	}
 
 	protocol := wallet.Protocol{SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty, Protocol: auth.AUTH_PROTOCOL_ID}
@@ -168,16 +176,20 @@ func PrepareCertificateResponseHeaders(ctx context.Context, walletInstance inter
 
 	signature, err := walletInstance.CreateSignature(ctx, createSignatureArgs, "")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create signature, %w", err)
+		return nil, fmt.Errorf("failed to create signature: %w", err)
 	}
+
 	headers := map[string]string{
 		constants.HeaderVersion:     "0.1",
 		constants.HeaderIdentityKey: clientIdentityKey.PublicKey.ToDERHex(),
 		constants.HeaderNonce:       newNonce,
 		constants.HeaderYourNonce:   serverNonce,
-		constants.HeaderSignature:   hex.EncodeToString(signature.Signature.Serialize()),
 		constants.HeaderRequestID:   encodedRequestID,
 		constants.HeaderMessageType: "certificateResponse",
+	}
+
+	if signature != nil {
+		headers[constants.HeaderSignature] = hex.EncodeToString(signature.Signature.Serialize())
 	}
 
 	return headers, nil
@@ -187,20 +199,20 @@ func PrepareCertificateResponseHeaders(ctx context.Context, walletInstance inter
 func WriteRequestData(request *http.Request, writer *bytes.Buffer) error {
 	err := WriteVarIntNum(writer, len(request.Method))
 	if err != nil {
-		return errors.New("failed to write method length")
+		return fmt.Errorf("failed to write method length: %w", err)
 	}
 	_, err = writer.Write([]byte(request.Method))
 	if err != nil {
-		return errors.New("failed to write method")
+		return fmt.Errorf("failed to write method: %w", err)
 	}
 
 	err = WriteVarIntNum(writer, len(request.URL.Path))
 	if err != nil {
-		return errors.New("failed to write path length")
+		return fmt.Errorf("failed to write path length: %w", err)
 	}
 	_, err = writer.Write([]byte(request.URL.Path))
 	if err != nil {
-		return errors.New("failed to write path")
+		return fmt.Errorf("failed to write path: %w", err)
 	}
 
 	query := request.URL.RawQuery
@@ -208,52 +220,52 @@ func WriteRequestData(request *http.Request, writer *bytes.Buffer) error {
 		searchAsArray := []byte(query)
 		err = WriteVarIntNum(writer, len(searchAsArray))
 		if err != nil {
-			return errors.New("failed to write query length")
+			return fmt.Errorf("failed to write query length: %w", err)
 		}
 		_, err = writer.Write([]byte(query))
 		if err != nil {
-			return errors.New("failed to write query")
+			return fmt.Errorf("failed to write query: %w", err)
 		}
 	} else {
 		err = WriteVarIntNum(writer, -1)
 		if err != nil {
-			return errors.New("failed to write -1 as query length")
+			return fmt.Errorf("failed to write -1 as query length: %w", err)
 		}
 	}
 
 	includedHeaders := ExtractHeaders(request.Header)
 	err = WriteVarIntNum(writer, len(includedHeaders))
 	if err != nil {
-		return errors.New("failed to write headers length")
+		return fmt.Errorf("failed to write headers length: %w", err)
 	}
 
 	for _, header := range includedHeaders {
 		headerKeyBytes := []byte(header[0])
 		err = WriteVarIntNum(writer, len(headerKeyBytes))
 		if err != nil {
-			return errors.New("failed to write header key length")
+			return fmt.Errorf("failed to write header key length: %w", err)
 		}
 
 		_, err = writer.Write(headerKeyBytes)
 		if err != nil {
-			return errors.New("failed to write header key")
+			return fmt.Errorf("failed to write header key: %w", err)
 		}
 
 		headerValueBytes := []byte(header[1])
 		err = WriteVarIntNum(writer, len(headerValueBytes))
 		if err != nil {
-			return errors.New("failed to write header value length")
+			return fmt.Errorf("failed to write header value length: %w", err)
 		}
 
 		_, err = writer.Write(headerValueBytes)
 		if err != nil {
-			return errors.New("failed to write header value")
+			return fmt.Errorf("failed to write header value: %w", err)
 		}
 	}
 
 	err = WriteBodyToBuffer(request, writer)
 	if err != nil {
-		return errors.New("failed to write request body")
+		return fmt.Errorf("failed to write request body: %w", err)
 	}
 
 	return nil
@@ -264,7 +276,7 @@ func WriteRequestData(request *http.Request, writer *bytes.Buffer) error {
 func WriteVarIntNum(writer *bytes.Buffer, num int) error {
 	err := binary.Write(writer, binary.LittleEndian, int64(num))
 	if err != nil {
-		return errors.New("failed to write varint number")
+		return fmt.Errorf("failed to write varint number: %w", err)
 	}
 	return nil
 }
@@ -274,7 +286,7 @@ func ReadVarIntNum(reader *bytes.Reader) (int64, error) {
 	var intByte int64
 	err := binary.Read(reader, binary.LittleEndian, &intByte)
 	if err != nil {
-		return 0, errors.New("failed to read varint number")
+		return 0, fmt.Errorf("failed to read varint number: %w", err)
 	}
 
 	return intByte, nil
@@ -298,25 +310,25 @@ func WriteBodyToBuffer(req *http.Request, buf *bytes.Buffer) error {
 	if req.Body == nil {
 		err := WriteVarIntNum(buf, -1)
 		if err != nil {
-			return errors.New("failed to write -1 for empty body")
+			return fmt.Errorf("failed to write -1 for empty body: %w", err)
 		}
 		return nil
 	}
 
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
-		return errors.New("failed to read request body")
+		return fmt.Errorf("failed to read request body: %w", err)
 	}
 
 	if len(body) > 0 {
 		err = WriteVarIntNum(buf, len(body))
 		if err != nil {
-			return errors.New("failed to write body length")
+			return fmt.Errorf("failed to write body length: %w", err)
 		}
 
 		_, err = buf.Write(body)
 		if err != nil {
-			return errors.New("failed to write body")
+			return fmt.Errorf("failed to write body: %w", err)
 		}
 
 		return nil
@@ -324,7 +336,7 @@ func WriteBodyToBuffer(req *http.Request, buf *bytes.Buffer) error {
 
 	err = WriteVarIntNum(buf, -1)
 	if err != nil {
-		return errors.New("failed to write -1 for empty body")
+		return fmt.Errorf("failed to write -1 for empty body: %w", err)
 	}
 	return nil
 }
