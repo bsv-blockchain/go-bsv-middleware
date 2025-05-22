@@ -152,7 +152,7 @@ func processPayment(
 		Outputs: []wallet.InternalizeOutput{
 			{
 				OutputIndex: 0,
-				Protocol:    "wallet payment",
+				Protocol:    wallet.InternalizeProtocolWalletPayment,
 				PaymentRemittance: &wallet.Payment{
 					DerivationPrefix:  paymentData.DerivationPrefix,
 					DerivationSuffix:  paymentData.DerivationSuffix,

@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/constants"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
@@ -104,15 +105,15 @@ func PrepareGeneralRequestHeaders(ctx context.Context, walletInstance interfaces
 	}
 
 	headers := map[string]string{
-		"x-bsv-auth-version":      "0.1",
-		"x-bsv-auth-identity-key": clientIdentityKey.PublicKey.ToDERHex(),
-		"x-bsv-auth-nonce":        newNonce,
-		"x-bsv-auth-your-nonce":   serverNonce,
-		"x-bsv-auth-request-id":   encodedRequestID,
+		constants.HeaderVersion:     "0.1",
+		constants.HeaderIdentityKey: clientIdentityKey.PublicKey.ToDERHex(),
+		constants.HeaderNonce:       newNonce,
+		constants.HeaderYourNonce:   serverNonce,
+		constants.HeaderRequestID:   encodedRequestID,
 	}
 
 	if signature != nil {
-		headers["x-bsv-auth-signature"] = hex.EncodeToString(signature.Signature.Serialize())
+		headers[constants.HeaderSignature] = hex.EncodeToString(signature.Signature.Serialize())
 	}
 
 	return headers, nil
@@ -170,13 +171,13 @@ func PrepareCertificateResponseHeaders(ctx context.Context, walletInstance inter
 		return nil, fmt.Errorf("failed to create signature, %w", err)
 	}
 	headers := map[string]string{
-		"x-bsv-auth-version":      "0.1",
-		"x-bsv-auth-identity-key": clientIdentityKey.PublicKey.ToDERHex(),
-		"x-bsv-auth-nonce":        newNonce,
-		"x-bsv-auth-your-nonce":   serverNonce,
-		"x-bsv-auth-signature":    hex.EncodeToString(signature.Signature.Serialize()),
-		"x-bsv-auth-request-id":   encodedRequestID,
-		"x-bsv-auth-message-type": "certificateResponse",
+		constants.HeaderVersion:     "0.1",
+		constants.HeaderIdentityKey: clientIdentityKey.PublicKey.ToDERHex(),
+		constants.HeaderNonce:       newNonce,
+		constants.HeaderYourNonce:   serverNonce,
+		constants.HeaderSignature:   hex.EncodeToString(signature.Signature.Serialize()),
+		constants.HeaderRequestID:   encodedRequestID,
+		constants.HeaderMessageType: "certificateResponse",
 	}
 
 	return headers, nil
@@ -285,7 +286,7 @@ func ExtractHeaders(headers http.Header) [][]string {
 	for k, v := range headers {
 		k = strings.ToLower(k)
 		if (strings.HasPrefix(k, "x-bsv-") || k == "content-type" || k == "authorization") &&
-			!strings.HasPrefix(k, "x-bsv-auth") {
+			!strings.HasPrefix(k, constants.AuthHeaderPrefix) {
 			includedHeaders = append(includedHeaders, []string{k, v[0]})
 		}
 	}

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/constants"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/utils"
 	"github.com/bsv-blockchain/go-sdk/auth"
@@ -23,22 +24,22 @@ type RequestBody auth.AuthMessage
 
 // WithWrongVersion adds a wrong version to the headers
 func WithWrongVersion(h map[string]string) {
-	h["x-bsv-auth-version"] = "0.2"
+	h[constants.HeaderVersion] = "0.2"
 }
 
 // WithWrongSignature adds a wrong signature to the headers
 func WithWrongSignature(h map[string]string) {
-	h["x-bsv-auth-signature"] = "wrong_signature"
+	h[constants.HeaderSignature] = "wrong_signature"
 }
 
 // WithWrongYourNonce adds a wrong your nonce to the headers
 func WithWrongYourNonce(h map[string]string) {
-	h["x-bsv-auth-your-nonce"] = "wrong_your_nonce"
+	h[constants.HeaderYourNonce] = "wrong_your_nonce"
 }
 
 // WithWrongNonce adds a wrong nonce to the headers
 func WithWrongNonce(h map[string]string) {
-	h["x-bsv-auth-nonce"] = "wrong_nonce"
+	h[constants.HeaderNonce] = "wrong_nonce"
 }
 
 // NewRequestBody creates a new RequestBody from an AuthMessage
@@ -235,12 +236,12 @@ func prepareGeneralRequestHeadersFixesNonce(ctx context.Context, walletInstance 
 	}
 
 	headers := map[string]string{
-		"x-bsv-auth-version":      "0.1",
-		"x-bsv-auth-identity-key": clientIdentityKey.PublicKey.ToDERHex(),
-		"x-bsv-auth-nonce":        newNonce,
-		"x-bsv-auth-your-nonce":   serverNonce,
-		"x-bsv-auth-signature":    hex.EncodeToString(signature.Signature.Serialize()),
-		"x-bsv-auth-request-id":   encodedRequestID,
+		constants.HeaderVersion:     "0.1",
+		constants.HeaderIdentityKey: clientIdentityKey.PublicKey.ToDERHex(),
+		constants.HeaderNonce:       newNonce,
+		constants.HeaderYourNonce:   serverNonce,
+		constants.HeaderSignature:   hex.EncodeToString(signature.Signature.Serialize()),
+		constants.HeaderRequestID:   encodedRequestID,
 	}
 
 	return headers, nil

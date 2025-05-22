@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/constants"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 	httptransport "github.com/bsv-blockchain/go-bsv-middleware/pkg/transport/http"
@@ -16,7 +17,7 @@ import (
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )
 
-// Middleware is a struct that holds the configuration for the BRC authentication middleware
+// Middleware is an HTTP middleware that handles authentication messages.
 type Middleware struct {
 	wallet               interfaces.Wallet
 	peer                 *auth.Peer
@@ -26,7 +27,7 @@ type Middleware struct {
 	logger               *slog.Logger
 }
 
-// New creates a new instance of the BRC authentication middleware
+// New creates a new instance of the auth middleware.
 func New(cfg Config) (*Middleware, error) {
 	if cfg.Wallet == nil {
 		return nil, errors.New("wallet is required")
@@ -80,7 +81,7 @@ func New(cfg Config) (*Middleware, error) {
 	}, nil
 }
 
-// Handler returns a middleware handler function for BRC authentication
+// Handler returns an HTTP handler that processes authentication messages.
 func (m *Middleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		wrappedWriter := httptransport.WrapResponseWriter(w)
@@ -108,20 +109,26 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 				next.ServeHTTP(wrappedWriter, r)
 				return
 			} else {
-				// BRC-104 requires 401 for authentication failures
 				http.Error(wrappedWriter, "Authentication required", http.StatusUnauthorized)
 				return
 			}
 		}
 
-		if authMsg.IdentityKey == nil && r.Header.Get("x-bsv-auth-identity-key") != "" {
-			pubKey, err := ec.PublicKeyFromString(r.Header.Get("x-bsv-auth-identity-key"))
-			if err != nil {
-				m.logger.Error("Failed to parse identity key", slog.String("error", err.Error()))
-				http.Error(wrappedWriter, "Invalid identity key format", http.StatusBadRequest)
+		if authMsg.IdentityKey == nil {
+			identityKeyHeader := r.Header.Get(constants.HeaderIdentityKey)
+			if identityKeyHeader != "" {
+				pubKey, err := ec.PublicKeyFromString(identityKeyHeader)
+				if err != nil {
+					m.logger.Error("Failed to parse identity key", slog.String("error", err.Error()))
+					http.Error(wrappedWriter, "Invalid identity key format", http.StatusBadRequest)
+					return
+				}
+				authMsg.IdentityKey = pubKey
+			} else {
+				m.logger.Error("Auth message present but missing identity key")
+				http.Error(wrappedWriter, "Missing identity key in authentication", http.StatusBadRequest)
 				return
 			}
-			authMsg.IdentityKey = pubKey
 		}
 
 		callback, err := m.transport.GetRegisteredOnData()
@@ -136,7 +143,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 			m.logger.Error("Failed to process auth message", slog.String("error", err.Error()))
 
 			statusCode := http.StatusInternalServerError
-			errMsg := err.Error()
+			errMsg := "Internal server error"
 
 			switch {
 			case errors.Is(err, auth.ErrNotAuthenticated):
@@ -144,7 +151,11 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 				errMsg = "Authentication failed"
 			case errors.Is(err, auth.ErrMissingCertificate):
 				statusCode = http.StatusBadRequest
-				errMsg = prepareMissingCertificateTypesErrorMsg(m.peer.CertificatesToRequest.CertificateTypes)
+				var certTypes sdkUtils.RequestedCertificateTypeIDAndFieldList
+				if m.peer != nil && m.peer.CertificatesToRequest != nil {
+					certTypes = m.peer.CertificatesToRequest.CertificateTypes
+				}
+				errMsg = prepareMissingCertificateTypesErrorMsg(certTypes)
 			case errors.Is(err, auth.ErrInvalidNonce):
 				statusCode = http.StatusBadRequest
 				errMsg = "Invalid nonce"
@@ -161,17 +172,13 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		}
 
 		if !httptransport.HasBeenWritten(wrappedWriter) {
-			if authMsg.IdentityKey != nil {
-				r = r.WithContext(context.WithValue(r.Context(), httptransport.IdentityKey, authMsg.IdentityKey.ToDERHex()))
-			}
-
+			r = r.WithContext(context.WithValue(r.Context(), httptransport.IdentityKey, authMsg.IdentityKey.ToDERHex()))
 			next.ServeHTTP(wrappedWriter, r)
 		}
 	})
 }
 
-// prepareMissingCertificateTypesError creates a formatted error message for missing certificate types
-// It accepts a RequestedCertificateTypeIDAndFieldList (map of type -> fields) and formats it into a readable error
+// prepareMissingCertificateTypesErrorMsg prepares a user-friendly error message for missing certificate types.
 func prepareMissingCertificateTypesErrorMsg(missingCertTypes sdkUtils.RequestedCertificateTypeIDAndFieldList) string {
 	if len(missingCertTypes) == 0 {
 		return ""
@@ -180,7 +187,6 @@ func prepareMissingCertificateTypesErrorMsg(missingCertTypes sdkUtils.RequestedC
 	var typesWithFields []string
 	var typesWithoutFields []string
 
-	// Iterate through the map of certificate types and their fields
 	for certType, fields := range missingCertTypes {
 		typeName := getReadableCertTypeName(certType)
 
@@ -192,24 +198,16 @@ func prepareMissingCertificateTypesErrorMsg(missingCertTypes sdkUtils.RequestedC
 		}
 	}
 
-	// Use a more detailed message if we have field information
+	withFields := ""
 	if len(typesWithFields) > 0 {
-		if len(typesWithoutFields) > 0 {
-			// Combine types with fields and types without fields
-			allMissing := append(typesWithFields, typesWithoutFields...)
-			return fmt.Sprintf("Missing required certificates: %s", strings.Join(allMissing, "; "))
-		}
-		return fmt.Sprintf("Missing required certificates with fields: %s", strings.Join(typesWithFields, "; "))
+		withFields = " with fields"
 	}
-
-	// Simple message when no field information is available
-	return fmt.Sprintf("Missing required certificates: %s", strings.Join(typesWithoutFields, ", "))
+	allMissing := append(typesWithFields, typesWithoutFields...)
+	return fmt.Sprintf("Missing required certificates%s: %s", withFields, strings.Join(allMissing, ", "))
 }
 
-// getReadableCertTypeName returns a more readable version of certificate type ID
-// Certificate type IDs are often base64 encoded and difficult to read
+// getReadableCertTypeName returns a shortened version of the certificate type ID for better readability.
 func getReadableCertTypeName(certTypeID string) string {
-	// If the certificate type ID looks like a base64 string, use a shortened version
 	if len(certTypeID) > 16 && !strings.Contains(certTypeID, " ") {
 		return certTypeID[:8] + "..." + certTypeID[len(certTypeID)-8:]
 	}

@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/constants"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 	"github.com/bsv-blockchain/go-sdk/auth"
@@ -33,16 +34,6 @@ const (
 	ResponseKey contextKey = "http_response"
 	// NextKey is the key used to store the next handler in the context
 	NextKey contextKey = "http_next_handler"
-
-	// HTTP headers - as specified in BRC-104
-	authHeaderPrefix  = "x-bsv-auth-"
-	versionHeader     = authHeaderPrefix + "version"
-	messageTypeHeader = authHeaderPrefix + "message-type"
-	identityKeyHeader = authHeaderPrefix + "identity-key"
-	nonceHeader       = authHeaderPrefix + "nonce"
-	yourNonceHeader   = authHeaderPrefix + "your-nonce"
-	signatureHeader   = authHeaderPrefix + "signature"
-	requestIDHeader   = authHeaderPrefix + "request-id"
 )
 
 type responseRecorder struct {
@@ -160,20 +151,20 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 
 	switch message.MessageType {
 	case auth.MessageTypeInitialResponse, auth.MessageTypeCertificateResponse:
-		resp.Header().Set(versionHeader, message.Version)
-		resp.Header().Set(messageTypeHeader, string(message.MessageType))
-		resp.Header().Set(identityKeyHeader, message.IdentityKey.ToDERHex())
+		resp.Header().Set(constants.HeaderVersion, message.Version)
+		resp.Header().Set(constants.HeaderMessageType, string(message.MessageType))
+		resp.Header().Set(constants.HeaderIdentityKey, message.IdentityKey.ToDERHex())
 
 		if message.Nonce != "" {
-			resp.Header().Set(nonceHeader, message.Nonce)
+			resp.Header().Set(constants.HeaderNonce, message.Nonce)
 		}
 
 		if message.YourNonce != "" {
-			resp.Header().Set(yourNonceHeader, message.YourNonce)
+			resp.Header().Set(constants.HeaderYourNonce, message.YourNonce)
 		}
 
 		if message.Signature != nil {
-			resp.Header().Set(signatureHeader, hex.EncodeToString(message.Signature))
+			resp.Header().Set(constants.HeaderSignature, hex.EncodeToString(message.Signature))
 		}
 
 		resp.Header().Set("Content-Type", "application/json")
@@ -187,26 +178,26 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 		req, _ := ctx.Value(RequestKey).(*http.Request)
 		requestID := ""
 		if req != nil {
-			requestID = req.Header.Get(requestIDHeader)
+			requestID = req.Header.Get(constants.HeaderRequestID)
 		}
 
-		resp.Header().Set(versionHeader, message.Version)
-		resp.Header().Set(identityKeyHeader, message.IdentityKey.ToDERHex())
+		resp.Header().Set(constants.HeaderVersion, message.Version)
+		resp.Header().Set(constants.HeaderIdentityKey, message.IdentityKey.ToDERHex())
 
 		if message.Nonce != "" {
-			resp.Header().Set(nonceHeader, message.Nonce)
+			resp.Header().Set(constants.HeaderNonce, message.Nonce)
 		}
 
 		if message.YourNonce != "" {
-			resp.Header().Set(yourNonceHeader, message.YourNonce)
+			resp.Header().Set(constants.HeaderYourNonce, message.YourNonce)
 		}
 
 		if message.Signature != nil {
-			resp.Header().Set(signatureHeader, hex.EncodeToString(message.Signature))
+			resp.Header().Set(constants.HeaderSignature, hex.EncodeToString(message.Signature))
 		}
 
 		if requestID != "" {
-			resp.Header().Set(requestIDHeader, requestID)
+			resp.Header().Set(constants.HeaderRequestID, requestID)
 		}
 
 		if next != nil {
@@ -232,20 +223,20 @@ func ParseAuthMessageFromRequest(req *http.Request) (*auth.AuthMessage, error) {
 		return &message, nil
 
 	} else {
-		version := req.Header.Get(versionHeader)
+		version := req.Header.Get(constants.HeaderVersion)
 		if version == "" {
 			return nil, nil
 		}
 
-		identityKey := req.Header.Get(identityKeyHeader)
+		identityKey := req.Header.Get(constants.HeaderIdentityKey)
 		if identityKey == "" {
 			return nil, errors.New("missing identity key header")
 		}
 
-		nonce := req.Header.Get(nonceHeader)
-		yourNonce := req.Header.Get(yourNonceHeader)
-		signature := req.Header.Get(signatureHeader)
-		requestID := req.Header.Get(requestIDHeader)
+		nonce := req.Header.Get(constants.HeaderNonce)
+		yourNonce := req.Header.Get(constants.HeaderYourNonce)
+		signature := req.Header.Get(constants.HeaderSignature)
+		requestID := req.Header.Get(constants.HeaderRequestID)
 
 		pubKey, err := primitives.PublicKeyFromString(identityKey)
 		if err != nil {
@@ -344,7 +335,7 @@ func BuildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 	for k, v := range req.Header {
 		k = strings.ToLower(k)
 		if (strings.HasPrefix(k, "x-bsv-") || k == "content-type" || k == "authorization") &&
-			!strings.HasPrefix(k, "x-bsv-auth") {
+			!strings.HasPrefix(k, constants.AuthHeaderPrefix) {
 			includedHeaders = append(includedHeaders, []string{k, v[0]})
 		}
 	}

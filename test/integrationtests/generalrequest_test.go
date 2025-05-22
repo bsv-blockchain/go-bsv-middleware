@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/constants"
 	"github.com/bsv-blockchain/go-bsv-middleware/test/assert"
 	"github.com/bsv-blockchain/go-bsv-middleware/test/mocks"
 	"github.com/bsv-blockchain/go-sdk/auth"
@@ -241,7 +242,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 		request, err := http.NewRequest(http.MethodGet, pingPath, nil)
 		require.NoError(t, err)
 		err = mocks.PrepareGeneralRequestHeaders(t.Context(), clientWallet, authMessage, request)
-		request.Header.Del("x-bsv-auth-version")
+		request.Header.Del(constants.HeaderVersion)
 
 		require.NoError(t, err)
 		serverWallet.OnVerifyNonceOnce(true, nil)
@@ -292,7 +293,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 		request, err := http.NewRequest(http.MethodGet, pingPath, nil)
 		require.NoError(t, err)
 		err = mocks.PrepareGeneralRequestHeaders(t.Context(), clientWallet, authMessage, request)
-		request.Header.Del("x-bsv-auth-identity-key")
+		request.Header.Del(constants.HeaderIdentityKey)
 
 		require.NoError(t, err)
 		serverWallet.OnVerifyNonceOnce(true, nil)
@@ -343,7 +344,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 		request, err := http.NewRequest(http.MethodGet, pingPath, nil)
 		require.NoError(t, err)
 		err = mocks.PrepareGeneralRequestHeaders(t.Context(), clientWallet, authMessage, request)
-		request.Header.Del("x-bsv-auth-nonce")
+		request.Header.Del(constants.HeaderNonce)
 
 		require.NoError(t, err)
 		serverWallet.OnVerifyNonceOnce(true, nil)
@@ -394,7 +395,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 		request, err := http.NewRequest(http.MethodGet, pingPath, nil)
 		require.NoError(t, err)
 		err = mocks.PrepareGeneralRequestHeaders(t.Context(), clientWallet, authMessage, request)
-		request.Header.Del("x-bsv-auth-your-nonce")
+		request.Header.Del(constants.HeaderYourNonce)
 
 		require.NoError(t, err)
 		serverWallet.OnVerifyNonceOnce(true, nil)
@@ -445,7 +446,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 		request, err := http.NewRequest(http.MethodGet, pingPath, nil)
 		require.NoError(t, err)
 		err = mocks.PrepareGeneralRequestHeaders(t.Context(), clientWallet, authMessage, request)
-		request.Header.Del("x-bsv-auth-signature")
+		request.Header.Del(constants.HeaderSignature)
 
 		require.NoError(t, err)
 		serverWallet.OnVerifyNonceOnce(true, nil)
