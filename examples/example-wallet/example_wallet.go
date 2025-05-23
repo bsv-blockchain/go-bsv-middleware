@@ -3,9 +3,15 @@ package wallet
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/bsv-blockchain/go-sdk/wallet"
+)
+
+const (
+	// ErrNotImplemented is returned when a method is not implemented
+	ErrNotImplemented = "not implemented"
 )
 
 // ExtendedProtoWallet wraps ProtoWallet and implements the full wallet.Interface
@@ -30,11 +36,11 @@ func NewExtendedProtoWallet(privateKey *ec.PrivateKey) (*ExtendedProtoWallet, er
 
 // Transaction-related methods (not needed for auth demo, return appropriate errors/defaults)
 func (w *ExtendedProtoWallet) CreateAction(ctx context.Context, args wallet.CreateActionArgs, originator string) (*wallet.CreateActionResult, error) {
-	return nil, errors.New("CreateAction not implemented - this is an auth demo wallet")
+	return nil, fmt.Errorf("CreateAction: %s", ErrNotImplemented)
 }
 
 func (w *ExtendedProtoWallet) SignAction(ctx context.Context, args wallet.SignActionArgs, originator string) (*wallet.SignActionResult, error) {
-	return nil, fmt.Errorf("SignAction: %w", ErrNotImplemented)
+	return nil, fmt.Errorf("SignAction: %s", ErrNotImplemented)
 }
 
 func (w *ExtendedProtoWallet) AbortAction(ctx context.Context, args wallet.AbortActionArgs, originator string) (*wallet.AbortActionResult, error) {
