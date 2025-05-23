@@ -348,33 +348,22 @@ func buildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 		}
 	}
 
-	if req.Body != nil {
-		body, err := io.ReadAll(req.Body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read request body: %w", err)
-		}
+	body, err := bodyContent(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read request body: %w", err)
+	}
 
-		if len(body) > 0 {
-			req.Body = io.NopCloser(bytes.NewBuffer(body))
-			if err := writeVarInt(writer, len(body)); err != nil {
-				return nil, fmt.Errorf("failed to write body length: %w", err)
-			}
+	if len(body) > 0 {
+		req.Body = io.NopCloser(bytes.NewBuffer(body))
 
-			_, err = writer.Write(body)
-			if err != nil {
-				return nil, fmt.Errorf("failed to write body: %w", err)
-			}
-		} else {
-			if err := writeVarInt(writer, -1); err != nil {
-				return nil, fmt.Errorf("failed to write empty body marker: %w", err)
-			}
+		if err = writeBytes(writer, body); err != nil {
+			return nil, fmt.Errorf("failed to write request body: %w", err)
 		}
 	} else {
 		if err := writeVarInt(writer, -1); err != nil {
 			return nil, fmt.Errorf("failed to write nil body marker: %w", err)
 		}
 	}
-
 	return writer.Bytes(), nil
 }
 
@@ -412,6 +401,29 @@ func writeVarInt(w *bytes.Buffer, n int) error {
 	err := binary.Write(w, binary.LittleEndian, int64(n))
 	if err != nil {
 		return fmt.Errorf("failed to write variable integer: %w", err)
+	}
+	return nil
+}
+
+func bodyContent(req *http.Request) ([]byte, error) {
+	if req.Body == nil {
+		return nil, nil
+	}
+
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read request body: %w", err)
+	}
+
+	return body, nil
+}
+
+func writeBytes(writer *bytes.Buffer, data []byte) error {
+	if err := writeVarInt(writer, len(data)); err != nil {
+		return fmt.Errorf("failed to write bytes length: %w", err)
+	}
+	if _, err := writer.Write(data); err != nil {
+		return fmt.Errorf("failed to write bytes: %w", err)
 	}
 	return nil
 }
