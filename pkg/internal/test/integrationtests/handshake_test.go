@@ -48,7 +48,6 @@ func TestHandshake_MissingInitialNonce(t *testing.T) {
 
 	clientWallet := mocks.CreateClientMockWallet()
 
-	// given
 	initialRequest := mocks.PrepareInitialRequestBody(t.Context(), clientWallet)
 	initialRequest.InitialNonce = ""
 
