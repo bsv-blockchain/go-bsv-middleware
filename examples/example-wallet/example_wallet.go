@@ -34,7 +34,7 @@ func (w *ExtendedProtoWallet) CreateAction(ctx context.Context, args wallet.Crea
 }
 
 func (w *ExtendedProtoWallet) SignAction(ctx context.Context, args wallet.SignActionArgs, originator string) (*wallet.SignActionResult, error) {
-	return nil, errors.New("SignAction not implemented - this is an auth demo wallet")
+	return nil, fmt.Errorf("SignAction: %w", ErrNotImplemented)
 }
 
 func (w *ExtendedProtoWallet) AbortAction(ctx context.Context, args wallet.AbortActionArgs, originator string) (*wallet.AbortActionResult, error) {
