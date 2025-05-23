@@ -354,9 +354,8 @@ func buildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 			return nil, fmt.Errorf("failed to read request body: %w", err)
 		}
 
-		req.Body = io.NopCloser(bytes.NewBuffer(body))
-
 		if len(body) > 0 {
+			req.Body = io.NopCloser(bytes.NewBuffer(body))
 			if err := writeVarInt(writer, len(body)); err != nil {
 				return nil, fmt.Errorf("failed to write body length: %w", err)
 			}
