@@ -135,7 +135,7 @@ func PrepareCertificateResponseHeaders(ctx context.Context, walletInstance inter
 	}
 
 	if clientIdentityKey.PublicKey == nil {
-		return nil, errors.New("client identity key is nil")
+		return nil, fmt.Errorf("client identity key is nil")
 	}
 
 	requestID := generateRandom()
