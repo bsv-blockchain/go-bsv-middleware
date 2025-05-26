@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"log/slog"
@@ -156,7 +155,7 @@ func callInitialRequest(clientWallet wallet.Interface) (*auth.AuthMessage, error
 	if resp.IsError() {
 		errMsg := resp.String()
 		log.Printf("Server returned error (%d): %s", resp.StatusCode(), errMsg)
-		return nil, errors.New("server error occurred")
+		return nil, fmt.Errorf("server returned error: %s", errMsg)
 	}
 
 	log.Printf("Response from server: %s", resp.String())

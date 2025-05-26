@@ -2,7 +2,6 @@ package wallet
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
@@ -72,17 +71,17 @@ func (w *ExtendedProtoWallet) RelinquishOutput(ctx context.Context, args wallet.
 
 // Key linkage methods (return errors for demo)
 func (w *ExtendedProtoWallet) RevealCounterpartyKeyLinkage(ctx context.Context, args wallet.RevealCounterpartyKeyLinkageArgs, originator string) (*wallet.RevealCounterpartyKeyLinkageResult, error) {
-	return nil, errors.New("RevealCounterpartyKeyLinkage not implemented - this is an auth demo wallet")
+	return nil, fmt.Errorf("RevealCounterpartyKeyLinkage: %s", ErrNotImplemented)
 }
 
 func (w *ExtendedProtoWallet) RevealSpecificKeyLinkage(ctx context.Context, args wallet.RevealSpecificKeyLinkageArgs, originator string) (*wallet.RevealSpecificKeyLinkageResult, error) {
-	return nil, errors.New("RevealSpecificKeyLinkage not implemented - this is an auth demo wallet")
+	return nil, fmt.Errorf("RevealSpecificKeyLinkage: %s", ErrNotImplemented)
 }
 
 // Certificate methods - implement basic functionality for demo
 func (w *ExtendedProtoWallet) AcquireCertificate(ctx context.Context, args wallet.AcquireCertificateArgs, originator string) (*wallet.Certificate, error) {
 	if args.Type == "" || args.Certifier == "" {
-		return nil, errors.New("missing required certificate fields")
+		return nil, fmt.Errorf("certificate type and certifier are required")
 	}
 
 	// Get our identity key for the subject
@@ -118,7 +117,7 @@ func (w *ExtendedProtoWallet) ListCertificates(ctx context.Context, args wallet.
 
 func (w *ExtendedProtoWallet) ProveCertificate(ctx context.Context, args wallet.ProveCertificateArgs, originator string) (*wallet.ProveCertificateResult, error) {
 	if args.Certificate.Type == "" {
-		return nil, errors.New("certificate type is required")
+		return nil, fmt.Errorf("certificate type is required")
 	}
 
 	// Create mock keyring for demo

@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
@@ -134,7 +134,7 @@ func callInitialRequest(clientWallet wallet.Interface) (*auth.AuthMessage, error
 	if resp.IsError() {
 		errMsg := resp.String()
 		log.Printf("Server returned error (%d): %s", resp.StatusCode(), errMsg)
-		return nil, errors.New("server error occurred")
+		return nil, fmt.Errorf("server returned error (%d): %s", resp.StatusCode(), errMsg)
 	}
 
 	log.Println("Response from server: ", resp.String())
