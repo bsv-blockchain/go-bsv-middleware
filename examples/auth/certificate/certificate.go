@@ -112,17 +112,17 @@ func main() {
 	}
 	log.Println("✓ Auth completed")
 
-	log.Println("\n📡 STEP 2: Sending general request to test authorization")
-	if err := callPingEndpoint(clientWallet, responseData); err != nil {
-		log.Fatalf("Failed to call ping endpoint: %v", err)
-	}
-	log.Println("✓ General request completed")
-
-	log.Println("\n📡 STEP 3: Sending certificates")
+	log.Println("\n📡 STEP 2: Sending certificates")
 	if err := sendCertificate(context.Background(), clientWallet, responseData); err != nil {
 		log.Fatalf("Failed to send certificate: %v", err)
 	}
 	log.Println("✓ Certificate request completed")
+
+	log.Println("\n📡 STEP 3: Sending general request to test authorization")
+	if err := callPingEndpoint(clientWallet, responseData); err != nil {
+		log.Fatalf("Failed to call ping endpoint: %v", err)
+	}
+	log.Println("✓ General request completed")
 }
 
 // pingHandler handles ping requests and returns a simple "Pong!" response
