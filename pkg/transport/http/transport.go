@@ -173,6 +173,7 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 			resp.Header().Set(constants.HeaderSignature, hex.EncodeToString(message.Signature))
 		}
 
+		// requested certificates are not set, use the configured ones
 		if message.MessageType == auth.MessageTypeInitialResponse &&
 			len(message.RequestedCertificates.CertificateTypes) == 0 &&
 			t.certificatesToRequest != nil {
