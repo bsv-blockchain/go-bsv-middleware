@@ -55,7 +55,7 @@ func PrepareInitialRequestBody(ctx context.Context, walletInstance interfaces.Wa
 // PrepareGeneralRequestHeaders prepares the general request headers
 func PrepareGeneralRequestHeaders(ctx context.Context, walletInstance interfaces.Wallet, previousResponse *auth.AuthMessage, requestData RequestData) (map[string]string, error) {
 	serverIdentityKey := previousResponse.IdentityKey
-	serverNonce := previousResponse.InitialNonce
+	serverNonce := previousResponse.Nonce
 
 	opts := wallet.GetPublicKeyArgs{IdentityKey: true}
 	clientIdentityKey, err := walletInstance.GetPublicKey(ctx, opts, "")
@@ -126,7 +126,7 @@ func PrepareGeneralRequestHeaders(ctx context.Context, walletInstance interfaces
 // PrepareCertificateResponseHeaders prepares the certificate response headers
 func PrepareCertificateResponseHeaders(ctx context.Context, walletInstance interfaces.Wallet, previousResponse *auth.AuthMessage, requestData RequestData) (map[string]string, error) {
 	serverIdentityKey := previousResponse.IdentityKey
-	serverNonce := previousResponse.InitialNonce
+	serverNonce := previousResponse.Nonce
 
 	opts := wallet.GetPublicKeyArgs{IdentityKey: true}
 	clientIdentityKey, err := walletInstance.GetPublicKey(ctx, opts, "")

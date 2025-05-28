@@ -100,7 +100,7 @@ func TestAuthMiddleware_GeneralRequest_Signature(t *testing.T) {
 
 	// then
 	require.NoError(t, err)
-	testutils.InternalServerError(t, response)
+	testutils.BadRequest(t, response)
 }
 
 func TestAuthMiddleware_GeneralRequest_SessionManager(t *testing.T) {
