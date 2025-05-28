@@ -173,12 +173,7 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 			resp.Header().Set(constants.HeaderSignature, hex.EncodeToString(message.Signature))
 		}
 
-		// requested certificates are not set, use the configured ones
-		if message.MessageType == auth.MessageTypeInitialResponse &&
-			len(message.RequestedCertificates.CertificateTypes) == 0 &&
-			t.certificatesToRequest != nil {
-			message.RequestedCertificates = *t.certificatesToRequest
-		}
+		t.applyDefaultCertificateRequests(message)
 
 		resp.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(resp).Encode(message); err != nil {
@@ -304,6 +299,18 @@ func ParseAuthMessageFromRequest(req *http.Request) (*auth.AuthMessage, error) {
 	}
 
 	return message, nil
+}
+
+func (t *Transport) applyDefaultCertificateRequests(message *auth.AuthMessage) {
+	if t.shouldApplyDefaultCertificates(message) {
+		message.RequestedCertificates = *t.certificatesToRequest
+	}
+}
+
+func (t *Transport) shouldApplyDefaultCertificates(message *auth.AuthMessage) bool {
+	return message.MessageType == auth.MessageTypeInitialResponse &&
+		len(message.RequestedCertificates.CertificateTypes) == 0 &&
+		t.certificatesToRequest != nil
 }
 
 func buildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
