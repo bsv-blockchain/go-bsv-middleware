@@ -173,6 +173,12 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 			resp.Header().Set(constants.HeaderSignature, hex.EncodeToString(message.Signature))
 		}
 
+		if message.MessageType == auth.MessageTypeInitialResponse &&
+			len(message.RequestedCertificates.CertificateTypes) == 0 &&
+			t.certificatesToRequest != nil {
+			message.RequestedCertificates = *t.certificatesToRequest
+		}
+
 		resp.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(resp).Encode(message); err != nil {
 			return fmt.Errorf("failed to encode message to JSON: %w", err)

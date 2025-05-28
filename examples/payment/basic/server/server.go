@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
-	"log/slog"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -23,27 +23,27 @@ const (
 )
 
 func main() {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	log.Println("Starting BSV Payment Server")
 
 	sPrivKey, err := ec.PrivateKeyFromHex(serverPrivateKeyHex)
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to parse server private key: %v", err)
 	}
 
 	paymentWallet, err := wallet.NewExtendedProtoWallet(sPrivKey)
 	if err != nil {
-		logger.Error("create wallet failed", slog.String("error", err.Error()))
-		os.Exit(1)
+		log.Fatalf("Failed to create wallet: %v", err)
 	}
+	log.Println("Wallet created successfully")
+
 	authMiddleware, err := auth.New(auth.Config{
 		AllowUnauthenticated: false,
-		Logger:               logger,
 		Wallet:               paymentWallet,
 	})
 	if err != nil {
-		logger.Error("create auth middleware failed", slog.String("error", err.Error()))
-		os.Exit(1)
+		log.Fatalf("Failed to create auth middleware: %v", err)
 	}
+	log.Println("Auth middleware initialized")
 
 	paymentMiddleware, err := payment.New(payment.Options{
 		Wallet: paymentWallet,
@@ -59,9 +59,9 @@ func main() {
 		},
 	})
 	if err != nil {
-		logger.Error("middleware setup failed", slog.String("error", err.Error()))
-		os.Exit(1)
+		log.Fatalf("Failed to create payment middleware: %v", err)
 	}
+	log.Println("Payment middleware initialized")
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/info", infoHandler)
@@ -70,39 +70,50 @@ func main() {
 	handler := authMiddleware.Handler(paymentMiddleware.Handler(mux))
 
 	srv := &http.Server{
-		Addr:    ":8080",
+		Addr:    serverPort,
 		Handler: handler,
 	}
 
 	go func() {
-		logger.Info("server listening", slog.String("addr", srv.Addr))
-		logger.Info("/.well-known/auth")
-		logger.Info("/info (auth only)")
-		logger.Info("/premium (paid)")
+		log.Printf("Server listening on %s", srv.Addr)
+		log.Println("Available endpoints:")
+		log.Println("  /.well-known/auth")
+		log.Println("  /info (auth only)")
+		log.Println("  /premium (auth + payment)")
+
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Error("server error", slog.Any("error", err))
+			log.Printf("Server error: %v", err)
 		}
 	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
+
+	log.Println("Server shutting down...")
 }
 
 func infoHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GET %s from %s", r.URL.Path, r.RemoteAddr)
+
 	w.Header().Set("Content-Type", "application/json")
-	_, err := w.Write([]byte(`{"name":"BSV Payment API","version":"1.0","type":"free"}`))
-	if err != nil {
-		fmt.Println("Error writing response:", err)
+	response := `{"name":"BSV Payment API","version":"1.0","type":"free"}`
+
+	if _, err := w.Write([]byte(response)); err != nil {
+		log.Printf("Error writing response: %v", err)
 		return
 	}
 }
 
 func premiumHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GET %s from %s", r.URL.Path, r.RemoteAddr)
+
 	info, ok := payment.GetPaymentInfoFromContext(r.Context())
 	w.Header().Set("Content-Type", "application/json")
 
 	if ok && info.SatoshisPaid > 0 {
+		log.Printf("Payment verified: %d satoshis, txid: %s", info.SatoshisPaid, info.TransactionID)
+
 		response := fmt.Sprintf(`{
             "name": "BSV Payment API",
             "version": "1.0",
@@ -113,9 +124,8 @@ func premiumHandler(w http.ResponseWriter, r *http.Request) {
             "txid": "%s"
         }`, info.SatoshisPaid, info.TransactionID)
 
-		_, err := w.Write([]byte(response))
-		if err != nil {
-			fmt.Println("Error writing response:", err)
+		if _, err := w.Write([]byte(response)); err != nil {
+			log.Printf("Error writing response: %v", err)
 			return
 		}
 		return
@@ -124,6 +134,8 @@ func premiumHandler(w http.ResponseWriter, r *http.Request) {
 	// NOTE: This code path is for demonstration only and won't actually execute
 	// in normal operation because the payment middleware would intercept the request
 	// with a 402 Payment Required response before reaching this handler
+	log.Println("WARNING: Premium endpoint reached without payment - this should not happen")
+
 	response := `{
         "name": "BSV Payment API",
         "version": "1.0",
@@ -132,9 +144,8 @@ func premiumHandler(w http.ResponseWriter, r *http.Request) {
         "note": "This code path would normally not be reached - middleware would return 402 Payment Required"
     }`
 
-	_, err := w.Write([]byte(response))
-	if err != nil {
-		fmt.Println("Error writing response:", err)
+	if _, err := w.Write([]byte(response)); err != nil {
+		log.Printf("Error writing response: %v", err)
 		return
 	}
 }
