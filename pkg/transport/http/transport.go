@@ -21,6 +21,7 @@ import (
 	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/auth/utils"
 	primitives "github.com/bsv-blockchain/go-sdk/primitives/ec"
+	"github.com/bsv-blockchain/go-sdk/util"
 )
 
 type contextKey string
@@ -388,12 +389,10 @@ func isIncludedHeader(headerKey string) bool {
 }
 
 func writeString(writer *bytes.Buffer, str string) error {
-	if err := writeVarInt(writer, len(str)); err != nil {
-		return fmt.Errorf("failed to write string length: %w", err)
-	}
-	if _, err := writer.WriteString(str); err != nil {
-		return fmt.Errorf("failed to write string: %w", err)
-	}
+	length := util.VarInt(len(str))
+
+	writer.Write(length.Bytes())
+	writer.WriteString(str)
 	return nil
 }
 
