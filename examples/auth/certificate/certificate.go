@@ -52,9 +52,9 @@ func main() {
 	log.Println("✓ Server wallet created")
 
 	certificateToRequest := &sdkUtils.RequestedCertificateSet{
-		Certifiers: []string{trustedCertifier},
-		CertificateTypes: map[string][]string{
-			"age-verification": {"age"},
+		Certifiers: byteToWalletHexBytes33([]byte(trustedCertifier)),
+		CertificateTypes: map[wallet.Base64Bytes32][]string{
+			toBase64Bytes32("age-verification"): {"age"},
 		},
 	}
 
@@ -480,4 +480,18 @@ func onCertificatesReceivedFunc(
 
 	log.Printf("Age verification successful")
 	return nil
+}
+
+func byteToWalletHexBytes33(bytetable []byte) []wallet.HexBytes33 {
+	if len(bytetable) == 0 || len(bytetable) != 33 {
+		return nil
+	}
+	hexBytes := make([]wallet.HexBytes33, 1)
+	copy(hexBytes[0][:], bytetable[:33])
+	return hexBytes
+}
+
+func toBase64Bytes32(s string) (out wallet.Base64Bytes32) {
+	copy(out[:], s)
+	return
 }

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -177,7 +178,8 @@ func prepareMissingCertificateTypesErrorMsg(missingCertTypes sdkUtils.RequestedC
 	var typesWithoutFields []string
 
 	for certType, fields := range missingCertTypes {
-		typeName := getReadableCertTypeName(certType)
+		certTypeIDStr := base64.StdEncoding.EncodeToString(certType[:])
+		typeName := getReadableCertTypeName(certTypeIDStr)
 
 		if len(fields) > 0 {
 			fieldStr := fmt.Sprintf("%s (fields: %s)", typeName, strings.Join(fields, ", "))

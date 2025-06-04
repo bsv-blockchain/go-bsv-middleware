@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
@@ -80,18 +81,17 @@ func (w *ExtendedProtoWallet) RevealSpecificKeyLinkage(ctx context.Context, args
 
 // Certificate methods - implement basic functionality for demo
 func (w *ExtendedProtoWallet) AcquireCertificate(ctx context.Context, args wallet.AcquireCertificateArgs, originator string) (*wallet.Certificate, error) {
-	if args.Type == "" || args.Certifier == "" {
+	if len(args.Type) == 0 || len(args.Certifier) == 0 {
 		return nil, fmt.Errorf("certificate type and certifier are required")
 	}
 
-	// Get our identity key for the subject
 	identityResult, err := w.GetPublicKey(ctx, wallet.GetPublicKeyArgs{IdentityKey: true}, originator)
 	if err != nil {
 		return nil, err
 	}
 
-	// Parse certifier key
-	certifierKey, err := ec.PublicKeyFromString(args.Certifier)
+	certifierStr := hex.EncodeToString(args.Certifier[:])
+	certifierKey, err := ec.PublicKeyFromString(certifierStr)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func (w *ExtendedProtoWallet) ListCertificates(ctx context.Context, args wallet.
 }
 
 func (w *ExtendedProtoWallet) ProveCertificate(ctx context.Context, args wallet.ProveCertificateArgs, originator string) (*wallet.ProveCertificateResult, error) {
-	if args.Certificate.Type == "" {
+	if len(args.Certificate.Type) == 0 {
 		return nil, fmt.Errorf("certificate type is required")
 	}
 
@@ -164,7 +164,7 @@ func (w *ExtendedProtoWallet) GetHeight(ctx context.Context, args any, originato
 }
 
 func (w *ExtendedProtoWallet) GetHeaderForHeight(ctx context.Context, args wallet.GetHeaderArgs, originator string) (*wallet.GetHeaderResult, error) {
-	return &wallet.GetHeaderResult{Header: "mock-header"}, nil
+	return &wallet.GetHeaderResult{Header: []byte("mock-header")}, nil
 }
 
 func (w *ExtendedProtoWallet) GetNetwork(ctx context.Context, args any, originator string) (*wallet.GetNetworkResult, error) {
