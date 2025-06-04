@@ -26,8 +26,8 @@ func TestHandshake_HappyPath(t *testing.T) {
 	serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
 	serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
 	serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
-	serverWallet.OnCreateHmacOnce(&wallet.CreateHmacResult{
-		Hmac: []byte("mockhmacsignature"),
+	serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
+		HMAC: []byte("mockhmacsignature"),
 	}, nil)
 
 	// when
@@ -110,8 +110,8 @@ func TestHandshake_InvalidNonceFormat(t *testing.T) {
 	initialRequest.InitialNonce = "this-is-not-valid-base64!"
 
 	serverWallet.OnCreateNonceOnce("", errors.New("invalid nonce format"))
-	serverWallet.OnCreateHmacOnce(&wallet.CreateHmacResult{
-		Hmac: []byte("mockhmacsignature"),
+	serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
+		HMAC: []byte("mockhmacsignature"),
 	}, nil)
 
 	// when

@@ -13,6 +13,7 @@ import (
 	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	primitives "github.com/bsv-blockchain/go-sdk/primitives/ec"
+	tu "github.com/bsv-blockchain/go-sdk/util/test_util"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 	"github.com/stretchr/testify/require"
 )
@@ -25,10 +26,12 @@ var (
 
 func TestAuthMiddleware_InvalidCertificateHandling(t *testing.T) {
 	// given
+	var certType wallet.Base64Bytes32
+	copy(certType[:], "age-verification")
 	certificateRequirements := &sdkUtils.RequestedCertificateSet{
-		Certifiers: []string{trustedCertifier.ToDERHex()},
+		Certifiers: []wallet.HexBytes33{tu.GetByte33FromString(trustedCertifier.ToDERHex()[:32])},
 		CertificateTypes: sdkUtils.RequestedCertificateTypeIDAndFieldList{
-			"age-verification": []string{"age", "country"},
+			certType: []string{"age", "country"},
 		},
 	}
 
@@ -193,8 +196,8 @@ func TestAuthMiddleware_InvalidCertificateHandling(t *testing.T) {
 			serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
 			serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
 			serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
-			serverWallet.OnCreateHmacOnce(&wallet.CreateHmacResult{
-				Hmac: []byte("mockhmacsignature"),
+			serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
+				HMAC: []byte("mockhmacsignature"),
 			}, nil)
 			serverWallet.OnVerifySignatureOnce(&wallet.VerifySignatureResult{
 				Valid: true,
@@ -276,8 +279,8 @@ func TestAuthMiddleware_CertificateHandling(t *testing.T) {
 		serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
 		serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
 		serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
-		serverWallet.OnCreateHmacOnce(&wallet.CreateHmacResult{
-			Hmac: []byte("mockhmacsignature"),
+		serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
+			HMAC: []byte("mockhmacsignature"),
 		}, nil)
 		serverWallet.OnVerifySignatureOnce(&wallet.VerifySignatureResult{
 			Valid: true,
@@ -291,10 +294,12 @@ func TestAuthMiddleware_CertificateHandling(t *testing.T) {
 			LastUpdate:      1747241090788,
 		})
 
+		var certType wallet.Base64Bytes32
+		copy(certType[:], "age-verification")
 		certificateRequirements := &sdkUtils.RequestedCertificateSet{
-			Certifiers: []string{trustedCertifier.ToDERHex()},
+			Certifiers: []wallet.HexBytes33{tu.GetByte33FromString(trustedCertifier.ToDERHex()[:32])},
 			CertificateTypes: sdkUtils.RequestedCertificateTypeIDAndFieldList{
-				"age-verification": []string{"age", "country"},
+				certType: []string{"age", "country"},
 			},
 		}
 
@@ -333,8 +338,8 @@ func TestAuthMiddleware_CertificateHandling(t *testing.T) {
 		serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
 		serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
 		serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
-		serverWallet.OnCreateHmacOnce(&wallet.CreateHmacResult{
-			Hmac: []byte("mockhmacsignature"),
+		serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
+			HMAC: []byte("mockhmacsignature"),
 		}, nil)
 		serverWallet.OnVerifySignatureOnce(&wallet.VerifySignatureResult{
 			Valid: true,
@@ -347,10 +352,12 @@ func TestAuthMiddleware_CertificateHandling(t *testing.T) {
 			PeerIdentityKey: clientIdentityKey,
 			LastUpdate:      1747241090788,
 		})
+		var certType wallet.Base64Bytes32
+		copy(certType[:], "age-verification")
 		certificateRequirements := &sdkUtils.RequestedCertificateSet{
-			Certifiers: []string{trustedCertifier.ToDERHex()},
+			Certifiers: []wallet.HexBytes33{tu.GetByte33FromString(trustedCertifier.ToDERHex()[:32])},
 			CertificateTypes: sdkUtils.RequestedCertificateTypeIDAndFieldList{
-				"age-verification": []string{"age", "country"},
+				certType: []string{"age", "country"},
 			},
 		}
 
@@ -406,8 +413,8 @@ func TestAuthMiddleware_CertificateHandling(t *testing.T) {
 		serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
 		serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
 		serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
-		serverWallet.OnCreateHmacOnce(&wallet.CreateHmacResult{
-			Hmac: []byte("mockhmacsignature"),
+		serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
+			HMAC: []byte("mockhmacsignature"),
 		}, nil)
 		serverWallet.OnVerifySignatureOnce(&wallet.VerifySignatureResult{
 			Valid: true,

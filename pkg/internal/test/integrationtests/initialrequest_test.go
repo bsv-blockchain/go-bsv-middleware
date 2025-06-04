@@ -27,8 +27,8 @@ func TestAuthMiddleware_InitialRequest_HappyPath(t *testing.T) {
 		initialRequest := mocks.PrepareInitialRequestBody(t.Context(), clientWallet)
 
 		serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
-		serverWallet.OnCreateHmacOnce(&wallet.CreateHmacResult{
-			Hmac: []byte("mockhmacsignature"),
+		serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
+			HMAC: []byte("mockhmacsignature"),
 		}, nil)
 		serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
 
