@@ -291,11 +291,19 @@ func ParseAuthMessageFromRequest(req *http.Request) (*auth.AuthMessage, error) {
 		Payload:     payload,
 	}
 
+	fmt.Println("Version: ", message.Version)
+	fmt.Println("MessageType: ", message.MessageType)
+	fmt.Println("IdentityKey: ", message.IdentityKey.ToDERHex())
+	fmt.Println("Nonce: ", message.Nonce)
+	fmt.Println("YourNonce: ", message.YourNonce)
+	fmt.Println("Payload: ", message.Payload)
+
 	if signature != "" {
 		sigBytes, err := hex.DecodeString(signature)
 		if err != nil {
 			return nil, fmt.Errorf("invalid signature format: %w", err)
 		}
+		fmt.Println("Signature: ", sigBytes)
 		message.Signature = sigBytes
 	}
 
@@ -379,6 +387,10 @@ func buildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 			return nil, fmt.Errorf("failed to write nil body marker: %w", err)
 		}
 	}
+	fmt.Println(writer.Bytes())
+	for i, val := range writer.Bytes() {
+		fmt.Println(i, " : ", val)
+	}
 	return writer.Bytes(), nil
 }
 
@@ -390,7 +402,6 @@ func isIncludedHeader(headerKey string) bool {
 
 func writeString(writer *bytes.Buffer, str string) error {
 	length := util.VarInt(len(str))
-
 	writer.Write(length.Bytes())
 	writer.WriteString(str)
 	return nil
@@ -410,12 +421,48 @@ func writeOptionalString(writer *bytes.Buffer, str string) error {
 	return nil
 }
 
+// func writeVarInt(w *bytes.Buffer, n int) error {
+// 	if n < 0xFD {
+// 		return w.WriteByte(byte(n))
+// 	} else if n <= 0xFFFF {
+// 		w.WriteByte(0xFD)
+// 		return binary.Write(w, binary.LittleEndian, uint16(n))
+// 	} else if n <= 0xFFFFFFFF {
+// 		w.WriteByte(0xFE)
+// 		return binary.Write(w, binary.LittleEndian, uint32(n))
+// 	} else {
+// 		w.WriteByte(0xFF)
+// 		return binary.Write(w, binary.LittleEndian, uint64(n))
+// 	}
+// }
+
 func writeVarInt(w *bytes.Buffer, n int) error {
-	err := binary.Write(w, binary.LittleEndian, int64(n))
-	if err != nil {
-		return fmt.Errorf("failed to write variable integer: %w", err)
+	if n < -1 {
+		return fmt.Errorf("invalid negative value for VarInt: %d", n)
 	}
-	return nil
+
+	if n == -1 {
+		return w.WriteByte(0xFF)
+	}
+
+	if n < 0xFD {
+		return w.WriteByte(byte(n))
+	} else if n <= 0xFFFF {
+		if err := w.WriteByte(0xFD); err != nil {
+			return err
+		}
+		return binary.Write(w, binary.LittleEndian, uint16(n))
+	} else if n <= 0xFFFFFFFF {
+		if err := w.WriteByte(0xFE); err != nil {
+			return err
+		}
+		return binary.Write(w, binary.LittleEndian, uint32(n))
+	} else {
+		if err := w.WriteByte(0xFF); err != nil {
+			return err
+		}
+		return binary.Write(w, binary.LittleEndian, uint64(n))
+	}
 }
 
 func bodyContent(req *http.Request) ([]byte, error) {

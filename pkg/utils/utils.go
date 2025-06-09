@@ -274,23 +274,100 @@ func WriteRequestData(request *http.Request, writer *bytes.Buffer) error {
 // WriteVarIntNum writes a variable-length integer to a buffer
 // integer is converted to fixed size int64
 func WriteVarIntNum(writer *bytes.Buffer, num int) error {
-	err := binary.Write(writer, binary.LittleEndian, int64(num))
-	if err != nil {
-		return fmt.Errorf("failed to write varint number: %w", err)
+	if num < 0 {
+		// For negative values (like -1 for empty optional strings/bodies)
+		// Write as 8-byte signed integer in little endian
+		return binary.Write(writer, binary.LittleEndian, int64(num))
 	}
-	return nil
+
+	if num < 0xFD {
+		// 0-252: single byte
+		return writer.WriteByte(byte(num))
+	} else if num <= 0xFFFF {
+		// 253-65535: 0xFD + 2 bytes little endian
+		if err := writer.WriteByte(0xFD); err != nil {
+			return fmt.Errorf("failed to write varint prefix: %w", err)
+		}
+		err := binary.Write(writer, binary.LittleEndian, uint16(num))
+		if err != nil {
+			return fmt.Errorf("failed to write varint number: %w", err)
+		}
+		return nil
+	} else if num <= 0xFFFFFFFF {
+		// 65536-4294967295: 0xFE + 4 bytes little endian
+		if err := writer.WriteByte(0xFE); err != nil {
+			return fmt.Errorf("failed to write varint prefix: %w", err)
+		}
+		err := binary.Write(writer, binary.LittleEndian, uint32(num))
+		if err != nil {
+			return fmt.Errorf("failed to write varint number: %w", err)
+		}
+		return nil
+	} else {
+		// Above 4294967295: 0xFF + 8 bytes little endian
+		if err := writer.WriteByte(0xFF); err != nil {
+			return fmt.Errorf("failed to write varint prefix: %w", err)
+		}
+		err := binary.Write(writer, binary.LittleEndian, uint64(num))
+		if err != nil {
+			return fmt.Errorf("failed to write varint number: %w", err)
+		}
+		return nil
+	}
 }
+
+// func WriteVarIntNum(writer *bytes.Buffer, num int) error {
+// 	err := binary.Write(writer, binary.LittleEndian, int64(num))
+// 	if err != nil {
+// 		return fmt.Errorf("failed to write varint number: %w", err)
+// 	}
+// 	return nil
+// }
 
 // ReadVarIntNum reads a variable-length integer from a buffer
 func ReadVarIntNum(reader *bytes.Reader) (int64, error) {
-	var intByte int64
-	err := binary.Read(reader, binary.LittleEndian, &intByte)
+	firstByte, err := reader.ReadByte()
 	if err != nil {
-		return 0, fmt.Errorf("failed to read varint number: %w", err)
+		return 0, fmt.Errorf("failed to read first byte: %w", err)
 	}
 
-	return intByte, nil
+	switch firstByte {
+	case 0xFD:
+		var val uint16
+		err := binary.Read(reader, binary.LittleEndian, &val)
+		if err != nil {
+			return 0, fmt.Errorf("failed to read 2-byte varint: %w", err)
+		}
+		return int64(val), nil
+	case 0xFE:
+		var val uint32
+		err := binary.Read(reader, binary.LittleEndian, &val)
+		if err != nil {
+			return 0, fmt.Errorf("failed to read 4-byte varint: %w", err)
+		}
+		return int64(val), nil
+	case 0xFF:
+		var val uint64
+		err := binary.Read(reader, binary.LittleEndian, &val)
+		if err != nil {
+			return 0, fmt.Errorf("failed to read 8-byte varint: %w", err)
+		}
+		return int64(val), nil
+	default:
+		// Single byte value (0-252)
+		return int64(firstByte), nil
+	}
 }
+
+// func ReadVarIntNum(reader *bytes.Reader) (int64, error) {
+// 	var intByte int64
+// 	err := binary.Read(reader, binary.LittleEndian, &intByte)
+// 	if err != nil {
+// 		return 0, fmt.Errorf("failed to read varint number: %w", err)
+// 	}
+
+// 	return intByte, nil
+// }
 
 // ExtractHeaders extracts required headers based on conditions
 func ExtractHeaders(headers http.Header) [][]string {
