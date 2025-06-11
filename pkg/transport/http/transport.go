@@ -38,27 +38,42 @@ const ResponseKey contextKey = "http_response"
 // NextKey stores the next handler in context.
 const NextKey contextKey = "http_next_handler"
 
+// Przesunąć do pkg/internal/transport
+// i zrobić publicznym
 type responseRecorder struct {
 	http.ResponseWriter
 	written    bool
 	statusCode int
+	body       []byte
+}
+
+func (r *responseRecorder) GetBody() []byte {
+	return r.body
 }
 
 func (r *responseRecorder) WriteHeader(code int) {
 	r.statusCode = code
-	r.ResponseWriter.WriteHeader(code)
 	r.written = true
 }
 
 func (r *responseRecorder) Write(b []byte) (int, error) {
-	n, err := r.ResponseWriter.Write(b)
-	if err != nil {
-		return n, fmt.Errorf("failed to write response: %w", err)
-	}
+	r.body = b
 	r.written = true
-	return n, nil
+	return len(b), nil
 }
 
+func (r *responseRecorder) Flush() error {
+	if r.statusCode != 0 {
+		r.ResponseWriter.WriteHeader(r.statusCode)
+	}
+	_, err := r.ResponseWriter.Write(r.body)
+	if err != nil {
+		return fmt.Errorf("failed to write response, %w", err)
+	}
+	return nil
+}
+
+// Zrobić publicznym a wyrzucić HasBeenWritten funkcję
 func (r *responseRecorder) hasBeenWritten() bool {
 	return r.written
 }
@@ -77,6 +92,13 @@ func HasBeenWritten(w http.ResponseWriter) bool {
 		return rw.hasBeenWritten()
 	}
 	return false
+}
+
+func GetStatusCode(w http.ResponseWriter) (int, error) {
+	if rw, ok := w.(*responseRecorder); ok {
+		return rw.statusCode, nil
+	}
+	return 0, errors.New("response writer is not a response recorder")
 }
 
 // TransportConfig config for Transport.
@@ -214,14 +236,14 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 			resp.Header().Set(constants.HeaderRequestID, requestID)
 		}
 
-		nextVal := ctx.Value(NextKey)
-		if nextVal != nil {
-			if next, ok := nextVal.(func()); ok {
-				next()
-			} else {
-				t.logger.Warn("Next handler has invalid type in context")
-			}
-		}
+		// nextVal := ctx.Value(NextKey)
+		// if nextVal != nil {
+		// 	if next, ok := nextVal.(func()); ok {
+		// 		next()
+		// 	} else {
+		// 		t.logger.Warn("Next handler has invalid type in context")
+		// 	}
+		// }
 
 		return nil
 
@@ -231,6 +253,11 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 	default:
 		return fmt.Errorf("unsupported message type: %s", message.MessageType)
 	}
+}
+
+type AuthMessage struct {
+	*auth.AuthMessage
+	RequestID string
 }
 
 // ParseAuthMessageFromRequest parses auth message from HTTP request.
