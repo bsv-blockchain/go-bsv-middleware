@@ -88,14 +88,15 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 
 		ctx := context.WithValue(r.Context(), httptransport.RequestKey, r)
 		ctx = context.WithValue(ctx, httptransport.ResponseKey, wrappedWriter)
-		ctx = context.WithValue(ctx, httptransport.NextKey, func() {
-			next.ServeHTTP(wrappedWriter, r)
-		})
+		// ctx = context.WithValue(ctx, httptransport.NextKey, func() {
+		// 	next.ServeHTTP(wrappedWriter, r)
+		// })
 
 		m.logger.Debug("Processing request",
 			slog.String("path", r.URL.Path),
 			slog.String("method", r.Method))
 
+		// Dodać rozszerzony AuthMessage zawierający request ID
 		authMsg, err := httptransport.ParseAuthMessageFromRequest(r)
 		if err != nil {
 			m.logger.Error("Failed to parse auth message", slog.String("error", err.Error()))
@@ -164,6 +165,48 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		if !httptransport.HasBeenWritten(wrappedWriter) {
 			r = r.WithContext(context.WithValue(r.Context(), httptransport.IdentityKey, authMsg.IdentityKey.ToDERHex()))
 			next.ServeHTTP(wrappedWriter, r)
+		}
+
+		if authMsg.MessageType == auth.MessageTypeGeneral {
+
+			code, err := httptransport.GetStatusCode(wrappedWriter)
+			if err != nil {
+				m.logger.Error("Failed to get status code", slog.String("error", err.Error()))
+				return
+			}
+
+			headers := wrappedWriter.Header()
+
+			headers.Set(constants.HeaderRequestID, "1234")
+
+			body := wrappedWriter.GetBody()
+
+			fmt.Println(code, headers, body)
+
+			var payload []byte
+			// zbudować payload
+			// payload = {
+			//  authMsg.requestID,
+			//	status: code
+			//  headers: headers
+			//  body
+			// }
+
+			// TODO: configure maxTimeout or something :D
+			err = m.peer.ToPeer(ctx, payload, authMsg.IdentityKey, 30000)
+			if err != nil {
+				wrappedWriter.WriteHeader(http.StatusInternalServerError)
+				_, err := wrappedWriter.Write([]byte(err.Error()))
+				if err != nil {
+					m.logger.Error("Failed to write error response", slog.String("error", err.Error()))
+				}
+				return
+			}
+
+			err = wrappedWriter.Flush()
+			if err != nil {
+				m.logger.Error("Failed to flush response", slog.String("error", err.Error()))
+			}
 		}
 	})
 }
