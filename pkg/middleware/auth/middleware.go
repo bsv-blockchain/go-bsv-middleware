@@ -6,7 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
+	"net/url"
+	"sort"
 	"strings"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/constants"
@@ -15,6 +18,7 @@ import (
 	httptransport "github.com/bsv-blockchain/go-bsv-middleware/pkg/transport/http"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
+	"github.com/bsv-blockchain/go-sdk/util"
 )
 
 // Middleware is an HTTP middleware that handles authentication messages.
@@ -81,56 +85,52 @@ func New(cfg Config) (*Middleware, error) {
 	}, nil
 }
 
-// Handler returns an HTTP handler that processes authentication messages.
 func (m *Middleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		wrappedWriter := httptransport.WrapResponseWriter(w)
 
 		ctx := context.WithValue(r.Context(), httptransport.RequestKey, r)
 		ctx = context.WithValue(ctx, httptransport.ResponseKey, wrappedWriter)
-		// ctx = context.WithValue(ctx, httptransport.NextKey, func() {
-		// 	next.ServeHTTP(wrappedWriter, r)
-		// })
+		ctx = context.WithValue(ctx, httptransport.NextKey, func() {
+			next.ServeHTTP(wrappedWriter, r)
+		})
 
 		m.logger.Debug("Processing request",
 			slog.String("path", r.URL.Path),
 			slog.String("method", r.Method))
 
-		// Dodać rozszerzony AuthMessage zawierający request ID
 		authMsg, err := httptransport.ParseAuthMessageFromRequest(r)
 		if err != nil {
 			m.logger.Error("Failed to parse auth message", slog.String("error", err.Error()))
-			http.Error(wrappedWriter, err.Error(), http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		if authMsg == nil {
 			if m.allowUnauthenticated {
 				r = r.WithContext(context.WithValue(r.Context(), httptransport.IdentityKey, constants.UnknownParty))
-				next.ServeHTTP(wrappedWriter, r)
+				next.ServeHTTP(w, r)
 				return
 			} else {
-				http.Error(wrappedWriter, "Authentication required", http.StatusUnauthorized)
+				http.Error(w, "Authentication required", http.StatusUnauthorized)
 				return
 			}
 		}
 
-		// At this point, authMsg.IdentityKey should always be set by ParseAuthMessageFromRequest
-		// If it's not set, that's an internal error
 		if authMsg.IdentityKey == nil {
 			m.logger.Error("Internal error: ParseAuthMessageFromRequest returned message with nil IdentityKey")
-			http.Error(wrappedWriter, "Internal authentication error", http.StatusInternalServerError)
+			http.Error(w, "Internal authentication error", http.StatusInternalServerError)
 			return
 		}
 
 		callback, err := m.transport.GetRegisteredOnData()
 		if err != nil {
 			m.logger.Error("No message handler registered", slog.String("error", err.Error()))
-			http.Error(wrappedWriter, "Server configuration error", http.StatusInternalServerError)
+			http.Error(w, "Server configuration error", http.StatusInternalServerError)
 			return
 		}
 
-		if err := callback(ctx, authMsg); err != nil {
+		if err := callback(ctx, authMsg.AuthMessage); err != nil {
 			m.logger.Error("Failed to process auth message", slog.String("error", err.Error()))
 
 			statusCode := http.StatusInternalServerError
@@ -158,57 +158,122 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 				errMsg = "Session not found"
 			}
 
-			http.Error(wrappedWriter, errMsg, statusCode)
+			http.Error(w, errMsg, statusCode)
 			return
-		}
-
-		if !httptransport.HasBeenWritten(wrappedWriter) {
-			r = r.WithContext(context.WithValue(r.Context(), httptransport.IdentityKey, authMsg.IdentityKey.ToDERHex()))
-			next.ServeHTTP(wrappedWriter, r)
 		}
 
 		if authMsg.MessageType == auth.MessageTypeGeneral {
 
-			code, err := httptransport.GetStatusCode(wrappedWriter)
+			signaturePayload, err := serializeRequest(r.Method, r.Header, authMsg.Payload, r.URL, []byte(authMsg.Nonce))
 			if err != nil {
-				m.logger.Error("Failed to get status code", slog.String("error", err.Error()))
+				m.logger.Error("Failed to serialize request", slog.String("error", err.Error()))
+				http.Error(w, "Failed to serialize request", http.StatusInternalServerError)
 				return
 			}
 
-			headers := wrappedWriter.Header()
+			m.peer.ToPeer(ctx, signaturePayload, authMsg.IdentityKey, 30000)
+		}
 
-			headers.Set(constants.HeaderRequestID, "1234")
+		if err := wrappedWriter.Flush(); err != nil {
+			m.logger.Error("Failed to flush auth response", slog.String("error", err.Error()))
+		}
+		return
+	})
+}
 
-			body := wrappedWriter.GetBody()
+func serializeRequest(method string, headers map[string][]string, body []byte, parsedURL *url.URL, requestNonce []byte) ([]byte, error) {
+	writer := util.NewWriter()
 
-			fmt.Println(code, headers, body)
+	writer.WriteBytes(requestNonce)
 
-			var payload []byte
-			// zbudować payload
-			// payload = {
-			//  authMsg.requestID,
-			//	status: code
-			//  headers: headers
-			//  body
-			// }
+	writer.WriteVarInt(uint64(len(method)))
+	writer.WriteBytes([]byte(method))
 
-			// TODO: configure maxTimeout or something :D
-			err = m.peer.ToPeer(ctx, payload, authMsg.IdentityKey, 30000)
-			if err != nil {
-				wrappedWriter.WriteHeader(http.StatusInternalServerError)
-				_, err := wrappedWriter.Write([]byte(err.Error()))
-				if err != nil {
-					m.logger.Error("Failed to write error response", slog.String("error", err.Error()))
+	if parsedURL.Path != "" {
+		pathBytes := []byte(parsedURL.Path)
+		writer.WriteVarInt(uint64(len(pathBytes)))
+		writer.WriteBytes(pathBytes)
+	} else {
+		writer.WriteVarInt(math.MaxUint64)
+	}
+
+	if parsedURL.RawQuery != "" {
+		searchString := "?" + parsedURL.RawQuery
+		searchBytes := []byte(searchString)
+		writer.WriteVarInt(uint64(len(searchBytes)))
+		writer.WriteBytes(searchBytes)
+	} else {
+		writer.WriteVarInt(math.MaxUint64)
+	}
+
+	var includedHeaders [][]string
+
+	for key, values := range headers {
+		headerKey := strings.ToLower(key)
+
+		for _, value := range values {
+			if strings.HasPrefix(headerKey, "x-bsv-") {
+				if strings.HasPrefix(headerKey, "x-bsv-auth-") {
+					continue
 				}
-				return
-			}
-
-			err = wrappedWriter.Flush()
-			if err != nil {
-				m.logger.Error("Failed to flush response", slog.String("error", err.Error()))
+				includedHeaders = append(includedHeaders, []string{headerKey, value})
+			} else if headerKey == "authorization" {
+				includedHeaders = append(includedHeaders, []string{headerKey, value})
+			} else if strings.HasPrefix(headerKey, "content-type") {
+				contentType := strings.Split(value, ";")[0]
+				includedHeaders = append(includedHeaders, []string{headerKey, strings.TrimSpace(contentType)})
 			}
 		}
+	}
+	sort.Slice(includedHeaders, func(i, j int) bool {
+		return includedHeaders[i][0] < includedHeaders[j][0]
 	})
+
+	writer.WriteVarInt(uint64(len(includedHeaders)))
+
+	for _, header := range includedHeaders {
+		headerKey := header[0]
+		headerKeyBytes := []byte(headerKey)
+		writer.WriteVarInt(uint64(len(headerKeyBytes)))
+		writer.WriteBytes(headerKeyBytes)
+
+		headerValue := header[1]
+		headerValueBytes := []byte(headerValue)
+		writer.WriteVarInt(uint64(len(headerValueBytes)))
+		writer.WriteBytes(headerValueBytes)
+	}
+
+	methodsThatTypicallyHaveBody := []string{"POST", "PUT", "PATCH", "DELETE"}
+	if len(body) == 0 && contains(methodsThatTypicallyHaveBody, strings.ToUpper(method)) {
+		for _, header := range includedHeaders {
+			if header[0] == "content-type" && strings.Contains(header[1], "application/json") {
+				body = []byte("{}")
+				break
+			}
+		}
+
+		if len(body) == 0 {
+			body = []byte("")
+		}
+	}
+
+	if len(body) > 0 {
+		writer.WriteVarInt(uint64(len(body)))
+		writer.WriteBytes(body)
+	} else {
+		writer.WriteVarInt(math.MaxUint64)
+	}
+
+	return writer.Buf, nil
+}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }
 
 // prepareMissingCertificateTypesErrorMsg prepares a user-friendly error message for missing certificate types.
