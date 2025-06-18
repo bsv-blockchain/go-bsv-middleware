@@ -1,14 +1,13 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
-	"math"
 	"net/http"
-	"net/url"
 	"sort"
 	"strings"
 
@@ -16,9 +15,9 @@ import (
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 	httptransport "github.com/bsv-blockchain/go-bsv-middleware/pkg/transport/http"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/utils"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
-	"github.com/bsv-blockchain/go-sdk/util"
 )
 
 // Middleware is an HTTP middleware that handles authentication messages.
@@ -85,6 +84,7 @@ func New(cfg Config) (*Middleware, error) {
 	}, nil
 }
 
+// Handler returns an HTTP handler that processes incoming requests and handles authentication messages.
 func (m *Middleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		wrappedWriter := httptransport.WrapResponseWriter(w)
@@ -163,117 +163,26 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		}
 
 		if authMsg.MessageType == auth.MessageTypeGeneral {
-
-			signaturePayload, err := serializeRequest(r.Method, r.Header, authMsg.Payload, r.URL, []byte(authMsg.Nonce))
+			createRequestPayload, err := createRequestPayload([]byte(authMsg.RequestID), r.Method, r.URL.Path, r.URL.RawQuery, r.Header, authMsg.Payload)
 			if err != nil {
-				m.logger.Error("Failed to serialize request", slog.String("error", err.Error()))
-				http.Error(w, "Failed to serialize request", http.StatusInternalServerError)
+				m.logger.Error("Failed to create request payload", slog.String("error", err.Error()))
+				http.Error(w, "Failed to create request payload", http.StatusInternalServerError)
 				return
 			}
 
-			m.peer.ToPeer(ctx, signaturePayload, authMsg.IdentityKey, 30000)
+			err = m.peer.ToPeer(ctx, createRequestPayload, authMsg.IdentityKey, 30000)
+			if err != nil {
+				m.logger.Error("Failed to send request to peer", slog.String("error", err.Error()), slog.String("identityKey", authMsg.IdentityKey.ToDERHex()))
+				http.Error(w, "Failed to send request to peer", http.StatusInternalServerError)
+				return
+			}
 		}
 
 		if err := wrappedWriter.Flush(); err != nil {
 			m.logger.Error("Failed to flush auth response", slog.String("error", err.Error()))
 		}
-		return
+		// return
 	})
-}
-
-func serializeRequest(method string, headers map[string][]string, body []byte, parsedURL *url.URL, requestNonce []byte) ([]byte, error) {
-	writer := util.NewWriter()
-
-	writer.WriteBytes(requestNonce)
-
-	writer.WriteVarInt(uint64(len(method)))
-	writer.WriteBytes([]byte(method))
-
-	if parsedURL.Path != "" {
-		pathBytes := []byte(parsedURL.Path)
-		writer.WriteVarInt(uint64(len(pathBytes)))
-		writer.WriteBytes(pathBytes)
-	} else {
-		writer.WriteVarInt(math.MaxUint64)
-	}
-
-	if parsedURL.RawQuery != "" {
-		searchString := "?" + parsedURL.RawQuery
-		searchBytes := []byte(searchString)
-		writer.WriteVarInt(uint64(len(searchBytes)))
-		writer.WriteBytes(searchBytes)
-	} else {
-		writer.WriteVarInt(math.MaxUint64)
-	}
-
-	var includedHeaders [][]string
-
-	for key, values := range headers {
-		headerKey := strings.ToLower(key)
-
-		for _, value := range values {
-			if strings.HasPrefix(headerKey, "x-bsv-") {
-				if strings.HasPrefix(headerKey, "x-bsv-auth-") {
-					continue
-				}
-				includedHeaders = append(includedHeaders, []string{headerKey, value})
-			} else if headerKey == "authorization" {
-				includedHeaders = append(includedHeaders, []string{headerKey, value})
-			} else if strings.HasPrefix(headerKey, "content-type") {
-				contentType := strings.Split(value, ";")[0]
-				includedHeaders = append(includedHeaders, []string{headerKey, strings.TrimSpace(contentType)})
-			}
-		}
-	}
-	sort.Slice(includedHeaders, func(i, j int) bool {
-		return includedHeaders[i][0] < includedHeaders[j][0]
-	})
-
-	writer.WriteVarInt(uint64(len(includedHeaders)))
-
-	for _, header := range includedHeaders {
-		headerKey := header[0]
-		headerKeyBytes := []byte(headerKey)
-		writer.WriteVarInt(uint64(len(headerKeyBytes)))
-		writer.WriteBytes(headerKeyBytes)
-
-		headerValue := header[1]
-		headerValueBytes := []byte(headerValue)
-		writer.WriteVarInt(uint64(len(headerValueBytes)))
-		writer.WriteBytes(headerValueBytes)
-	}
-
-	methodsThatTypicallyHaveBody := []string{"POST", "PUT", "PATCH", "DELETE"}
-	if len(body) == 0 && contains(methodsThatTypicallyHaveBody, strings.ToUpper(method)) {
-		for _, header := range includedHeaders {
-			if header[0] == "content-type" && strings.Contains(header[1], "application/json") {
-				body = []byte("{}")
-				break
-			}
-		}
-
-		if len(body) == 0 {
-			body = []byte("")
-		}
-	}
-
-	if len(body) > 0 {
-		writer.WriteVarInt(uint64(len(body)))
-		writer.WriteBytes(body)
-	} else {
-		writer.WriteVarInt(math.MaxUint64)
-	}
-
-	return writer.Buf, nil
-}
-
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
 }
 
 // prepareMissingCertificateTypesErrorMsg prepares a user-friendly error message for missing certificate types.
@@ -311,4 +220,123 @@ func getReadableCertTypeName(certTypeID string) string {
 		return certTypeID[:8] + "..." + certTypeID[len(certTypeID)-8:]
 	}
 	return certTypeID
+}
+
+type headerPair struct {
+	Key   string
+	Value string
+}
+
+func createRequestPayload(requestID []byte, method, path, query string, headers http.Header, body []byte) ([]byte, error) {
+	var buf bytes.Buffer
+
+	if len(requestID) == 0 {
+		return nil, fmt.Errorf("requestID in null")
+	}
+	buf.Write(requestID)
+
+	methodBytes := []byte(method)
+	err := utils.WriteVarIntNum(&buf, len(methodBytes))
+	if err != nil {
+		return nil, fmt.Errorf("failed to write method length: %w", err)
+	}
+	buf.Write(methodBytes)
+
+	if path == "" {
+		err = utils.WriteVarIntNum(&buf, -1)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write empty path: %w", err)
+		}
+	} else {
+		pathBytes := []byte(path)
+		err = utils.WriteVarIntNum(&buf, len(pathBytes))
+		if err != nil {
+			return nil, fmt.Errorf("failed to write path length: %w", err)
+		}
+		buf.Write(pathBytes)
+	}
+
+	if query == "" {
+		err = utils.WriteVarIntNum(&buf, -1)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write empty query: %w", err)
+		}
+	} else {
+		queryBytes := []byte(query)
+		err = utils.WriteVarIntNum(&buf, len(queryBytes))
+		if err != nil {
+			return nil, fmt.Errorf("failed to write query length: %w", err)
+		}
+		buf.Write(queryBytes)
+	}
+
+	whitelisted := getWhitelistedHeaders(headers, true)
+	err = utils.WriteVarIntNum(&buf, len(whitelisted))
+	if err != nil {
+		return nil, fmt.Errorf("failed to write headers count: %w", err)
+	}
+
+	for _, h := range whitelisted {
+		keyBytes := []byte(h.Key)
+		err = utils.WriteVarIntNum(&buf, len(keyBytes))
+		if err != nil {
+			return nil, fmt.Errorf("failed to write header key length: %w", err)
+		}
+		buf.Write(keyBytes)
+
+		valueBytes := []byte(h.Value)
+		err = utils.WriteVarIntNum(&buf, len(valueBytes))
+		if err != nil {
+			return nil, fmt.Errorf("failed to write header value length: %w", err)
+		}
+		buf.Write(valueBytes)
+	}
+
+	if len(body) == 0 {
+		err = utils.WriteVarIntNum(&buf, -1)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write empty body: %w", err)
+		}
+	} else {
+		err = utils.WriteVarIntNum(&buf, len(body))
+		if err != nil {
+			return nil, fmt.Errorf("failed to write body length: %w", err)
+		}
+		buf.Write(body)
+	}
+
+	return buf.Bytes(), nil
+}
+
+func getWhitelistedHeaders(headers http.Header, isRequest bool) []headerPair {
+	var result []headerPair
+
+	for key, values := range headers {
+		lowerKey := strings.ToLower(key)
+
+		if strings.HasPrefix(lowerKey, constants.AuthHeaderPrefix) {
+			continue
+		}
+
+		if lowerKey == "authorization" {
+			for _, value := range values {
+				result = append(result, headerPair{Key: lowerKey, Value: value})
+			}
+		} else if isRequest && lowerKey == "content-type" {
+			for _, value := range values {
+				contentType := strings.Split(value, ";")[0]
+				result = append(result, headerPair{Key: lowerKey, Value: strings.TrimSpace(contentType)})
+			}
+		} else if strings.HasPrefix(lowerKey, "x-bsv-") {
+			for _, value := range values {
+				result = append(result, headerPair{Key: lowerKey, Value: value})
+			}
+		}
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Key < result[j].Key
+	})
+
+	return result
 }
