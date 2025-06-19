@@ -2,7 +2,6 @@ package wallet
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
@@ -81,7 +80,7 @@ func (w *ExtendedProtoWallet) RevealSpecificKeyLinkage(ctx context.Context, args
 
 // Certificate methods - implement basic functionality for demo
 func (w *ExtendedProtoWallet) AcquireCertificate(ctx context.Context, args wallet.AcquireCertificateArgs, originator string) (*wallet.Certificate, error) {
-	if len(args.Type) == 0 || len(args.Certifier) == 0 {
+	if len(args.Type) == 0 || args.Certifier == nil {
 		return nil, fmt.Errorf("certificate type and certifier are required")
 	}
 
@@ -90,17 +89,11 @@ func (w *ExtendedProtoWallet) AcquireCertificate(ctx context.Context, args walle
 		return nil, err
 	}
 
-	certifierStr := hex.EncodeToString(args.Certifier[:])
-	certifierKey, err := ec.PublicKeyFromString(certifierStr)
-	if err != nil {
-		return nil, err
-	}
-
 	return &wallet.Certificate{
 		Type:               args.Type,
 		SerialNumber:       args.SerialNumber,
 		Subject:            identityResult.PublicKey,
-		Certifier:          certifierKey,
+		Certifier:          args.Certifier,
 		RevocationOutpoint: args.RevocationOutpoint,
 		Fields:             args.Fields,
 		Signature:          args.Signature,
