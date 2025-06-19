@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"errors"
@@ -15,9 +14,9 @@ import (
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 	httptransport "github.com/bsv-blockchain/go-bsv-middleware/pkg/transport/http"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/utils"
 	"github.com/bsv-blockchain/go-sdk/auth"
-	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
+	"github.com/bsv-blockchain/go-sdk/auth/utils"
+	"github.com/bsv-blockchain/go-sdk/util"
 )
 
 // Middleware is an HTTP middleware that handles authentication messages.
@@ -142,7 +141,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 				errMsg = "Authentication failed"
 			case errors.Is(err, auth.ErrMissingCertificate):
 				statusCode = http.StatusBadRequest
-				var certTypes sdkUtils.RequestedCertificateTypeIDAndFieldList
+				var certTypes utils.RequestedCertificateTypeIDAndFieldList
 				if m.peer != nil && m.peer.CertificatesToRequest != nil {
 					certTypes = m.peer.CertificatesToRequest.CertificateTypes
 				}
@@ -181,12 +180,12 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		if err := wrappedWriter.Flush(); err != nil {
 			m.logger.Error("Failed to flush auth response", slog.String("error", err.Error()))
 		}
-		// return
+		return
 	})
 }
 
 // prepareMissingCertificateTypesErrorMsg prepares a user-friendly error message for missing certificate types.
-func prepareMissingCertificateTypesErrorMsg(missingCertTypes sdkUtils.RequestedCertificateTypeIDAndFieldList) string {
+func prepareMissingCertificateTypesErrorMsg(missingCertTypes utils.RequestedCertificateTypeIDAndFieldList) string {
 	if len(missingCertTypes) == 0 {
 		return ""
 	}
@@ -228,84 +227,35 @@ type headerPair struct {
 }
 
 func createRequestPayload(requestID []byte, method, path, query string, headers http.Header, body []byte) ([]byte, error) {
-	var buf bytes.Buffer
+	writer := util.NewWriter()
 
 	if len(requestID) == 0 {
 		return nil, fmt.Errorf("requestID in null")
 	}
-	buf.Write(requestID)
+	writer.WriteBytes(requestID)
 
-	methodBytes := []byte(method)
-	err := utils.WriteVarIntNum(&buf, len(methodBytes))
-	if err != nil {
-		return nil, fmt.Errorf("failed to write method length: %w", err)
-	}
-	buf.Write(methodBytes)
+	writer.WriteString(method)
 
-	if path == "" {
-		err = utils.WriteVarIntNum(&buf, -1)
-		if err != nil {
-			return nil, fmt.Errorf("failed to write empty path: %w", err)
-		}
-	} else {
-		pathBytes := []byte(path)
-		err = utils.WriteVarIntNum(&buf, len(pathBytes))
-		if err != nil {
-			return nil, fmt.Errorf("failed to write path length: %w", err)
-		}
-		buf.Write(pathBytes)
-	}
+	writer.WriteOptionalString(path)
 
-	if query == "" {
-		err = utils.WriteVarIntNum(&buf, -1)
-		if err != nil {
-			return nil, fmt.Errorf("failed to write empty query: %w", err)
-		}
-	} else {
-		queryBytes := []byte(query)
-		err = utils.WriteVarIntNum(&buf, len(queryBytes))
-		if err != nil {
-			return nil, fmt.Errorf("failed to write query length: %w", err)
-		}
-		buf.Write(queryBytes)
-	}
+	writer.WriteOptionalString(query)
 
 	whitelisted := getWhitelistedHeaders(headers, true)
-	err = utils.WriteVarIntNum(&buf, len(whitelisted))
-	if err != nil {
-		return nil, fmt.Errorf("failed to write headers count: %w", err)
-	}
+
+	writer.WriteVarInt(uint64(len(whitelisted)))
 
 	for _, h := range whitelisted {
 		keyBytes := []byte(h.Key)
-		err = utils.WriteVarIntNum(&buf, len(keyBytes))
-		if err != nil {
-			return nil, fmt.Errorf("failed to write header key length: %w", err)
-		}
-		buf.Write(keyBytes)
+		writer.WriteVarInt(uint64(len(keyBytes)))
+		writer.WriteBytes(keyBytes)
 
 		valueBytes := []byte(h.Value)
-		err = utils.WriteVarIntNum(&buf, len(valueBytes))
-		if err != nil {
-			return nil, fmt.Errorf("failed to write header value length: %w", err)
-		}
-		buf.Write(valueBytes)
+		writer.WriteVarInt(uint64(len(valueBytes)))
+		writer.WriteBytes(valueBytes)
 	}
+	writer.WriteIntBytesOptional(body)
 
-	if len(body) == 0 {
-		err = utils.WriteVarIntNum(&buf, -1)
-		if err != nil {
-			return nil, fmt.Errorf("failed to write empty body: %w", err)
-		}
-	} else {
-		err = utils.WriteVarIntNum(&buf, len(body))
-		if err != nil {
-			return nil, fmt.Errorf("failed to write body length: %w", err)
-		}
-		buf.Write(body)
-	}
-
-	return buf.Bytes(), nil
+	return writer.Buf, nil
 }
 
 func getWhitelistedHeaders(headers http.Header, isRequest bool) []headerPair {
@@ -318,16 +268,16 @@ func getWhitelistedHeaders(headers http.Header, isRequest bool) []headerPair {
 			continue
 		}
 
-		if lowerKey == "authorization" {
+		if lowerKey == constants.HeaderAuthorization {
 			for _, value := range values {
 				result = append(result, headerPair{Key: lowerKey, Value: value})
 			}
-		} else if isRequest && lowerKey == "content-type" {
+		} else if isRequest && lowerKey == constants.HeaderContentType {
 			for _, value := range values {
 				contentType := strings.Split(value, ";")[0]
 				result = append(result, headerPair{Key: lowerKey, Value: strings.TrimSpace(contentType)})
 			}
-		} else if strings.HasPrefix(lowerKey, "x-bsv-") {
+		} else if strings.HasPrefix(lowerKey, constants.XBSVPrefix) {
 			for _, value := range values {
 				result = append(result, headerPair{Key: lowerKey, Value: value})
 			}

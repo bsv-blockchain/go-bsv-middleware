@@ -29,4 +29,10 @@ const (
 
 	// HeaderRequestedCertificates contains requested certificates (if used)
 	HeaderRequestedCertificates = AuthHeaderPrefix + "requested-certificates"
+
+	HeaderContentType = "content-type"
+
+	HeaderAuthorization = "authorization"
+
+	XBSVPrefix = "x-bsv-"
 )

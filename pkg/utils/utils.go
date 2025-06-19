@@ -17,6 +17,7 @@ import (
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
+	"github.com/bsv-blockchain/go-sdk/util"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
@@ -374,7 +375,7 @@ func ExtractHeaders(headers http.Header) [][]string {
 	var includedHeaders [][]string
 	for k, v := range headers {
 		k = strings.ToLower(k)
-		if (strings.HasPrefix(k, "x-bsv-") || k == "content-type" || k == "authorization") &&
+		if (strings.HasPrefix(k, constants.XBSVPrefix) || k == constants.HeaderContentType || k == constants.HeaderAuthorization) &&
 			!strings.HasPrefix(k, constants.AuthHeaderPrefix) {
 			includedHeaders = append(includedHeaders, []string{k, v[0]})
 		}
@@ -384,11 +385,11 @@ func ExtractHeaders(headers http.Header) [][]string {
 
 // WriteBodyToBuffer writes the request body into a buffer
 func WriteBodyToBuffer(req *http.Request, buf *bytes.Buffer) error {
+	writer := util.NewWriter()
+
 	if req.Body == nil {
-		err := WriteVarIntNum(buf, -1)
-		if err != nil {
-			return fmt.Errorf("failed to write -1 for empty body: %w", err)
-		}
+		writer.WriteNegativeOneByte()
+		buf.Write(writer.Buf)
 		return nil
 	}
 
@@ -398,23 +399,13 @@ func WriteBodyToBuffer(req *http.Request, buf *bytes.Buffer) error {
 	}
 
 	if len(body) > 0 {
-		err = WriteVarIntNum(buf, len(body))
-		if err != nil {
-			return fmt.Errorf("failed to write body length: %w", err)
-		}
-
-		_, err = buf.Write(body)
-		if err != nil {
-			return fmt.Errorf("failed to write body: %w", err)
-		}
-
-		return nil
+		writer.WriteVarInt(uint64(len(body)))
+		writer.WriteBytes(body)
+	} else {
+		writer.WriteNegativeOneByte()
 	}
 
-	err = WriteVarIntNum(buf, -1)
-	if err != nil {
-		return fmt.Errorf("failed to write -1 for empty body: %w", err)
-	}
+	buf.Write(writer.Buf)
 	return nil
 }
 

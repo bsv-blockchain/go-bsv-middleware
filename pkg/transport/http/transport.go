@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -59,11 +58,7 @@ func NewResponseRecorder(w http.ResponseWriter) *ResponseRecorder {
 
 // GetBody retrieves the recorded response body.
 func (r *ResponseRecorder) GetBody() []byte {
-	fmt.Println("r.ResponseWriter.(*ResponseRecorder).body", r.ResponseWriter.(*ResponseRecorder).body)
-	fmt.Println("r.body", r.body)
-
 	return r.ResponseWriter.(*ResponseRecorder).body
-	// return r.body
 }
 
 // WriteHeader captures the status code
@@ -419,27 +414,16 @@ func (t *Transport) shouldApplyDefaultCertificates(message *auth.AuthMessage) bo
 }
 
 func buildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
-	writer := new(bytes.Buffer)
+	writer := util.NewWriter()
 	requestIDBytes, err := base64.StdEncoding.DecodeString(requestID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid request ID format: %w", err)
 	}
-	_, err = writer.Write(requestIDBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to write request ID: %w", err)
-	}
 
-	if err = writeString(writer, req.Method); err != nil {
-		return nil, fmt.Errorf("failed to write request method: %w", err)
-	}
-
-	if err = writeOptionalString(writer, req.URL.Path); err != nil {
-		return nil, fmt.Errorf("failed to write request path: %w", err)
-	}
-
-	if err = writeOptionalString(writer, req.URL.RawQuery); err != nil {
-		return nil, fmt.Errorf("failed to write request query: %w", err)
-	}
+	writer.WriteBytes(requestIDBytes)
+	writer.WriteString(req.Method)
+	writer.WriteOptionalString(req.URL.Path)
+	writer.WriteOptionalString(req.URL.RawQuery)
 
 	var includedHeaders [][]string
 	for k, v := range req.Header {
@@ -451,18 +435,11 @@ func buildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 		return includedHeaders[i][0] < includedHeaders[j][0]
 	})
 
-	if err := writeVarInt(writer, len(includedHeaders)); err != nil {
-		return nil, fmt.Errorf("failed to write headers count: %w", err)
-	}
+	writer.WriteVarInt(uint64(len(includedHeaders)))
 
 	for _, header := range includedHeaders {
-		if err := writeString(writer, header[0]); err != nil {
-			return nil, fmt.Errorf("failed to write header key: %w", err)
-		}
-
-		if err := writeString(writer, header[1]); err != nil {
-			return nil, fmt.Errorf("failed to write header value: %w", err)
-		}
+		writer.WriteString(header[0])
+		writer.WriteString(header[1])
 	}
 
 	body, err := bodyContent(req)
@@ -472,73 +449,19 @@ func buildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 
 	if len(body) > 0 {
 		req.Body = io.NopCloser(bytes.NewBuffer(body))
-
-		if err = writeBytes(writer, body); err != nil {
-			return nil, fmt.Errorf("failed to write request body: %w", err)
-		}
+		writer.WriteVarInt(uint64(len(body)))
+		writer.WriteBytes(body)
 	} else {
-		if err := writeVarInt(writer, -1); err != nil {
-			return nil, fmt.Errorf("failed to write nil body marker: %w", err)
-		}
+		writer.WriteNegativeOneByte()
 	}
 
-	return writer.Bytes(), nil
+	return writer.Buf, nil
 }
 
 func isIncludedHeader(headerKey string) bool {
 	k := strings.ToLower(headerKey)
-	return (strings.HasPrefix(k, "x-bsv-") || k == "content-type" || k == "authorization") &&
+	return (strings.HasPrefix(k, constants.XBSVPrefix) || k == constants.HeaderContentType || k == constants.HeaderAuthorization) &&
 		!strings.HasPrefix(k, constants.AuthHeaderPrefix)
-}
-
-func writeString(writer *bytes.Buffer, str string) error {
-	length := util.VarInt(len(str))
-	writer.Write(length.Bytes())
-	writer.WriteString(str)
-	return nil
-}
-
-func writeOptionalString(writer *bytes.Buffer, str string) error {
-	if str == "" {
-		if err := writeVarInt(writer, -1); err != nil {
-			return fmt.Errorf("failed to write empty string placeholder: %w", err)
-		}
-		return nil
-	}
-
-	if err := writeString(writer, str); err != nil {
-		return fmt.Errorf("failed to write optional string: %w", err)
-	}
-	return nil
-}
-
-func writeVarInt(w *bytes.Buffer, n int) error {
-	if n < -1 {
-		return fmt.Errorf("invalid negative value for VarInt: %d", n)
-	}
-
-	if n == -1 {
-		return w.WriteByte(0xFF)
-	}
-
-	if n < 0xFD {
-		return w.WriteByte(byte(n))
-	} else if n <= 0xFFFF {
-		if err := w.WriteByte(0xFD); err != nil {
-			return err
-		}
-		return binary.Write(w, binary.LittleEndian, uint16(n))
-	} else if n <= 0xFFFFFFFF {
-		if err := w.WriteByte(0xFE); err != nil {
-			return err
-		}
-		return binary.Write(w, binary.LittleEndian, uint32(n))
-	} else {
-		if err := w.WriteByte(0xFF); err != nil {
-			return err
-		}
-		return binary.Write(w, binary.LittleEndian, uint64(n))
-	}
 }
 
 func bodyContent(req *http.Request) ([]byte, error) {
@@ -552,16 +475,6 @@ func bodyContent(req *http.Request) ([]byte, error) {
 	}
 
 	return body, nil
-}
-
-func writeBytes(writer *bytes.Buffer, data []byte) error {
-	if err := writeVarInt(writer, len(data)); err != nil {
-		return fmt.Errorf("failed to write bytes length: %w", err)
-	}
-	if _, err := writer.Write(data); err != nil {
-		return fmt.Errorf("failed to write bytes: %w", err)
-	}
-	return nil
 }
 
 // buildResponsePayload creates a BRC-103 response payload according to BRC-104 section 6.9
@@ -601,8 +514,8 @@ func filterAndSortResponseHeaders(headers http.Header) [][2]string {
 	var includedHeaders [][2]string
 	for key, values := range headers {
 		lowerKey := strings.ToLower(key)
-		if (strings.HasPrefix(lowerKey, "x-bsv-") && !strings.HasPrefix(lowerKey, "x-bsv-auth-")) ||
-			lowerKey == "authorization" {
+		if (strings.HasPrefix(lowerKey, constants.XBSVPrefix) && !strings.HasPrefix(lowerKey, constants.AuthHeaderPrefix)) ||
+			lowerKey == constants.HeaderAuthorization {
 			for _, value := range values {
 				includedHeaders = append(includedHeaders, [2]string{lowerKey, value})
 			}
