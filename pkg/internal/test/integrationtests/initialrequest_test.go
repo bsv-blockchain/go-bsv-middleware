@@ -49,7 +49,7 @@ func prepareExampleSignature(t *testing.T) *wallet.CreateSignatureResult {
 	signature, err := key.Sign([]byte("test signature"))
 	require.NoError(t, err)
 
-	return &wallet.CreateSignatureResult{Signature: *signature}
+	return &wallet.CreateSignatureResult{Signature: signature}
 }
 
 func prepareExampleIdentityKey(t *testing.T) *wallet.GetPublicKeyResult {

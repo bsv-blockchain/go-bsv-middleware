@@ -13,7 +13,6 @@ import (
 	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	primitives "github.com/bsv-blockchain/go-sdk/primitives/ec"
-	tu "github.com/bsv-blockchain/go-sdk/util/test_util"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 	"github.com/stretchr/testify/require"
 )
@@ -26,10 +25,11 @@ var (
 
 func TestAuthMiddleware_InvalidCertificateHandling(t *testing.T) {
 	// given
-	var certType wallet.Base64Bytes32
+	var certType wallet.CertificateType
 	copy(certType[:], "age-verification")
 	certificateRequirements := &sdkUtils.RequestedCertificateSet{
-		Certifiers: []wallet.HexBytes33{tu.GetByte33FromString(trustedCertifier.ToDERHex()[:32])},
+		// Certifiers: []wallet.HexBytes33{tu.GetByte33FromString(trustedCertifier.ToDERHex()[:32])},
+		Certifiers: []*ec.PublicKey{trustedCertifier},
 		CertificateTypes: sdkUtils.RequestedCertificateTypeIDAndFieldList{
 			certType: []string{"age", "country"},
 		},
@@ -90,17 +90,17 @@ func TestAuthMiddleware_InvalidCertificateHandling(t *testing.T) {
 				return []*certificates.VerifiableCertificate{
 					{
 						Certificate: certificates.Certificate{
-							Type:         wallet.Base64String("age-verification"),
-							SerialNumber: wallet.Base64String("12345"),
+							Type:         wallet.StringBase64("age-verification"),
+							SerialNumber: wallet.StringBase64("12345"),
 							Subject:      *clientIdentityKey.PublicKey,
 							Certifier:    *wrongCertifierKey,
-							Fields: map[wallet.CertificateFieldNameUnder50Bytes]wallet.Base64String{
-								"age":     wallet.Base64String("21"),
-								"country": wallet.Base64String("Switzerland"),
+							Fields: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{
+								"age":     wallet.StringBase64("21"),
+								"country": wallet.StringBase64("Switzerland"),
 							},
 							Signature: []byte("mocksignature"),
 						},
-						Keyring: map[wallet.CertificateFieldNameUnder50Bytes]wallet.Base64String{},
+						Keyring: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{},
 					},
 				}
 			}(),
@@ -116,17 +116,17 @@ func TestAuthMiddleware_InvalidCertificateHandling(t *testing.T) {
 				return []*certificates.VerifiableCertificate{
 					{
 						Certificate: certificates.Certificate{
-							Type:         wallet.Base64String("wrong-type"),
-							SerialNumber: wallet.Base64String("12345"),
+							Type:         wallet.StringBase64("wrong-type"),
+							SerialNumber: wallet.StringBase64("12345"),
 							Subject:      *clientIdentityKey.PublicKey,
 							Certifier:    *certifierKey,
-							Fields: map[wallet.CertificateFieldNameUnder50Bytes]wallet.Base64String{
-								"age":     wallet.Base64String("21"),
-								"country": wallet.Base64String("Switzerland"),
+							Fields: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{
+								"age":     wallet.StringBase64("21"),
+								"country": wallet.StringBase64("Switzerland"),
 							},
 							Signature: []byte("mocksignature"),
 						},
-						Keyring: map[wallet.CertificateFieldNameUnder50Bytes]wallet.Base64String{},
+						Keyring: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{},
 					},
 				}
 			}(),
@@ -142,17 +142,17 @@ func TestAuthMiddleware_InvalidCertificateHandling(t *testing.T) {
 				return []*certificates.VerifiableCertificate{
 					{
 						Certificate: certificates.Certificate{
-							Type:         wallet.Base64String("age-verification"),
-							SerialNumber: wallet.Base64String("12345"),
+							Type:         wallet.StringBase64("age-verification"),
+							SerialNumber: wallet.StringBase64("12345"),
 							Subject:      *clientIdentityKey.PublicKey,
 							Certifier:    *certifierKey,
-							Fields: map[wallet.CertificateFieldNameUnder50Bytes]wallet.Base64String{
-								"country": wallet.Base64String("Switzerland"),
+							Fields: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{
+								"country": wallet.StringBase64("Switzerland"),
 								// Age field missing
 							},
 							Signature: []byte("mocksignature"),
 						},
-						Keyring: map[wallet.CertificateFieldNameUnder50Bytes]wallet.Base64String{},
+						Keyring: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{},
 					},
 				}
 			}(),
@@ -168,17 +168,17 @@ func TestAuthMiddleware_InvalidCertificateHandling(t *testing.T) {
 				return []*certificates.VerifiableCertificate{
 					{
 						Certificate: certificates.Certificate{
-							Type:         wallet.Base64String("age-verification"),
-							SerialNumber: wallet.Base64String("12345"),
+							Type:         wallet.StringBase64("age-verification"),
+							SerialNumber: wallet.StringBase64("12345"),
 							Subject:      *clientIdentityKey.PublicKey,
 							Certifier:    *certifierKey,
-							Fields: map[wallet.CertificateFieldNameUnder50Bytes]wallet.Base64String{
-								"age":     wallet.Base64String("17"), // Underage
-								"country": wallet.Base64String("Switzerland"),
+							Fields: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{
+								"age":     wallet.StringBase64("17"), // Underage
+								"country": wallet.StringBase64("Switzerland"),
 							},
 							Signature: []byte("mocksignature"),
 						},
-						Keyring: map[wallet.CertificateFieldNameUnder50Bytes]wallet.Base64String{},
+						Keyring: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{},
 					},
 				}
 			}(),
@@ -294,10 +294,10 @@ func TestAuthMiddleware_CertificateHandling(t *testing.T) {
 			LastUpdate:      1747241090788,
 		})
 
-		var certType wallet.Base64Bytes32
+		var certType wallet.CertificateType
 		copy(certType[:], "age-verification")
 		certificateRequirements := &sdkUtils.RequestedCertificateSet{
-			Certifiers: []wallet.HexBytes33{tu.GetByte33FromString(trustedCertifier.ToDERHex()[:32])},
+			Certifiers: []*ec.PublicKey{trustedCertifier},
 			CertificateTypes: sdkUtils.RequestedCertificateTypeIDAndFieldList{
 				certType: []string{"age", "country"},
 			},
@@ -352,10 +352,10 @@ func TestAuthMiddleware_CertificateHandling(t *testing.T) {
 			PeerIdentityKey: clientIdentityKey,
 			LastUpdate:      1747241090788,
 		})
-		var certType wallet.Base64Bytes32
+		var certType wallet.CertificateType
 		copy(certType[:], "age-verification")
 		certificateRequirements := &sdkUtils.RequestedCertificateSet{
-			Certifiers: []wallet.HexBytes33{tu.GetByte33FromString(trustedCertifier.ToDERHex()[:32])},
+			Certifiers: []*ec.PublicKey{trustedCertifier},
 			CertificateTypes: sdkUtils.RequestedCertificateTypeIDAndFieldList{
 				certType: []string{"age", "country"},
 			},
@@ -392,18 +392,18 @@ func TestAuthMiddleware_CertificateHandling(t *testing.T) {
 		certificates := []*certificates.VerifiableCertificate{
 			{
 				Certificate: certificates.Certificate{
-					Type:         wallet.Base64String("age-verification"),
-					SerialNumber: wallet.Base64String("12345"),
+					Type:         wallet.StringBase64("age-verification"),
+					SerialNumber: wallet.StringBase64("12345"),
 					Subject:      *clientIDKey.PublicKey,
 					Certifier:    *certifierPubKey,
-					Fields: map[wallet.CertificateFieldNameUnder50Bytes]wallet.Base64String{
-						"age":     wallet.Base64String("21"),
-						"country": wallet.Base64String("Switzerland"),
+					Fields: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{
+						"age":     wallet.StringBase64("21"),
+						"country": wallet.StringBase64("Switzerland"),
 					},
 					Signature: []byte("mocksignature"),
 				},
-				Keyring: map[wallet.CertificateFieldNameUnder50Bytes]wallet.Base64String{
-					"age": wallet.Base64String("mockkey"),
+				Keyring: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{
+					"age": wallet.StringBase64("mockkey"),
 				},
 			},
 		}

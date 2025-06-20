@@ -421,7 +421,7 @@ func (w *Wallet) CreateSignature(ctx context.Context, args wallet.CreateSignatur
 	}
 
 	return &wallet.CreateSignatureResult{
-		Signature: *signature,
+		Signature: signature,
 	}, nil
 }
 
@@ -460,7 +460,7 @@ func (w *Wallet) VerifySignature(ctx context.Context, args wallet.VerifySignatur
 
 // AcquireCertificate is a simplified mock implementation
 func (w *Wallet) AcquireCertificate(ctx context.Context, args wallet.AcquireCertificateArgs, originator string) (*wallet.Certificate, error) {
-	if len(args.Type) == 0 || len(args.Certifier) == 0 {
+	if len(args.Type) == 0 || len(args.Certifier.ToDERHex()) == 0 {
 		return nil, errors.New("missing required fields")
 	}
 

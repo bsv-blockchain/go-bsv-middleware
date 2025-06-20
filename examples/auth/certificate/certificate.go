@@ -51,10 +51,15 @@ func main() {
 	}
 	log.Println("✓ Server wallet created")
 
+	certifierPublicKey, err := ec.PublicKeyFromString(trustedCertifier)
+	if err != nil {
+		log.Fatalf("Failed to parse certifier public key: %v", err)
+	}
+
 	certificateToRequest := &sdkUtils.RequestedCertificateSet{
-		Certifiers: byteToWalletHexBytes33([]byte(trustedCertifier)),
-		CertificateTypes: map[wallet.Base64Bytes32][]string{
-			toBase64Bytes32("age-verification"): {"age"},
+		Certifiers: []*ec.PublicKey{certifierPublicKey},
+		CertificateTypes: map[wallet.CertificateType][]string{
+			stringToCertificateType("age-verification"): {"age"},
 		},
 	}
 
@@ -310,12 +315,12 @@ func createVerifiableCertificates(identityKey *ec.PublicKey) ([]*certificates.Ve
 	}
 
 	certificate := certificates.Certificate{
-		Type:         wallet.Base64String(encodeToBase64("age-verification")),
-		SerialNumber: wallet.Base64String(serialNumber),
+		Type:         wallet.StringBase64(encodeToBase64("age-verification")),
+		SerialNumber: wallet.StringBase64(serialNumber),
 		Subject:      *identityKey,
 		Certifier:    *certifier.PubKey(),
-		Fields: map[wallet.CertificateFieldNameUnder50Bytes]wallet.Base64String{
-			"age": wallet.Base64String(encodeToBase64("21")),
+		Fields: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{
+			"age": wallet.StringBase64(encodeToBase64("21")),
 		},
 		// For testing purposes, we are not using a real signature
 		// We receive warning about the signature being invalid, but we are ignoring it here
@@ -326,8 +331,8 @@ func createVerifiableCertificates(identityKey *ec.PublicKey) ([]*certificates.Ve
 	return []*certificates.VerifiableCertificate{
 		{
 			Certificate: certificate,
-			Keyring: map[wallet.CertificateFieldNameUnder50Bytes]wallet.Base64String{
-				"age": wallet.Base64String(encodeToBase64("symmetricKeyToField")),
+			Keyring: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{
+				"age": wallet.StringBase64(encodeToBase64("symmetricKeyToField")),
 			},
 		},
 	}, nil
@@ -482,16 +487,7 @@ func onCertificatesReceivedFunc(
 	return nil
 }
 
-func byteToWalletHexBytes33(bytetable []byte) []wallet.HexBytes33 {
-	if len(bytetable) == 0 || len(bytetable) != 33 {
-		return nil
-	}
-	hexBytes := make([]wallet.HexBytes33, 1)
-	copy(hexBytes[0][:], bytetable[:33])
-	return hexBytes
-}
-
-func toBase64Bytes32(s string) (out wallet.Base64Bytes32) {
+func stringToCertificateType(s string) (out wallet.CertificateType) {
 	copy(out[:], s)
 	return
 }
