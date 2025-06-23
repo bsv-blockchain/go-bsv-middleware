@@ -8,12 +8,13 @@ import (
 	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
-// Config configures the auth middleware
+// Config contains configuration options for the auth middleware
 type Config struct {
 	Wallet                 wallet.Interface
+	Transport              auth.Transport 
+	Logger                 *slog.Logger
 	SessionManager         auth.SessionManager
 	AllowUnauthenticated   bool
-	Logger                 *slog.Logger
 	CertificatesToRequest  *utils.RequestedCertificateSet
 	OnCertificatesReceived auth.OnCertificateReceivedCallback
 }
