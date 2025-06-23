@@ -1,9 +1,12 @@
 module github.com/bsv-blockchain/go-bsv-middleware
 
-go 1.24.0
+go 1.24.3
+
+toolchain go1.24.4
 
 require (
-	github.com/bsv-blockchain/go-sdk v1.1.23
+	github.com/bsv-blockchain/go-sdk v1.2.1
+	github.com/go-softwarelab/common v1.1.0
 	github.com/stretchr/testify v1.10.0
 )
 
@@ -12,8 +15,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
-	golang.org/x/crypto v0.37.0 // indirect
+	golang.org/x/crypto v0.39.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/bsv-blockchain/go-sdk => github.com/b-open-io/go-sdk v1.1.25-0.20250512182945-5fe49978cd05
