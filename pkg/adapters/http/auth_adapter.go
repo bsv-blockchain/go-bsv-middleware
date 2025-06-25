@@ -37,7 +37,6 @@ func NewHTTPAuthMiddleware(config authmiddleware.Config, logger *slog.Logger) *H
 	}
 }
 
-
 // Handler returns an HTTP handler
 func (a *HTTPAuthMiddleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
