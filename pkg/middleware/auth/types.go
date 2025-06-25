@@ -11,7 +11,7 @@ import (
 // Config contains configuration options for the auth middleware
 type Config struct {
 	Wallet                 wallet.Interface
-	Transport              auth.Transport 
+	Transport              auth.Transport
 	Logger                 *slog.Logger
 	SessionManager         auth.SessionManager
 	AllowUnauthenticated   bool
