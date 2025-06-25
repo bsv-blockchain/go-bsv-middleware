@@ -16,22 +16,30 @@ import (
 	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
 )
 
-// HTTPAuthAdapter connects HTTP requests to transport-agnostic middleware
-type HTTPAuthAdapter struct {
+// HTTPAuthMiddleware connects HTTP requests to transport-agnostic middleware
+type HTTPAuthMiddleware struct {
 	middleware *authmiddleware.Middleware
 	logger     *slog.Logger
 }
 
-// NewHTTPAuthAdapter creates an adapter for HTTP authentication middleware
-func NewHTTPAuthAdapter(middleware *authmiddleware.Middleware, logger *slog.Logger) *HTTPAuthAdapter {
-	return &HTTPAuthAdapter{
+// NewHTTPAuthMiddleware creates an adapter for HTTP authentication middleware
+func NewHTTPAuthMiddleware(config authmiddleware.Config, logger *slog.Logger) *HTTPAuthMiddleware {
+
+	middleware, err := authmiddleware.New(config)
+	if err != nil {
+		logger.Error("Failed to create auth middleware", slog.String("error", err.Error()))
+		return nil
+	}
+
+	return &HTTPAuthMiddleware{
 		middleware: middleware,
 		logger:     logger,
 	}
 }
 
+
 // Handler returns an HTTP handler
-func (a *HTTPAuthAdapter) Handler(next http.Handler) http.Handler {
+func (a *HTTPAuthMiddleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		a.logger.Debug("Processing HTTP request",
 			slog.String("path", r.URL.Path),
@@ -61,22 +69,43 @@ func (a *HTTPAuthAdapter) Handler(next http.Handler) http.Handler {
 	})
 }
 
-// parseHTTPRequest handles ALL HTTP-specific parsing
-func (a *HTTPAuthAdapter) parseHTTPRequest(w http.ResponseWriter, r *http.Request, next http.Handler) (*auth.AuthMessage, context.Context, error) {
+func (a *HTTPAuthMiddleware) parseHTTPRequest(w http.ResponseWriter, r *http.Request, next http.Handler) (*auth.AuthMessage, context.Context, error) {
+	a.logger.Debug("parseHTTPRequest entry",
+		slog.String("path", r.URL.Path),
+		slog.String("method", r.Method))
+
+	isAuthEndpoint := a.isAuthEndpoint(r)
+	a.logger.Debug("isAuthEndpoint check",
+		slog.Bool("isAuthEndpoint", isAuthEndpoint),
+		slog.String("requestID", r.Header.Get(constants.HeaderRequestID)),
+		slog.String("identityKey", r.Header.Get(constants.HeaderIdentityKey)))
+
 	wrappedWriter := internaltransport.WrapResponseWriter(w)
 	ctx := context.WithValue(r.Context(), httptransport.RequestKey, r)
 	ctx = context.WithValue(ctx, httptransport.ResponseKey, wrappedWriter)
-	ctx = context.WithValue(ctx, httptransport.NextKey, func() {
-		next.ServeHTTP(wrappedWriter, r)
-	})
+
+	if !isAuthEndpoint {
+		a.logger.Debug("Setting NextKey for non-auth endpoint")
+		ctx = context.WithValue(ctx, httptransport.NextKey, func() {
+			a.logger.Debug("Calling next.ServeHTTP", slog.String("path", r.URL.Path))
+			next.ServeHTTP(wrappedWriter, r)
+		})
+	} else {
+		a.logger.Debug("Skipping NextKey for auth endpoint")
+	}
 
 	authMsgWithID, err := httptransport.ParseAuthMessageFromRequest(r)
+	a.logger.Debug("ParseAuthMessageFromRequest result",
+		slog.Bool("authMsgIsNil", authMsgWithID == nil),
+		slog.Any("error", err))
+
 	if err != nil {
 		a.logger.Error("Failed to parse auth message", slog.String("error", err.Error()))
 		return nil, ctx, errors.New("failed to parse authentication message")
 	}
 
 	if authMsgWithID == nil {
+		a.logger.Debug("No auth message found, returning nil")
 		return nil, ctx, nil
 	}
 
@@ -85,11 +114,13 @@ func (a *HTTPAuthAdapter) parseHTTPRequest(w http.ResponseWriter, r *http.Reques
 		return nil, ctx, errors.New("internal authentication error")
 	}
 
+	a.logger.Debug("Returning auth message",
+		slog.String("identityKey", authMsgWithID.IdentityKey.ToDERHex()))
 	return authMsgWithID.AuthMessage, ctx, nil
 }
 
 // handleHTTPError converts errors to HTTP responses (transport-specific)
-func (a *HTTPAuthAdapter) handleHTTPError(w http.ResponseWriter, err error) {
+func (a *HTTPAuthMiddleware) handleHTTPError(w http.ResponseWriter, err error) {
 	statusCode := http.StatusInternalServerError
 	errMsg := "Internal server error"
 
@@ -152,4 +183,34 @@ func prepareMissingCertificateTypesErrorMsg(certTypes sdkUtils.RequestedCertific
 	}
 
 	return sb.String()
+}
+
+func (a *HTTPAuthMiddleware) isAuthEndpoint(r *http.Request) bool {
+	// Well-known auth endpoint - always auto-handle
+	if r.URL.Path == constants.WellKnownAuthPath {
+		a.logger.Debug("Identified as well-known auth endpoint")
+		return true
+	}
+
+	// Check for general auth request headers
+	hasRequestID := r.Header.Get(constants.HeaderRequestID) != ""
+	hasIdentityKey := r.Header.Get(constants.HeaderIdentityKey) != ""
+	hasVersion := r.Header.Get(constants.HeaderVersion) != ""
+
+	a.logger.Debug("General auth header check",
+		slog.Bool("hasRequestID", hasRequestID),
+		slog.Bool("hasIdentityKey", hasIdentityKey),
+		slog.Bool("hasVersion", hasVersion),
+		slog.String("path", r.URL.Path),
+		slog.String("requestID", r.Header.Get(constants.HeaderRequestID)),
+		slog.String("identityKey", r.Header.Get(constants.HeaderIdentityKey)))
+
+	// CORRECTED LOGIC: If it has BSV auth headers, it's a general auth request
+	// that should be auto-handled regardless of path
+	if hasRequestID && hasIdentityKey && hasVersion {
+		a.logger.Debug("Identified as general auth endpoint - has required BSV headers")
+		return true
+	}
+
+	return false
 }

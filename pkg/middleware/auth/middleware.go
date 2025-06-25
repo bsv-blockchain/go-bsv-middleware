@@ -70,8 +70,6 @@ func New(cfg Config) (*Middleware, error) {
 
 // ProcessAuthentication is the core business logic
 func (m *Middleware) ProcessAuthentication(ctx context.Context, authMsg *auth.AuthMessage) error {
-	m.logger.Debug("Processing authentication request")
-
 	if authMsg == nil {
 		if m.allowUnauthenticated {
 			return nil
@@ -90,7 +88,6 @@ func (m *Middleware) ProcessAuthentication(ctx context.Context, authMsg *auth.Au
 		return err
 	}
 
-	m.logger.Debug("Authentication successful")
 	return nil
 }
 

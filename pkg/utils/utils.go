@@ -276,16 +276,21 @@ func WriteRequestData(request *http.Request, writer *bytes.Buffer) error {
 
 	return nil
 }
-
 func writeVarIntNum(writer *bytes.Buffer, num int) error {
 	if num < 0 {
 		err := binary.Write(writer, binary.LittleEndian, int64(num))
-		return fmt.Errorf("failed to write negative number: %w", err)
+		if err != nil {
+			return fmt.Errorf("failed to write negative number: %w", err)
+		}
+		return nil
 	}
 
 	if num < 0xFD {
 		err := writer.WriteByte(byte(num))
-		return fmt.Errorf("failed to write varint prefix: %w", err)
+		if err != nil {
+			return fmt.Errorf("failed to write varint prefix: %w", err)
+		}
+		return nil
 
 	} else if num <= 0xFFFF {
 		if err := writer.WriteByte(0xFD); err != nil {
@@ -326,7 +331,7 @@ func writeVarIntNum(writer *bytes.Buffer, num int) error {
 			return fmt.Errorf("failed to write varint prefix: %w", err)
 		}
 
-		numUInt64, err := to.UInt32(num)
+		numUInt64, err := to.UInt64(num)
 		if err != nil {
 			return fmt.Errorf("failed to convert number to uint64: %w", err)
 		}
