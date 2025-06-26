@@ -13,11 +13,10 @@ import (
 	"testing"
 
 	httpadapter "github.com/bsv-blockchain/go-bsv-middleware/pkg/adapters/http"
-	httptransport "github.com/bsv-blockchain/go-bsv-middleware/pkg/transport/http"
-
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	middleware "github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/auth"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
+	httptransport "github.com/bsv-blockchain/go-bsv-middleware/pkg/transport/http"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/auth/certificates"
 	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
@@ -27,12 +26,12 @@ import (
 
 // MockHTTPServer is a mock HTTP server used in tests
 type MockHTTPServer struct {
-	mux                  *http.ServeMux
-	server               *httptest.Server
-	allowUnauthenticated bool
-	logger               *slog.Logger
-	authMiddleware       *middleware.Middleware
-	httpAuthAdapter      *httpadapter.HTTPAuthMiddleware
+	mux                     *http.ServeMux
+	server                  *httptest.Server
+	allowUnauthenticated    bool
+	logger                  *slog.Logger
+	authMiddleware          *middleware.Middleware
+	httpAuthAdapter         *httpadapter.HTTPAuthMiddleware
 	certificateRequirements *sdkUtils.RequestedCertificateSet
 	onCertificatesReceived  auth.OnCertificateReceivedCallback
 }
