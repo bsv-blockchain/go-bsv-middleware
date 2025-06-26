@@ -133,7 +133,11 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 			m.logger.Error("Failed to process auth message", slog.String("error", err.Error()))
 
 			statusCode := http.StatusInternalServerError
+			// Ensure we handle the error correctly
 			errMsg := "Internal server error"
+			// errors.Join(err, errMsg)
+			// To handle errors more gracefully, we need go-sdk to return specific error types
+			// For now majority of errors will be treated as internal server error
 
 			switch {
 			case errors.Is(err, auth.ErrNotAuthenticated):
@@ -155,6 +159,9 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 			case errors.Is(err, auth.ErrSessionNotFound):
 				statusCode = http.StatusUnauthorized
 				errMsg = "Session not found"
+			default:
+				// errMsg = errMsg + err.Error()
+				errMsg = fmt.Sprintf("%s: %s", errMsg, err.Error())
 			}
 
 			http.Error(w, errMsg, statusCode)

@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/constants"
@@ -111,6 +112,10 @@ func PrepareGeneralRequestHeaders(
 		yourNonce = previousResponse.Nonce
 	}
 
+	if yourNonce == "" && previousResponse.InitialNonce != "" {
+		yourNonce = previousResponse.InitialNonce
+	}
+
 	if yourNonce == "" {
 		return errors.New("previous response has no nonce to use")
 	}
@@ -125,6 +130,11 @@ func PrepareGeneralRequestHeaders(
 	headers, err := utils.PrepareGeneralRequestHeaders(ctx, mockedWallet, normalizedResponse, utils.RequestData{Request: request})
 	if err != nil {
 		return errors.New("failed to prepare general request headers: " + err.Error())
+	}
+
+	if headers[constants.HeaderYourNonce] == "" && previousResponse.YourNonce != "" {
+		log.Println("We manually override YourNonce to not be empty")
+		headers[constants.HeaderYourNonce] = previousResponse.YourNonce
 	}
 
 	for _, opt := range opts {
@@ -197,11 +207,31 @@ func prepareGeneralRequestHeadersFixesNonce(ctx context.Context, walletInstance 
 	if err != nil {
 		return nil, errors.New("failed to get client identity key")
 	}
+	newNonce := DefaultNonces[0]
+
+	// newNonce := previousResponse.Nonce
+	// if newNonce == "" {
+	// 	newNonce = DefaultNonces[0]
+	// }
+
+	// requestID := []byte(DefaultNonces[0])
+	// reqID := requestID[:32]
+	// encodedRequestID := base64.StdEncoding.EncodeToString(reqID)
+
+	// OR even better, to be more explicit about the logic:
+	yourNonce := previousResponse.YourNonce
+	if yourNonce == "" {
+		// Fallback to Nonce if YourNonce is not set
+		yourNonce = previousResponse.Nonce
+	}
+	if yourNonce == "" {
+		// Final fallback to InitialNonce
+		yourNonce = previousResponse.InitialNonce
+	}
 
 	requestID := []byte(DefaultNonces[0])
 	encodedRequestID := base64.StdEncoding.EncodeToString(requestID)
 
-	newNonce := DefaultNonces[0]
 	var writer bytes.Buffer
 
 	_, err = writer.Write(requestID)
@@ -262,4 +292,75 @@ func getOrPrepareTempRequest(requestData utils.RequestData) *http.Request {
 	}
 
 	return req
+}
+
+// Fix for pkg/internal/test/mocks/requests.go - Update request ID generation
+
+// Update the prepareGeneralRequestHeaders function to create proper 32-byte request ID
+func prepareGeneralRequestHeaders(ctx context.Context, walletInstance interfaces.Wallet, previousResponse *auth.AuthMessage, requestData utils.RequestData) (map[string]string, error) {
+	serverIdentityKey := previousResponse.IdentityKey
+	serverNonce := previousResponse.InitialNonce
+
+	opts := wallet.GetPublicKeyArgs{IdentityKey: true}
+	clientIdentityKey, err := walletInstance.GetPublicKey(ctx, opts, "")
+	if err != nil {
+		return nil, errors.New("failed to get client identity key")
+	}
+
+	// Use the nonce from the message if available, otherwise use first default nonce
+	newNonce := previousResponse.Nonce
+	if newNonce == "" {
+		newNonce = DefaultNonces[0]
+	}
+
+	// Create proper 32-byte request ID (not base64 encoded)
+	requestID := make([]byte, 32)
+	copy(requestID, []byte("test_request_id_32_bytes_long___"))
+
+	var writer bytes.Buffer
+
+	_, err = writer.Write(requestID)
+	if err != nil {
+		return nil, errors.New("failed to write request ID")
+	}
+
+	request := getOrPrepareTempRequest(requestData)
+	err = utils.WriteRequestData(request, &writer)
+	if err != nil {
+		return nil, err
+	}
+
+	protocol := wallet.Protocol{SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty, Protocol: auth.AUTH_PROTOCOL_ID}
+
+	baseArgs := wallet.EncryptionArgs{
+		ProtocolID: protocol,
+		Counterparty: wallet.Counterparty{
+			Type:         wallet.CounterpartyTypeOther,
+			Counterparty: serverIdentityKey,
+		},
+		KeyID: fmt.Sprintf("%s %s", newNonce, serverNonce),
+	}
+	createSignatureArgs := wallet.CreateSignatureArgs{
+		EncryptionArgs: baseArgs,
+		Data:           writer.Bytes(),
+	}
+
+	signature, err := walletInstance.CreateSignature(ctx, createSignatureArgs, "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create signature, %w", err)
+	}
+
+	// Encode the 32-byte request ID as base64 for the header
+	encodedRequestID := base64.StdEncoding.EncodeToString(requestID)
+
+	headers := map[string]string{
+		constants.HeaderVersion:     "0.1",
+		constants.HeaderIdentityKey: clientIdentityKey.PublicKey.ToDERHex(),
+		constants.HeaderNonce:       newNonce,
+		constants.HeaderYourNonce:   serverNonce,
+		constants.HeaderSignature:   hex.EncodeToString(signature.Signature.Serialize()),
+		constants.HeaderRequestID:   encodedRequestID,
+	}
+
+	return headers, nil
 }

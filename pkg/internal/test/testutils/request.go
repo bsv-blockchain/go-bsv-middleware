@@ -42,7 +42,8 @@ func MissingHeaderError(t *testing.T, res *http.Response, header string) {
 
 // ReadBodyForTest reads and returns the response body for testing purposes
 func ReadBodyForTest(t *testing.T, res *http.Response) string {
-	return strings.ToLower(readBody(t, res))
+	body := strings.ToLower(readBody(t, res))
+	return body
 }
 
 func readBody(t *testing.T, res *http.Response) string {

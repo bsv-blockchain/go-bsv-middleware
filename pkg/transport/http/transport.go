@@ -56,6 +56,10 @@ func (r *ResponseRecorder) WriteHeader(statusCode int) {
 	if r.written {
 		return
 	}
+
+	if statusCode == 0 {
+		statusCode = http.StatusInternalServerError
+	}
 	r.statusCode = statusCode
 	r.written = true
 }
@@ -71,6 +75,9 @@ func (r *ResponseRecorder) Write(b []byte) (int, error) {
 
 // Flush writes the response header and body if they have not been written yet.
 func (r *ResponseRecorder) Flush() error {
+	if r.statusCode == 0 {
+		r.statusCode = http.StatusOK
+	}
 	r.ResponseWriter.WriteHeader(r.statusCode)
 	if len(r.body) > 0 {
 		_, err := r.ResponseWriter.Write(r.body)
