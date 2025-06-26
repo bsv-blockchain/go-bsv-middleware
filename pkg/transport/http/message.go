@@ -2,6 +2,7 @@ package httptransport
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -93,7 +94,7 @@ func parseGeneralAuthRequest(req *http.Request) (*AuthMessageWithRequestID, erro
 	}
 
 	if signature != "" {
-		sigBytes, err := base64.StdEncoding.DecodeString(signature)
+		sigBytes, err := hex.DecodeString(signature)
 		if err != nil {
 			return nil, fmt.Errorf("invalid signature format: %w", err)
 		}

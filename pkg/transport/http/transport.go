@@ -2,7 +2,7 @@ package httptransport
 
 import (
 	"context"
-	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,7 +11,6 @@ import (
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/constants"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
-	internaltransport "github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/transport"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/auth/utils"
 	primitives "github.com/bsv-blockchain/go-sdk/primitives/ec"
@@ -138,7 +137,7 @@ func (t *Transport) sendNonGeneralMessage(resp http.ResponseWriter, message *aut
 	}
 
 	if message.Signature != nil {
-		resp.Header().Set(constants.HeaderSignature, base64.StdEncoding.EncodeToString(message.Signature))
+		resp.Header().Set(constants.HeaderSignature, hex.EncodeToString(message.Signature))
 	}
 
 	t.applyDefaultCertificateRequests(message)
@@ -162,6 +161,7 @@ func (t *Transport) sendGeneralMessage(ctx context.Context, resp http.ResponseWr
 		return errors.New("missing request ID for general message response")
 	}
 
+	// Set BRC-104 headers only - don't modify the payload
 	resp.Header().Set(constants.HeaderVersion, message.Version)
 	resp.Header().Set(constants.HeaderMessageType, string(message.MessageType))
 	resp.Header().Set(constants.HeaderIdentityKey, message.IdentityKey.ToDERHex())
@@ -175,39 +175,78 @@ func (t *Transport) sendGeneralMessage(ctx context.Context, resp http.ResponseWr
 	}
 
 	if message.Signature != nil {
-		resp.Header().Set(constants.HeaderSignature, base64.StdEncoding.EncodeToString(message.Signature))
+		resp.Header().Set(constants.HeaderSignature, hex.EncodeToString(message.Signature))
 	}
 
 	resp.Header().Set(constants.HeaderRequestID, requestID)
 
-	recorder := internaltransport.NewResponseRecorder(resp)
-	nextVal := ctx.Value(NextKey)
-	if nextVal != nil {
-		if next, ok := nextVal.(func()); ok {
-			next()
-		}
-	}
-	statusCode := recorder.GetStatusCode()
-	responseBody := recorder.GetBody()
-	responseHeaders := recorder.Header()
+	// CRITICAL: For general messages sent via ToPeer, don't write any HTTP body
+	// The message.Payload is the actual peer message, not an HTTP response
+	resp.WriteHeader(http.StatusOK)
 
-	payload, err := buildResponsePayload(requestID, statusCode, responseHeaders, responseBody)
-	if err != nil {
-		return fmt.Errorf("failed to build response payload: %w", err)
-	}
-
-	if t.wallet != nil {
-		if err := t.signResponse(ctx, resp, message, payload, req); err != nil {
-			return fmt.Errorf("failed to sign response: %w", err)
-		}
-	}
-
-	if err := recorder.Flush(); err != nil {
-		return fmt.Errorf("failed to write response: %w", err)
-	}
+	// Don't call the next handler or write any body
+	// This prevents the transport from adding HTTP response data to the payload
 
 	return nil
 }
+
+// func (t *Transport) sendGeneralMessage(ctx context.Context, resp http.ResponseWriter, message *auth.AuthMessage) error {
+// 	req, ok := ctx.Value(RequestKey).(*http.Request)
+// 	if !ok {
+// 		return errors.New("invalid request type in context")
+// 	}
+
+// 	requestID := req.Header.Get(constants.HeaderRequestID)
+// 	if requestID == "" {
+// 		return errors.New("missing request ID for general message response")
+// 	}
+
+// 	resp.Header().Set(constants.HeaderVersion, message.Version)
+// 	resp.Header().Set(constants.HeaderMessageType, string(message.MessageType))
+// 	resp.Header().Set(constants.HeaderIdentityKey, message.IdentityKey.ToDERHex())
+
+// 	if message.Nonce != "" {
+// 		resp.Header().Set(constants.HeaderNonce, message.Nonce)
+// 	}
+
+// 	if message.YourNonce != "" {
+// 		resp.Header().Set(constants.HeaderYourNonce, message.YourNonce)
+// 	}
+
+// 	if message.Signature != nil {
+// 		resp.Header().Set(constants.HeaderSignature, hex.EncodeToString(message.Signature))
+// 	}
+
+// 	resp.Header().Set(constants.HeaderRequestID, requestID)
+
+// 	recorder := internaltransport.NewResponseRecorder(resp)
+// 	nextVal := ctx.Value(NextKey)
+// 	if nextVal != nil {
+// 		if next, ok := nextVal.(func()); ok {
+// 			next()
+// 		}
+// 	}
+// 	statusCode := recorder.GetStatusCode()
+// 	responseBody := recorder.GetBody()
+// 	responseHeaders := recorder.Header()
+
+// 	payload, err := buildResponsePayload(requestID, statusCode, responseHeaders, responseBody)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to build response payload: %w", err)
+// 	}
+
+// 	if t.wallet != nil {
+// 		if err := t.signResponse(ctx, resp, message, payload, req); err != nil {
+// 			return fmt.Errorf("failed to sign response: %w", err)
+// 		}
+// 	}
+
+// 	if err := recorder.Flush(); err != nil {
+// 		return fmt.Errorf("failed to write response: %w", err)
+// 	}
+
+// 	return nil
+// }
 
 func (t *Transport) signResponse(ctx context.Context, resp http.ResponseWriter, message *auth.AuthMessage, payload []byte, req *http.Request) error {
 	peerIdentityKeyStr := req.Header.Get(constants.HeaderIdentityKey)
@@ -240,7 +279,7 @@ func (t *Transport) signResponse(ctx context.Context, resp http.ResponseWriter, 
 		return fmt.Errorf("failed to sign response payload: %w", err)
 	}
 
-	resp.Header().Set(constants.HeaderSignature, base64.StdEncoding.EncodeToString(signResult.Signature.Serialize()))
+	resp.Header().Set(constants.HeaderSignature, hex.EncodeToString(signResult.Signature.Serialize()))
 	return nil
 }
 

@@ -110,3 +110,7 @@ func (m *Middleware) GetSessionManager() auth.SessionManager {
 func (m *Middleware) IsAuthenticationRequired() bool {
 	return !m.allowUnauthenticated
 }
+
+func (m *Middleware) GetWallet() wallet.Interface {
+	return m.wallet
+}

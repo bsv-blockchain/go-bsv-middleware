@@ -12,6 +12,9 @@ import (
 	"os"
 	"testing"
 
+	httpadapter "github.com/bsv-blockchain/go-bsv-middleware/pkg/adapters/http"
+	httptransport "github.com/bsv-blockchain/go-bsv-middleware/pkg/transport/http"
+
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	middleware "github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/auth"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
@@ -24,11 +27,12 @@ import (
 
 // MockHTTPServer is a mock HTTP server used in tests
 type MockHTTPServer struct {
-	mux                     *http.ServeMux
-	server                  *httptest.Server
-	allowUnauthenticated    bool
-	logger                  *slog.Logger
-	authMiddleware          *middleware.Middleware
+	mux                  *http.ServeMux
+	server               *httptest.Server
+	allowUnauthenticated bool
+	logger               *slog.Logger
+	authMiddleware       *middleware.Middleware
+	httpAuthAdapter      *httpadapter.HTTPAuthMiddleware
 	certificateRequirements *sdkUtils.RequestedCertificateSet
 	onCertificatesReceived  auth.OnCertificateReceivedCallback
 }
@@ -61,7 +65,6 @@ func CreateMockHTTPServer(
 	return mockServer
 }
 
-// WithHandler adds a custom handler to the server
 func (s *MockHTTPServer) WithHandler(path string, handler *MockHTTPHandler) *MockHTTPServer {
 	// TODO: uncomment when payment middleware implemented
 	//if handler.usePaymentMiddleware {
@@ -69,7 +72,8 @@ func (s *MockHTTPServer) WithHandler(path string, handler *MockHTTPHandler) *Moc
 	//}
 
 	if handler.useAuthMiddleware {
-		handler.h = s.authMiddleware.Handler(handler.h)
+		// Use the HTTP auth adapter instead of calling Handler directly on the middleware
+		handler.h = s.httpAuthAdapter.Handler(handler.h)
 	}
 
 	s.mux.Handle(path, handler.h)
@@ -229,13 +233,19 @@ func (s *MockHTTPServer) createMiddleware(wallet wallet.Interface, sessionManage
 		s.logger = slog.New(slog.DiscardHandler)
 	}
 
+	httpTransport := httptransport.CreateHTTPTransport(httptransport.Config{
+		Wallet:         wallet,
+		SessionManager: sessionManager,
+	})
+
 	opts := middleware.Config{
-		AllowUnauthenticated:   s.allowUnauthenticated,
-		Logger:                 s.logger,
 		Wallet:                 wallet,
+		Transport:              httpTransport,
+		Logger:                 s.logger,
+		SessionManager:         sessionManager,
+		AllowUnauthenticated:   s.allowUnauthenticated,
 		CertificatesToRequest:  s.certificateRequirements,
 		OnCertificatesReceived: s.onCertificatesReceived,
-		SessionManager:         sessionManager,
 	}
 
 	var err error
@@ -243,6 +253,13 @@ func (s *MockHTTPServer) createMiddleware(wallet wallet.Interface, sessionManage
 	if err != nil {
 		panic("failed to create auth middleware")
 	}
+	s.httpAuthAdapter = httpadapter.NewHTTPAuthMiddleware(middleware.Config{
+		AllowUnauthenticated: false,
+		Logger:               s.logger,
+		Wallet:               wallet,
+		Transport:            httpTransport,
+	}, s.logger)
+
 }
 
 // WithAuthMiddleware adds auth middleware to the server
