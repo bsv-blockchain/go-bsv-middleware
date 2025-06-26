@@ -61,7 +61,7 @@ func (m *MockableSessionManager) UpdateSession(session *auth.PeerSession) {
 			PeerIdentityKey: session.PeerIdentityKey,
 			LastUpdate:      0, // Set to predictable value
 		}
-		
+
 		if isExpectedMockCall(m.ExpectedCalls, "UpdateSession", *normalizedSession) {
 			m.Called(*normalizedSession)
 			return
