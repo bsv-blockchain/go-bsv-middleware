@@ -1,7 +1,6 @@
 package httptransport
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/hex"
@@ -17,10 +16,10 @@ import (
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/constants"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/util"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/auth/utils"
 	primitives "github.com/bsv-blockchain/go-sdk/primitives/ec"
-	"github.com/bsv-blockchain/go-sdk/util"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
@@ -47,18 +46,9 @@ type ResponseRecorder struct {
 	body       []byte
 }
 
-// NewResponseRecorder creates a new response recorder
-func NewResponseRecorder(w http.ResponseWriter) *ResponseRecorder {
-	return &ResponseRecorder{
-		ResponseWriter: w,
-		statusCode:     http.StatusOK, // Default status code if WriteHeader is never called
-		written:        false,
-	}
-}
-
 // GetBody retrieves the recorded response body.
 func (r *ResponseRecorder) GetBody() []byte {
-	return r.ResponseWriter.(*ResponseRecorder).body
+	return r.body
 }
 
 // WriteHeader captures the status code
@@ -106,14 +96,6 @@ func WrapResponseWriter(w http.ResponseWriter) *ResponseRecorder {
 // GetStatusCode retrieves the status code from the ResponseRecorder.
 func (r *ResponseRecorder) GetStatusCode() int {
 	return r.statusCode
-}
-
-// GetStatusCode retrieves the status code from the ResponseRecorder.
-func GetStatusCode(w http.ResponseWriter) (int, error) {
-	if rw, ok := w.(*ResponseRecorder); ok {
-		return rw.statusCode, nil
-	}
-	return 0, errors.New("response writer is not a response recorder")
 }
 
 // TransportConfig config for Transport.
@@ -253,23 +235,6 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 
 		resp.Header().Set(constants.HeaderRequestID, requestID)
 
-		recorder := NewResponseRecorder(resp)
-
-		nextVal := ctx.Value(NextKey)
-		if nextVal != nil {
-			if next, ok := nextVal.(func()); ok {
-				next()
-			}
-		}
-		statusCode := recorder.GetStatusCode()
-		responseBody := recorder.GetBody()
-		responseHeaders := recorder.Header()
-
-		payload, err := buildResponsePayload(requestID, statusCode, responseHeaders, responseBody)
-		if err != nil {
-			return fmt.Errorf("failed to build response payload: %w", err)
-		}
-
 		if t.wallet != nil {
 			peerIdentityKeyStr := req.Header.Get(constants.HeaderIdentityKey)
 			if peerIdentityKeyStr == "" {
@@ -293,7 +258,7 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 						Counterparty: peerIdentityKey,
 					},
 				},
-				Data: payload,
+				Data: message.Payload,
 			}
 
 			signResult, err := t.wallet.CreateSignature(ctx, signatureArgs, "")
@@ -302,11 +267,6 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 			}
 
 			resp.Header().Set(constants.HeaderSignature, hex.EncodeToString(signResult.Signature.Serialize()))
-		}
-
-		err = recorder.Flush()
-		if err != nil {
-			return fmt.Errorf("failed to write response: %w", err)
 		}
 
 		return nil
@@ -447,13 +407,7 @@ func buildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read request body: %w", err)
 	}
 
-	if len(body) > 0 {
-		req.Body = io.NopCloser(bytes.NewBuffer(body))
-		writer.WriteVarInt(uint64(len(body)))
-		writer.WriteBytes(body)
-	} else {
-		writer.WriteNegativeOneByte()
-	}
+	writer.WriteIntBytesOptional(body)
 
 	return writer.Buf, nil
 }
@@ -474,56 +428,8 @@ func bodyContent(req *http.Request) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read request body: %w", err)
 	}
 
+	// Create new reader for subsequent reads
+	req.Body = io.NopCloser(strings.NewReader(string(body)))
+
 	return body, nil
-}
-
-// buildResponsePayload creates a BRC-103 response payload according to BRC-104 section 6.9
-func buildResponsePayload(requestID string, statusCode int, headers http.Header, body []byte) ([]byte, error) {
-	writer := util.NewWriter()
-	requestIDBytes, err := base64.StdEncoding.DecodeString(requestID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid request ID format: %w", err)
-	}
-	if len(requestIDBytes) != 32 {
-		return nil, fmt.Errorf("request ID must be 32 bytes, got %d", len(requestIDBytes))
-	}
-	writer.WriteBytes(requestIDBytes)
-	writer.WriteVarInt(uint64(statusCode))
-	includedHeaders := filterAndSortResponseHeaders(headers)
-	writer.WriteVarInt(uint64(len(includedHeaders)))
-	for _, header := range includedHeaders {
-		keyBytes := []byte(header[0])
-		writer.WriteVarInt(uint64(len(keyBytes)))
-		writer.WriteBytes(keyBytes)
-		valueBytes := []byte(header[1])
-		writer.WriteVarInt(uint64(len(valueBytes)))
-		writer.WriteBytes(valueBytes)
-	}
-	if len(body) > 0 {
-		writer.WriteVarInt(uint64(len(body)))
-		writer.WriteBytes(body)
-	} else {
-		writer.WriteVarInt(uint64(^uint64(0)))
-	}
-	return writer.Buf, nil
-}
-
-// filterAndSortResponseHeaders filters response headers according to BRC-104 rules
-// Only includes headers with x-bsv- prefix (excluding x-bsv-auth-*) and authorization header
-func filterAndSortResponseHeaders(headers http.Header) [][2]string {
-	var includedHeaders [][2]string
-	for key, values := range headers {
-		lowerKey := strings.ToLower(key)
-		if (strings.HasPrefix(lowerKey, constants.XBSVPrefix) && !strings.HasPrefix(lowerKey, constants.AuthHeaderPrefix)) ||
-			lowerKey == constants.HeaderAuthorization {
-			for _, value := range values {
-				includedHeaders = append(includedHeaders, [2]string{lowerKey, value})
-			}
-		}
-	}
-	sort.Slice(includedHeaders, func(i, j int) bool {
-		return includedHeaders[i][0] < includedHeaders[j][0]
-	})
-
-	return includedHeaders
 }

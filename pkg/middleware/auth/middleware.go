@@ -13,10 +13,10 @@ import (
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/constants"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/util"
 	httptransport "github.com/bsv-blockchain/go-bsv-middleware/pkg/transport/http"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/auth/utils"
-	"github.com/bsv-blockchain/go-sdk/util"
 )
 
 // Middleware is an HTTP middleware that handles authentication messages.
@@ -162,7 +162,13 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		}
 
 		if authMsg.MessageType == auth.MessageTypeGeneral {
-			createRequestPayload, err := createRequestPayload([]byte(authMsg.RequestID), r.Method, r.URL.Path, r.URL.RawQuery, r.Header, authMsg.Payload)
+			next.ServeHTTP(wrappedWriter, r)
+
+			statusCode := wrappedWriter.GetStatusCode()
+			responseBody := wrappedWriter.GetBody()
+			responseHeaders := wrappedWriter.Header()
+
+			createRequestPayload, err := buildResponsePayload(authMsg.RequestID, statusCode, responseHeaders, responseBody)
 			if err != nil {
 				m.logger.Error("Failed to create request payload", slog.String("error", err.Error()))
 				http.Error(w, "Failed to create request payload", http.StatusInternalServerError)
@@ -226,35 +232,34 @@ type headerPair struct {
 	Value string
 }
 
-func createRequestPayload(requestID []byte, method, path, query string, headers http.Header, body []byte) ([]byte, error) {
+// buildResponsePayload creates a BRC-103 response payload according to BRC-104 section 6.9
+func buildResponsePayload(requestID string, statusCode int, headers http.Header, body []byte) ([]byte, error) {
 	writer := util.NewWriter()
-
-	if len(requestID) == 0 {
-		return nil, fmt.Errorf("requestID in null")
+	requestIDBytes, err := base64.StdEncoding.DecodeString(requestID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid request ID format: %w", err)
 	}
-	writer.WriteBytes(requestID)
-
-	writer.WriteString(method)
-
-	writer.WriteOptionalString(path)
-
-	writer.WriteOptionalString(query)
-
-	whitelisted := getWhitelistedHeaders(headers, true)
-
-	writer.WriteVarInt(uint64(len(whitelisted)))
-
-	for _, h := range whitelisted {
-		keyBytes := []byte(h.Key)
+	if len(requestIDBytes) != 32 {
+		return nil, fmt.Errorf("request ID must be 32 bytes, got %d", len(requestIDBytes))
+	}
+	writer.WriteBytes(requestIDBytes)
+	writer.WriteVarInt(uint64(statusCode))
+	includedHeaders := filterAndSortResponseHeaders(headers)
+	writer.WriteVarInt(uint64(len(includedHeaders)))
+	for _, header := range includedHeaders {
+		keyBytes := []byte(header[0])
 		writer.WriteVarInt(uint64(len(keyBytes)))
 		writer.WriteBytes(keyBytes)
-
-		valueBytes := []byte(h.Value)
+		valueBytes := []byte(header[1])
 		writer.WriteVarInt(uint64(len(valueBytes)))
 		writer.WriteBytes(valueBytes)
 	}
-	writer.WriteIntBytesOptional(body)
-
+	if len(body) > 0 {
+		writer.WriteVarInt(uint64(len(body)))
+		writer.WriteBytes(body)
+	} else {
+		writer.WriteVarInt(uint64(^uint64(0)))
+	}
 	return writer.Buf, nil
 }
 
@@ -289,4 +294,24 @@ func getWhitelistedHeaders(headers http.Header, isRequest bool) []headerPair {
 	})
 
 	return result
+}
+
+// filterAndSortResponseHeaders filters response headers according to BRC-104 rules
+// Only includes headers with x-bsv- prefix (excluding x-bsv-auth-*) and authorization header
+func filterAndSortResponseHeaders(headers http.Header) [][2]string {
+	var includedHeaders [][2]string
+	for key, values := range headers {
+		lowerKey := strings.ToLower(key)
+		if (strings.HasPrefix(lowerKey, constants.XBSVPrefix) && !strings.HasPrefix(lowerKey, constants.AuthHeaderPrefix)) ||
+			lowerKey == constants.HeaderAuthorization {
+			for _, value := range values {
+				includedHeaders = append(includedHeaders, [2]string{lowerKey, value})
+			}
+		}
+	}
+	sort.Slice(includedHeaders, func(i, j int) bool {
+		return includedHeaders[i][0] < includedHeaders[j][0]
+	})
+
+	return includedHeaders
 }
