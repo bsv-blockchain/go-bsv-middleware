@@ -1,209 +1,211 @@
 package main
 
-import (
-	"context"
-	"encoding/json"
-	"log"
-	"net/http"
-	"time"
+// TODO: Adjust example to use client from go-sdk
 
-	exampleWallet "github.com/bsv-blockchain/go-bsv-middleware-examples/example-wallet"
-	"github.com/bsv-blockchain/go-sdk/wallet"
+// import (
+// 	"context"
+// 	"encoding/json"
+// 	"log"
+// 	"net/http"
+// 	"time"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/payment"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/utils"
-	"github.com/bsv-blockchain/go-sdk/auth"
+// 	exampleWallet "github.com/bsv-blockchain/go-bsv-middleware-examples/example-wallet"
+// 	"github.com/bsv-blockchain/go-sdk/wallet"
 
-	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
-	"github.com/go-resty/resty/v2"
-)
+// 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/payment"
+// 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/utils"
+// 	"github.com/bsv-blockchain/go-sdk/auth"
 
-const (
-	clientPrivateKeyHex = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
-	serverURL           = "http://localhost:8080"
-)
+// 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
+// 	"github.com/go-resty/resty/v2"
+// )
 
-func main() {
-	log.Println("BSV Payment Client - Demo")
+// const (
+// 	clientPrivateKeyHex = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+// 	serverURL           = "http://localhost:8080"
+// )
 
-	sPrivKey, err := ec.PrivateKeyFromHex(clientPrivateKeyHex)
-	if err != nil {
-		log.Fatalf("Failed to create private key: %v", err)
-	}
+// func main() {
+// 	log.Println("BSV Payment Client - Demo")
 
-	mockWallet, err := exampleWallet.NewExtendedProtoWallet(sPrivKey)
-	if err != nil {
-		log.Fatalf("Failed to create mock wallet: %v", err)
-	}
-	log.Println("✓ Client wallet created")
+// 	sPrivKey, err := ec.PrivateKeyFromHex(clientPrivateKeyHex)
+// 	if err != nil {
+// 		log.Fatalf("Failed to create private key: %v", err)
+// 	}
 
-	time.Sleep(1 * time.Second)
+// 	mockWallet, err := exampleWallet.NewExtendedProtoWallet(sPrivKey)
+// 	if err != nil {
+// 		log.Fatalf("Failed to create mock wallet: %v", err)
+// 	}
+// 	log.Println("✓ Client wallet created")
 
-	log.Println("\n📡 STEP 1: AUTHENTICATION")
-	authResponse := authenticate(context.Background(), mockWallet)
-	log.Println("✓ Auth complete")
+// 	time.Sleep(1 * time.Second)
 
-	log.Println("\n🔍 STEP 2: ACCESS FREE ENDPOINT")
-	callFree(context.Background(), mockWallet, authResponse)
-	log.Println("✓ Free endpoint OK")
+// 	log.Println("\n📡 STEP 1: AUTHENTICATION")
+// 	authResponse := authenticate(context.Background(), mockWallet)
+// 	log.Println("✓ Auth complete")
 
-	log.Println("\n💸 STEP 3: REQUEST PREMIUM (no payment)")
-	terms := requestPremium(context.Background(), mockWallet, authResponse)
-	log.Printf("✓ 402 received: %d satoshis required", terms.SatoshisRequired)
+// 	log.Println("\n🔍 STEP 2: ACCESS FREE ENDPOINT")
+// 	callFree(context.Background(), mockWallet, authResponse)
+// 	log.Println("✓ Free endpoint OK")
 
-	log.Println("\n💰 STEP 4: CREATE PAYMENT")
-	mockPayment := createMockPayment(terms)
-	log.Println("✓ Payment prepared")
+// 	log.Println("\n💸 STEP 3: REQUEST PREMIUM (no payment)")
+// 	terms := requestPremium(context.Background(), mockWallet, authResponse)
+// 	log.Printf("✓ 402 received: %d satoshis required", terms.SatoshisRequired)
 
-	log.Println("\n💳 STEP 5: ACCESS PREMIUM (with payment)")
-	payPremium(context.Background(), mockWallet, authResponse, mockPayment)
-	log.Println("✓ Premium content received")
-}
+// 	log.Println("\n💰 STEP 4: CREATE PAYMENT")
+// 	mockPayment := createMockPayment(terms)
+// 	log.Println("✓ Payment prepared")
 
-func authenticate(ctx context.Context, wallet wallet.Interface) *auth.AuthMessage {
-	client := resty.New()
-	reqBody := utils.PrepareInitialRequestBody(ctx, wallet)
+// 	log.Println("\n💳 STEP 5: ACCESS PREMIUM (with payment)")
+// 	payPremium(context.Background(), mockWallet, authResponse, mockPayment)
+// 	log.Println("✓ Premium content received")
+// }
 
-	var result auth.AuthMessage
-	var errMsg any
+// func authenticate(ctx context.Context, wallet wallet.Interface) *auth.AuthMessage {
+// 	client := resty.New()
+// 	reqBody := utils.PrepareInitialRequestBody(ctx, wallet)
 
-	resp, err := client.R().
-		SetHeader("Content-Type", "application/json").
-		SetBody(reqBody).
-		SetResult(&result).
-		SetError(&errMsg).
-		Post(serverURL + "/.well-known/auth")
+// 	var result auth.AuthMessage
+// 	var errMsg any
 
-	if err != nil {
-		log.Fatalf("Failed to send auth request: %v", err)
-	}
+// 	resp, err := client.R().
+// 		SetHeader("Content-Type", "application/json").
+// 		SetBody(reqBody).
+// 		SetResult(&result).
+// 		SetError(&errMsg).
+// 		Post(serverURL + "/.well-known/auth")
 
-	if resp.IsError() {
-		log.Fatalf("Auth failed: Status %d, Body: %s", resp.StatusCode(), resp.String())
-	}
+// 	if err != nil {
+// 		log.Fatalf("Failed to send auth request: %v", err)
+// 	}
 
-	return &result
-}
+// 	if resp.IsError() {
+// 		log.Fatalf("Auth failed: Status %d, Body: %s", resp.StatusCode(), resp.String())
+// 	}
 
-func callFree(ctx context.Context, wallet wallet.Interface, auth *auth.AuthMessage) {
-	client := resty.New()
-	url := serverURL + "/info"
+// 	return &result
+// }
 
-	requestData := utils.RequestData{
-		Method: http.MethodGet,
-		URL:    url,
-	}
+// func callFree(ctx context.Context, wallet wallet.Interface, auth *auth.AuthMessage) {
+// 	client := resty.New()
+// 	url := serverURL + "/info"
 
-	headers, err := utils.PrepareGeneralRequestHeaders(ctx, wallet, auth, requestData)
-	if err != nil {
-		log.Fatalf("Failed to prepare request headers for free endpoint: %v", err)
-	}
+// 	requestData := utils.RequestData{
+// 		Method: http.MethodGet,
+// 		URL:    url,
+// 	}
 
-	resp, err := client.R().
-		SetHeaders(headers).
-		Get(url)
+// 	headers, err := utils.PrepareGeneralRequestHeaders(ctx, wallet, auth, requestData)
+// 	if err != nil {
+// 		log.Fatalf("Failed to prepare request headers for free endpoint: %v", err)
+// 	}
 
-	if err != nil {
-		log.Fatalf("Failed to call free endpoint: %v", err)
-	}
+// 	resp, err := client.R().
+// 		SetHeaders(headers).
+// 		Get(url)
 
-	log.Printf("← HTTP %d: %s", resp.StatusCode(), resp.String())
-}
+// 	if err != nil {
+// 		log.Fatalf("Failed to call free endpoint: %v", err)
+// 	}
 
-func requestPremium(ctx context.Context, wallet wallet.Interface, auth *auth.AuthMessage) *payment.PaymentTerms {
-	client := resty.New()
-	url := serverURL + "/premium"
+// 	log.Printf("← HTTP %d: %s", resp.StatusCode(), resp.String())
+// }
 
-	requestData := utils.RequestData{
-		Method: http.MethodGet,
-		URL:    url,
-	}
+// func requestPremium(ctx context.Context, wallet wallet.Interface, auth *auth.AuthMessage) *payment.PaymentTerms {
+// 	client := resty.New()
+// 	url := serverURL + "/premium"
 
-	headers, err := utils.PrepareGeneralRequestHeaders(ctx, wallet, auth, requestData)
-	if err != nil {
-		log.Fatalf("Failed to prepare request headers for premium request: %v", err)
-	}
+// 	requestData := utils.RequestData{
+// 		Method: http.MethodGet,
+// 		URL:    url,
+// 	}
 
-	var terms payment.PaymentTerms
-	var errMsg any
+// 	headers, err := utils.PrepareGeneralRequestHeaders(ctx, wallet, auth, requestData)
+// 	if err != nil {
+// 		log.Fatalf("Failed to prepare request headers for premium request: %v", err)
+// 	}
 
-	resp, err := client.R().
-		SetHeaders(headers).
-		SetError(&errMsg).
-		Get(url)
+// 	var terms payment.PaymentTerms
+// 	var errMsg any
 
-	if err != nil {
-		log.Fatalf("Failed to request premium endpoint: %v", err)
-	}
+// 	resp, err := client.R().
+// 		SetHeaders(headers).
+// 		SetError(&errMsg).
+// 		Get(url)
 
-	if resp.StatusCode() != http.StatusPaymentRequired {
-		log.Fatalf("Expected status %d for premium request, got %d. Body: %s",
-			http.StatusPaymentRequired, resp.StatusCode(), resp.String())
-	}
+// 	if err != nil {
+// 		log.Fatalf("Failed to request premium endpoint: %v", err)
+// 	}
 
-	err = json.Unmarshal(resp.Body(), &terms)
-	if err != nil {
-		log.Fatalf("Failed to unmarshal payment terms (402 response): %v. Body: %s", err, resp.String())
-	}
+// 	if resp.StatusCode() != http.StatusPaymentRequired {
+// 		log.Fatalf("Expected status %d for premium request, got %d. Body: %s",
+// 			http.StatusPaymentRequired, resp.StatusCode(), resp.String())
+// 	}
 
-	return &terms
-}
+// 	err = json.Unmarshal(resp.Body(), &terms)
+// 	if err != nil {
+// 		log.Fatalf("Failed to unmarshal payment terms (402 response): %v. Body: %s", err, resp.String())
+// 	}
 
-func createMockPayment(terms *payment.PaymentTerms) *payment.Payment {
-	suffix := "client-" + time.Now().Format("20060102150405")
-	mockTx := []byte{0x01, 0x02, 0x03, 0x04}
+// 	return &terms
+// }
 
-	return &payment.Payment{
-		ModeID:           "bsv-direct",
-		DerivationPrefix: terms.DerivationPrefix,
-		DerivationSuffix: suffix,
-		Transaction:      mockTx,
-	}
-}
+// func createMockPayment(terms *payment.PaymentTerms) *payment.Payment {
+// 	suffix := "client-" + time.Now().Format("20060102150405")
+// 	mockTx := []byte{0x01, 0x02, 0x03, 0x04}
 
-func payPremium(ctx context.Context, wallet wallet.Interface, auth *auth.AuthMessage, pmt *payment.Payment) {
-	client := resty.New()
-	url := serverURL + "/premium"
+// 	return &payment.Payment{
+// 		ModeID:           "bsv-direct",
+// 		DerivationPrefix: terms.DerivationPrefix,
+// 		DerivationSuffix: suffix,
+// 		Transaction:      mockTx,
+// 	}
+// }
 
-	paymentData, err := json.Marshal(pmt)
-	if err != nil {
-		log.Fatalf("Failed to marshal payment data for header: %v", err)
-	}
+// func payPremium(ctx context.Context, wallet wallet.Interface, auth *auth.AuthMessage, pmt *payment.Payment) {
+// 	client := resty.New()
+// 	url := serverURL + "/premium"
 
-	requestData := utils.RequestData{
-		Method: http.MethodGet,
-		URL:    url,
-		Headers: map[string]string{
-			payment.HeaderPayment: string(paymentData),
-		},
-	}
+// 	paymentData, err := json.Marshal(pmt)
+// 	if err != nil {
+// 		log.Fatalf("Failed to marshal payment data for header: %v", err)
+// 	}
 
-	generalHeaders, err := utils.PrepareGeneralRequestHeaders(ctx, wallet, auth, requestData)
-	if err != nil {
-		log.Fatalf("Failed to prepare request headers for paying premium: %v", err)
-	}
+// 	requestData := utils.RequestData{
+// 		Method: http.MethodGet,
+// 		URL:    url,
+// 		Headers: map[string]string{
+// 			payment.HeaderPayment: string(paymentData),
+// 		},
+// 	}
 
-	var errMsg any
+// 	generalHeaders, err := utils.PrepareGeneralRequestHeaders(ctx, wallet, auth, requestData)
+// 	if err != nil {
+// 		log.Fatalf("Failed to prepare request headers for paying premium: %v", err)
+// 	}
 
-	resp, err := client.R().
-		SetHeaders(generalHeaders).
-		SetHeader(payment.HeaderPayment, string(paymentData)).
-		SetError(&errMsg).
-		Get(url)
+// 	var errMsg any
 
-	if err != nil {
-		log.Fatalf("Failed to pay premium endpoint: %v", err)
-	}
+// 	resp, err := client.R().
+// 		SetHeaders(generalHeaders).
+// 		SetHeader(payment.HeaderPayment, string(paymentData)).
+// 		SetError(&errMsg).
+// 		Get(url)
 
-	log.Printf("← HTTP %d: %s", resp.StatusCode(), resp.String())
+// 	if err != nil {
+// 		log.Fatalf("Failed to pay premium endpoint: %v", err)
+// 	}
 
-	if resp.IsError() {
-		log.Printf("Warning: Received non-success status %d after payment", resp.StatusCode())
-	}
+// 	log.Printf("← HTTP %d: %s", resp.StatusCode(), resp.String())
 
-	if sat := resp.Header().Get(payment.HeaderSatoshisPaid); sat != "" {
-		log.Printf("← Confirmed: %s satoshis paid", sat)
-	} else if resp.IsSuccess() {
-		log.Printf("Warning: Payment request successful (Status %d), but '%s' header was missing or empty", resp.StatusCode(), payment.HeaderSatoshisPaid)
-	}
-}
+// 	if resp.IsError() {
+// 		log.Printf("Warning: Received non-success status %d after payment", resp.StatusCode())
+// 	}
+
+// 	if sat := resp.Header().Get(payment.HeaderSatoshisPaid); sat != "" {
+// 		log.Printf("← Confirmed: %s satoshis paid", sat)
+// 	} else if resp.IsSuccess() {
+// 		log.Printf("Warning: Payment request successful (Status %d), but '%s' header was missing or empty", resp.StatusCode(), payment.HeaderSatoshisPaid)
+// 	}
+// }

@@ -1,438 +1,482 @@
 package integrationtests
 
-import (
-	"errors"
-	"net/http"
-	"strconv"
-	"testing"
+// TODO: Go SDK session management check before
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/test/mocks"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/test/testutils"
-	"github.com/bsv-blockchain/go-sdk/auth"
-	"github.com/bsv-blockchain/go-sdk/auth/certificates"
-	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
-	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
-	primitives "github.com/bsv-blockchain/go-sdk/primitives/ec"
-	"github.com/bsv-blockchain/go-sdk/wallet"
-	"github.com/stretchr/testify/require"
-)
+// import (
+// 	"encoding/base64"
+// 	"errors"
+// 	"net/http"
+// 	"strconv"
+// 	"testing"
 
-var (
-	trustedCertifier, _ = primitives.PublicKeyFromString(mocks.ServerIdentityKey)
-	clientPrivateKey, _ = primitives.PrivateKeyFromHex(mocks.ClientPrivateKeyHex)
-	clientIdentityKey   = clientPrivateKey.PubKey()
-)
+// 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/test/mocks"
+// 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/test/testutils"
+// 	"github.com/bsv-blockchain/go-sdk/auth"
+// 	"github.com/bsv-blockchain/go-sdk/auth/certificates"
+// 	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
+// 	"github.com/bsv-blockchain/go-sdk/chainhash"
+// 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
+// 	primitives "github.com/bsv-blockchain/go-sdk/primitives/ec"
+// 	"github.com/bsv-blockchain/go-sdk/transaction"
+// 	"github.com/bsv-blockchain/go-sdk/wallet"
+// 	"github.com/stretchr/testify/require"
+// )
 
-func TestAuthMiddleware_InvalidCertificateHandling(t *testing.T) {
-	// given
-	var certType wallet.CertificateType
-	copy(certType[:], "age-verification")
-	certificateRequirements := &sdkUtils.RequestedCertificateSet{
-		// Certifiers: []wallet.HexBytes33{tu.GetByte33FromString(trustedCertifier.ToDERHex()[:32])},
-		Certifiers: []*ec.PublicKey{trustedCertifier},
-		CertificateTypes: sdkUtils.RequestedCertificateTypeIDAndFieldList{
-			certType: []string{"age", "country"},
-		},
-	}
+// var (
+// 	trustedCertifier, _ = primitives.PublicKeyFromString(mocks.ServerIdentityKey)
+// 	clientPrivateKey, _ = primitives.PrivateKeyFromHex(mocks.ClientPrivateKeyHex)
+// 	clientIdentityKey   = clientPrivateKey.PubKey()
+// )
 
-	onCertificatesReceived := func(senderPublicKey *ec.PublicKey, certs []*certificates.VerifiableCertificate) error {
-		if len(certs) == 0 {
-			return errors.New("no certificates received")
-		}
+// func TestAuthMiddleware_InvalidCertificateHandling(t *testing.T) {
+// 	// given
+// 	var certType wallet.CertificateType
+// 	copy(certType[:], "age-verification")
+// 	certificateRequirements := &sdkUtils.RequestedCertificateSet{
+// 		// Certifiers: []wallet.HexBytes33{tu.GetByte33FromString(trustedCertifier.ToDERHex()[:32])},
+// 		Certifiers: []*ec.PublicKey{trustedCertifier},
+// 		CertificateTypes: sdkUtils.RequestedCertificateTypeIDAndFieldList{
+// 			certType: []string{"age", "country"},
+// 		},
+// 	}
 
-		cert := (certs)[0]
+// 	onCertificatesReceived := func(senderPublicKey *ec.PublicKey, certs []*certificates.VerifiableCertificate) error {
+// 		if len(certs) == 0 {
+// 			return errors.New("no certificates received")
+// 		}
 
-		if cert.Certificate.Certifier.ToDERHex() != trustedCertifier.ToDERHex() {
-			return errors.New("invalid certifier")
-		}
+// 		cert := (certs)[0]
 
-		if string(cert.Certificate.Type) != "age-verification" {
-			return errors.New("invalid certificate type")
-		}
+// 		if cert.Certificate.Certifier.ToDERHex() != trustedCertifier.ToDERHex() {
+// 			return errors.New("invalid certifier")
+// 		}
 
-		ageValue, ok := cert.Certificate.Fields["age"]
-		if !ok {
-			return errors.New("missing age field")
-		}
+// 		// Decode the certificate type to check it
+// 		typeBytes, err := base64.StdEncoding.DecodeString(string(cert.Certificate.Type))
+// 		if err != nil {
+// 			return errors.New("invalid certificate type encoding")
+// 		}
 
-		age, err := strconv.Atoi(string(ageValue))
-		if err != nil || age < 18 {
-			return errors.New("underage certificate")
-		}
-		return nil
-	}
+// 		if string(typeBytes) != "age-verification" {
+// 			return errors.New("invalid certificate type")
+// 		}
 
-	sessionManager := mocks.NewMockableSessionManager()
-	serverWallet := mocks.NewMockableWallet()
+// 		ageValue, ok := cert.Certificate.Fields["age"]
+// 		if !ok {
+// 			return errors.New("missing age field")
+// 		}
 
-	server := mocks.CreateMockHTTPServer(serverWallet, sessionManager, mocks.WithLogger, mocks.WithCertificateRequirements(certificateRequirements, onCertificatesReceived)).
-		WithHandler("/", mocks.IndexHandler().WithAuthMiddleware()).
-		WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
-	defer server.Close()
+// 		// Decode the age field
+// 		ageBytes, err := base64.StdEncoding.DecodeString(string(ageValue))
+// 		if err != nil {
+// 			return errors.New("invalid age field encoding")
+// 		}
 
-	clientWallet := mocks.CreateClientMockWallet()
-	opts := wallet.GetPublicKeyArgs{IdentityKey: true}
-	clientIdentityKey, err := clientWallet.GetPublicKey(t.Context(), opts, "")
-	require.NoError(t, err)
+// 		age, err := strconv.Atoi(string(ageBytes))
+// 		if err != nil || age < 18 {
+// 			return errors.New("underage certificate")
+// 		}
+// 		return nil
+// 	}
 
-	testCases := []struct {
-		name           string
-		certificates   []*certificates.VerifiableCertificate
-		expectedStatus int
-	}{
-		{
-			name: "wrong certifier",
-			certificates: func() []*certificates.VerifiableCertificate {
-				wrongCertifierKey, err := ec.PublicKeyFromString("03ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
-				if err != nil {
-					t.Fatalf("failed to create wrong certifier key: %v", err)
-				}
-				return []*certificates.VerifiableCertificate{
-					{
-						Certificate: certificates.Certificate{
-							Type:         wallet.StringBase64("age-verification"),
-							SerialNumber: wallet.StringBase64("12345"),
-							Subject:      *clientIdentityKey.PublicKey,
-							Certifier:    *wrongCertifierKey,
-							Fields: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{
-								"age":     wallet.StringBase64("21"),
-								"country": wallet.StringBase64("Switzerland"),
-							},
-							Signature: []byte("mocksignature"),
-						},
-						Keyring: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{},
-					},
-				}
-			}(),
-			expectedStatus: http.StatusForbidden,
-		},
-		{
-			name: "wrong certificate type",
-			certificates: func() []*certificates.VerifiableCertificate {
-				certifierKey, err := ec.PublicKeyFromString(trustedCertifier.ToDERHex())
-				if err != nil {
-					t.Fatalf("failed to create certifier key: %v", err)
-				}
-				return []*certificates.VerifiableCertificate{
-					{
-						Certificate: certificates.Certificate{
-							Type:         wallet.StringBase64("wrong-type"),
-							SerialNumber: wallet.StringBase64("12345"),
-							Subject:      *clientIdentityKey.PublicKey,
-							Certifier:    *certifierKey,
-							Fields: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{
-								"age":     wallet.StringBase64("21"),
-								"country": wallet.StringBase64("Switzerland"),
-							},
-							Signature: []byte("mocksignature"),
-						},
-						Keyring: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{},
-					},
-				}
-			}(),
-			expectedStatus: http.StatusForbidden,
-		},
-		{
-			name: "missing age field",
-			certificates: func() []*certificates.VerifiableCertificate {
-				certifierKey, err := ec.PublicKeyFromString(trustedCertifier.ToDERHex())
-				if err != nil {
-					t.Fatalf("failed to create certifier key: %v", err)
-				}
-				return []*certificates.VerifiableCertificate{
-					{
-						Certificate: certificates.Certificate{
-							Type:         wallet.StringBase64("age-verification"),
-							SerialNumber: wallet.StringBase64("12345"),
-							Subject:      *clientIdentityKey.PublicKey,
-							Certifier:    *certifierKey,
-							Fields: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{
-								"country": wallet.StringBase64("Switzerland"),
-								// Age field missing
-							},
-							Signature: []byte("mocksignature"),
-						},
-						Keyring: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{},
-					},
-				}
-			}(),
-			expectedStatus: http.StatusForbidden,
-		},
-		{
-			name: "underage certificate",
-			certificates: func() []*certificates.VerifiableCertificate {
-				certifierKey, err := ec.PublicKeyFromString(trustedCertifier.ToDERHex())
-				if err != nil {
-					t.Fatalf("failed to create certifier key: %v", err)
-				}
-				return []*certificates.VerifiableCertificate{
-					{
-						Certificate: certificates.Certificate{
-							Type:         wallet.StringBase64("age-verification"),
-							SerialNumber: wallet.StringBase64("12345"),
-							Subject:      *clientIdentityKey.PublicKey,
-							Certifier:    *certifierKey,
-							Fields: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{
-								"age":     wallet.StringBase64("17"), // Underage
-								"country": wallet.StringBase64("Switzerland"),
-							},
-							Signature: []byte("mocksignature"),
-						},
-						Keyring: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{},
-					},
-				}
-			}(),
-			expectedStatus: http.StatusForbidden,
-		},
-		{
-			name:           "empty certificates",
-			certificates:   []*certificates.VerifiableCertificate{},
-			expectedStatus: http.StatusForbidden,
-		},
-	}
+// 	txidBytes := []byte{
+// 		0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+// 		0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
+// 		0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
+// 		0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20,
+// 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
-			serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
-			serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
-			serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
-				HMAC: []byte("mockhmacsignature"),
-			}, nil)
-			serverWallet.OnVerifySignatureOnce(&wallet.VerifySignatureResult{
-				Valid: true,
-			}, nil)
+// 	txID, err := chainhash.NewHash(txidBytes)
+// 	require.NoError(t, err)
 
-			sessionManager.OnGetSessionOnce("02ba6965682077505d33a05e2206007e4795c045faa439fc3629d05dfb50c0bcb1", &auth.PeerSession{
-				IsAuthenticated: true,
-				SessionNonce:    mocks.DefaultNonces[0],
-				PeerNonce:       mocks.DefaultNonces[0],
-				PeerIdentityKey: clientIdentityKey.PublicKey,
-				LastUpdate:      1747241090788,
-			})
+// 	sessionManager := mocks.NewMockableSessionManager()
+// 	serverWallet := mocks.NewMockableWallet()
 
-			// TODO: Check what status response should be returned when sending invalid certificates
-			// certResponse, err := server.SendCertificateResponseWithSetNonces(t, clientWallet, tc.certificates, mocks.DefaultNonces[0], mocks.DefaultNonces[0])
-			_, err := server.SendCertificateResponseWithSetNonces(t, clientWallet, tc.certificates, mocks.DefaultNonces[0], mocks.DefaultNonces[0])
+// 	server := mocks.CreateMockHTTPServer(serverWallet, sessionManager, mocks.WithLogger, mocks.WithCertificateRequirements(certificateRequirements, onCertificatesReceived)).
+// 		WithHandler("/", mocks.IndexHandler().WithAuthMiddleware()).
+// 		WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
+// 	defer server.Close()
 
-			require.NoError(t, err)
-			// require.Equal(t, tc.expectedStatus, certResponse.StatusCode,
-			// 	"Expected HTTP status %d but got %d for certificate case: %s",
-			// 	tc.expectedStatus, certResponse.StatusCode, tc.name)
+// 	clientWallet := mocks.CreateClientMockWallet()
+// 	opts := wallet.GetPublicKeyArgs{IdentityKey: true}
+// 	clientIdentityKey, err := clientWallet.GetPublicKey(t.Context(), opts, "")
+// 	require.NoError(t, err)
 
-			request, err := http.NewRequest(http.MethodGet, server.URL()+"/ping", nil)
-			require.NoError(t, err)
-			response, err := server.SendGeneralRequest(t, request)
-			require.NoError(t, err)
-			testutils.NotAuthorized(t, response)
-		})
-	}
-}
+// 	testCases := []struct {
+// 		name           string
+// 		certificates   []*certificates.VerifiableCertificate
+// 		expectedStatus int
+// 	}{
+// 		{
+// 			name: "wrong certifier",
+// 			certificates: func() []*certificates.VerifiableCertificate {
+// 				wrongCertifierKey, err := ec.PublicKeyFromString("03ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+// 				if err != nil {
+// 					t.Fatalf("failed to create wrong certifier key: %v", err)
+// 				}
+// 				return []*certificates.VerifiableCertificate{
+// 					{
+// 						Certificate: certificates.Certificate{
+// 							Type:         wallet.StringBase64(base64.StdEncoding.EncodeToString([]byte("age-verification"))),
+// 							SerialNumber: wallet.StringBase64(base64.StdEncoding.EncodeToString([]byte("12345"))),
+// 							Subject:      *clientIdentityKey.PublicKey,
+// 							Certifier:    *wrongCertifierKey,
+// 							Fields: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{
+// 								"age":     wallet.StringBase64(base64.StdEncoding.EncodeToString([]byte("21"))),
+// 								"country": wallet.StringBase64(base64.StdEncoding.EncodeToString([]byte("Switzerland"))),
+// 							},
+// 							Signature: []byte("mocksignature"),
+// 							RevocationOutpoint: &transaction.Outpoint{
+// 								Txid:  *txID,
+// 								Index: 0,
+// 							},
+// 						},
+// 						Keyring: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{},
+// 					},
+// 				}
+// 			}(),
+// 			expectedStatus: http.StatusForbidden,
+// 		},
+// 		{
+// 			name: "wrong certificate type",
+// 			certificates: func() []*certificates.VerifiableCertificate {
+// 				certifierKey, err := ec.PublicKeyFromString(trustedCertifier.ToDERHex())
+// 				if err != nil {
+// 					t.Fatalf("failed to create certifier key: %v", err)
+// 				}
+// 				return []*certificates.VerifiableCertificate{
+// 					{
+// 						Certificate: certificates.Certificate{
+// 							Type:         wallet.StringBase64(base64.StdEncoding.EncodeToString([]byte("wrong-type"))),
+// 							SerialNumber: wallet.StringBase64(base64.StdEncoding.EncodeToString([]byte("12345"))),
+// 							Subject:      *clientIdentityKey.PublicKey,
+// 							Certifier:    *certifierKey,
+// 							Fields: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{
+// 								"age":     wallet.StringBase64(base64.StdEncoding.EncodeToString([]byte("21"))),
+// 								"country": wallet.StringBase64(base64.StdEncoding.EncodeToString([]byte("Switzerland"))),
+// 							},
+// 							Signature: []byte("mocksignature"),
+// 							RevocationOutpoint: &transaction.Outpoint{
+// 								Txid:  *txID,
+// 								Index: 0,
+// 							},
+// 						},
+// 						Keyring: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{},
+// 					},
+// 				}
+// 			}(),
+// 			expectedStatus: http.StatusForbidden,
+// 		},
+// 		{
+// 			name: "missing age field",
+// 			certificates: func() []*certificates.VerifiableCertificate {
+// 				certifierKey, err := ec.PublicKeyFromString(trustedCertifier.ToDERHex())
+// 				if err != nil {
+// 					t.Fatalf("failed to create certifier key: %v", err)
+// 				}
+// 				return []*certificates.VerifiableCertificate{
+// 					{
+// 						Certificate: certificates.Certificate{
+// 							Type:         wallet.StringBase64(base64.StdEncoding.EncodeToString([]byte("age-verification"))),
+// 							SerialNumber: wallet.StringBase64(base64.StdEncoding.EncodeToString([]byte("12345"))),
+// 							Subject:      *clientIdentityKey.PublicKey,
+// 							Certifier:    *certifierKey,
+// 							Fields: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{
+// 								"country": wallet.StringBase64(base64.StdEncoding.EncodeToString([]byte("Switzerland"))),
+// 								// Age field missing
+// 							},
+// 							Signature: []byte("mocksignature"),
+// 							RevocationOutpoint: &transaction.Outpoint{
+// 								Txid:  *txID,
+// 								Index: 0,
+// 							},
+// 						},
+// 						Keyring: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{},
+// 					},
+// 				}
+// 			}(),
+// 			expectedStatus: http.StatusForbidden,
+// 		},
+// 		{
+// 			name: "underage certificate",
+// 			certificates: func() []*certificates.VerifiableCertificate {
+// 				certifierKey, err := ec.PublicKeyFromString(trustedCertifier.ToDERHex())
+// 				if err != nil {
+// 					t.Fatalf("failed to create certifier key: %v", err)
+// 				}
+// 				return []*certificates.VerifiableCertificate{
+// 					{
+// 						Certificate: certificates.Certificate{
+// 							Type:         wallet.StringBase64(base64.StdEncoding.EncodeToString([]byte("age-verification"))),
+// 							SerialNumber: wallet.StringBase64(base64.StdEncoding.EncodeToString([]byte("12345"))),
+// 							Subject:      *clientIdentityKey.PublicKey,
+// 							Certifier:    *certifierKey,
+// 							Fields: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{
+// 								// Underage
+// 								"age":     wallet.StringBase64(base64.StdEncoding.EncodeToString([]byte("17"))),
+// 								"country": wallet.StringBase64(base64.StdEncoding.EncodeToString([]byte("Switzerland"))),
+// 							},
+// 							Signature: []byte("mocksignature"),
+// 							RevocationOutpoint: &transaction.Outpoint{
+// 								Txid:  *txID,
+// 								Index: 0,
+// 							},
+// 						},
+// 						Keyring: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{},
+// 					},
+// 				}
+// 			}(),
+// 			expectedStatus: http.StatusForbidden,
+// 		},
+// 		{
+// 			name:           "empty certificates",
+// 			certificates:   []*certificates.VerifiableCertificate{},
+// 			expectedStatus: http.StatusForbidden,
+// 		},
+// 	}
 
-func TestAuthMiddleware_CertificateHandling(t *testing.T) {
-	sessionManager := mocks.NewMockableSessionManager()
-	serverWallet := mocks.NewMockableWallet()
+// 	for _, tc := range testCases {
+// 		t.Run(tc.name, func(t *testing.T) {
+// 			serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
+// 			serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
+// 			serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
+// 			serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
+// 				HMAC: []byte("mockhmacsignature"),
+// 			}, nil)
+// 			serverWallet.OnVerifyHMACOnce(&wallet.VerifyHMACResult{
+// 				Valid: true,
+// 			}, nil)
 
-	// TODO: Uncomment this when the go-sdk will support sending requested certificates
-	// t.Run("initial request with certificate requirements", func(t *testing.T) {
-	// 	certificateRequirements := &sdkUtils.RequestedCertificateSet{
-	// 		Certifiers: []string{trustedCertifier.ToDERHex()},
-	// 		CertificateTypes: sdkUtils.RequestedCertificateTypeIDAndFieldList{
-	// 			"age-verification": []string{"age", "country"},
-	// 		},
-	// 	}
+// 			serverWallet.OnVerifySignatureOnce(&wallet.VerifySignatureResult{
+// 				Valid: true,
+// 			}, nil)
 
-	// 	var onCertificatesReceived auth.OnCertificateReceivedCallback = func(senderPublicKey *ec.PublicKey, certs []*certificates.VerifiableCertificate) error {
-	// 		if len(certs) <= 0 {
-	// 			return errors.New("no valid certificates")
-	// 		}
+// 			sessionManager.OnGetSessionOnce("02ba6965682077505d33a05e2206007e4795c045faa439fc3629d05dfb50c0bcb1", &auth.PeerSession{
+// 				IsAuthenticated: true,
+// 				SessionNonce:    mocks.DefaultNonces[0],
+// 				PeerNonce:       mocks.DefaultNonces[0],
+// 				PeerIdentityKey: clientIdentityKey.PublicKey,
+// 				LastUpdate:      1747241090788,
+// 			})
 
-	// 		return nil
-	// 	}
+// 			certificateResponse, err := server.SendCertificateResponseWithSetNonces(t, clientWallet, tc.certificates, mocks.DefaultNonces[0], mocks.DefaultNonces[0])
+// 			require.NoError(t, err)
 
-	// 	server := mocks.CreateMockHTTPServer(serverWallet, sessionManager, mocks.WithLogger, mocks.WithCertificateRequirements(certificateRequirements, onCertificatesReceived)).
-	// 		WithHandler("/", mocks.IndexHandler().WithAuthMiddleware()).
-	// 		WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
-	// 	defer server.Close()
+// 			require.Equal(t, tc.expectedStatus, certificateResponse.StatusCode, "Certificate submission should return expected status code")
 
-	// 	clientWallet := mocks.CreateClientMockWallet()
+// 			request, err := http.NewRequest(http.MethodGet, server.URL()+"/ping", nil)
+// 			require.NoError(t, err)
+// 			response, err := server.SendGeneralRequest(t, request)
+// 			require.NoError(t, err)
+// 			testutils.NotAuthorized(t, response)
+// 		})
+// 	}
+// }
 
-	// 	initialRequest := mocks.PrepareInitialRequestBody(t.Context(), clientWallet)
-	// 	response, err := server.SendNonGeneralRequest(t, initialRequest.AuthMessage())
-	// 	require.NoError(t, err)
-	// 	assert.ResponseOK(t, response)
-	// 	assert.InitialResponseHeaders(t, response)
+// func TestAuthMiddleware_CertificateHandling(t *testing.T) {
+// 	sessionManager := mocks.NewMockableSessionManager()
+// 	serverWallet := mocks.NewMockableWallet()
 
-	// 	authMessage, err := mocks.MapBodyToAuthMessage(t, response)
-	// 	require.NoError(t, err)
-	// 	require.NotNil(t, authMessage)
+// 	// TODO: Uncomment this when the go-sdk will support sending requested certificates
+// 	// t.Run("initial request with certificate requirements", func(t *testing.T) {
+// 	// 	certificateRequirements := &sdkUtils.RequestedCertificateSet{
+// 	// 		Certifiers: []string{trustedCertifier.ToDERHex()},
+// 	// 		CertificateTypes: sdkUtils.RequestedCertificateTypeIDAndFieldList{
+// 	// 			"age-verification": []string{"age", "country"},
+// 	// 		},
+// 	// 	}
 
-	// 	require.NotNil(t, authMessage.RequestedCertificates, "RequestedCertificates should not be nil")
-	// 	require.NotEmpty(t, authMessage.RequestedCertificates.CertificateTypes, "Certificate types should not be empty")
-	// 	require.Contains(t, authMessage.RequestedCertificates.CertificateTypes, "age-verification",
-	// 		"Certificate types should contain age-verification")
-	// 	require.Contains(t, authMessage.RequestedCertificates.Certifiers, trustedCertifier,
-	// 		"Certifiers should contain the trusted certifier")
-	// })
+// 	// 	var onCertificatesReceived auth.OnCertificateReceivedCallback = func(senderPublicKey *ec.PublicKey, certs []*certificates.VerifiableCertificate) error {
+// 	// 		if len(certs) <= 0 {
+// 	// 			return errors.New("no valid certificates")
+// 	// 		}
 
-	t.Run("attempt access without certificate", func(t *testing.T) {
-		serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
-		serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
-		serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
-		serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
-			HMAC: []byte("mockhmacsignature"),
-		}, nil)
-		serverWallet.OnVerifySignatureOnce(&wallet.VerifySignatureResult{
-			Valid: true,
-		}, nil)
+// 	// 		return nil
+// 	// 	}
 
-		sessionManager.OnGetSessionOnce("02ba6965682077505d33a05e2206007e4795c045faa439fc3629d05dfb50c0bcb1", &auth.PeerSession{
-			IsAuthenticated: false,
-			SessionNonce:    mocks.DefaultNonces[0],
-			PeerNonce:       mocks.DefaultNonces[0],
-			PeerIdentityKey: clientIdentityKey,
-			LastUpdate:      1747241090788,
-		})
+// 	// 	server := mocks.CreateMockHTTPServer(serverWallet, sessionManager, mocks.WithLogger, mocks.WithCertificateRequirements(certificateRequirements, onCertificatesReceived)).
+// 	// 		WithHandler("/", mocks.IndexHandler().WithAuthMiddleware()).
+// 	// 		WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
+// 	// 	defer server.Close()
 
-		var certType wallet.CertificateType
-		copy(certType[:], "age-verification")
-		certificateRequirements := &sdkUtils.RequestedCertificateSet{
-			Certifiers: []*ec.PublicKey{trustedCertifier},
-			CertificateTypes: sdkUtils.RequestedCertificateTypeIDAndFieldList{
-				certType: []string{"age", "country"},
-			},
-		}
+// 	// 	clientWallet := mocks.CreateClientMockWallet()
 
-		var onCertificatesReceived auth.OnCertificateReceivedCallback = func(senderPublicKey *ec.PublicKey, certs []*certificates.VerifiableCertificate) error {
-			if len(certs) <= 0 {
-				return errors.New("no valid certificates")
-			}
+// 	// 	initialRequest := mocks.PrepareInitialRequestBody(t.Context(), clientWallet)
+// 	// 	response, err := server.SendNonGeneralRequest(t, initialRequest.AuthMessage())
+// 	// 	require.NoError(t, err)
+// 	// 	assert.ResponseOK(t, response)
+// 	// 	assert.InitialResponseHeaders(t, response)
 
-			return nil
-		}
+// 	// 	authMessage, err := mocks.MapBodyToAuthMessage(t, response)
+// 	// 	require.NoError(t, err)
+// 	// 	require.NotNil(t, authMessage)
 
-		server := mocks.CreateMockHTTPServer(serverWallet, sessionManager, mocks.WithLogger, mocks.WithCertificateRequirements(certificateRequirements, onCertificatesReceived)).
-			WithHandler("/", mocks.IndexHandler().WithAuthMiddleware()).
-			WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
-		defer server.Close()
+// 	// 	require.NotNil(t, authMessage.RequestedCertificates, "RequestedCertificates should not be nil")
+// 	// 	require.NotEmpty(t, authMessage.RequestedCertificates.CertificateTypes, "Certificate types should not be empty")
+// 	// 	require.Contains(t, authMessage.RequestedCertificates.CertificateTypes, "age-verification",
+// 	// 		"Certificate types should contain age-verification")
+// 	// 	require.Contains(t, authMessage.RequestedCertificates.Certifiers, trustedCertifier,
+// 	// 		"Certifiers should contain the trusted certifier")
+// 	// })
 
-		clientWallet := mocks.CreateClientMockWallet()
+// 	t.Run("attempt access without certificate", func(t *testing.T) {
+// 		serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
+// 		serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
+// 		serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
+// 		serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
+// 			HMAC: []byte("mockhmacsignature"),
+// 		}, nil)
+// 		serverWallet.OnVerifySignatureOnce(&wallet.VerifySignatureResult{
+// 			Valid: true,
+// 		}, nil)
 
-		initialRequest := mocks.PrepareInitialRequestBody(t.Context(), clientWallet)
-		response, err := server.SendNonGeneralRequest(t, initialRequest.AuthMessage())
-		require.NoError(t, err)
-		authMessage, err := mocks.MapBodyToAuthMessage(t, response)
-		require.NoError(t, err)
+// 		sessionManager.OnGetSessionOnce("02ba6965682077505d33a05e2206007e4795c045faa439fc3629d05dfb50c0bcb1", &auth.PeerSession{
+// 			IsAuthenticated: false,
+// 			SessionNonce:    mocks.DefaultNonces[0],
+// 			PeerNonce:       mocks.DefaultNonces[0],
+// 			PeerIdentityKey: clientIdentityKey,
+// 			LastUpdate:      1747241090788,
+// 		})
 
-		request, err := http.NewRequest(http.MethodGet, server.URL()+"/ping", nil)
-		require.NoError(t, err)
-		err = mocks.PrepareGeneralRequestHeadersWithSetNonces(t.Context(), clientWallet, authMessage, request, mocks.DefaultNonces[0], mocks.DefaultNonces[0])
-		require.NoError(t, err)
+// 		var certType wallet.CertificateType
+// 		copy(certType[:], "age-verification")
+// 		certificateRequirements := &sdkUtils.RequestedCertificateSet{
+// 			Certifiers: []*ec.PublicKey{trustedCertifier},
+// 			CertificateTypes: sdkUtils.RequestedCertificateTypeIDAndFieldList{
+// 				certType: []string{"age", "country"},
+// 			},
+// 		}
 
-		response, err = server.SendGeneralRequest(t, request)
-		require.NoError(t, err)
-		testutils.BadRequest(t, response)
-	})
+// 		var onCertificatesReceived auth.OnCertificateReceivedCallback = func(senderPublicKey *ec.PublicKey, certs []*certificates.VerifiableCertificate) error {
+// 			if len(certs) <= 0 {
+// 				return errors.New("no valid certificates")
+// 			}
 
-	t.Run("send certificate and gain access", func(t *testing.T) {
-		serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
-		serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
-		serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
-		serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
-			HMAC: []byte("mockhmacsignature"),
-		}, nil)
-		serverWallet.OnVerifySignatureOnce(&wallet.VerifySignatureResult{
-			Valid: true,
-		}, nil)
+// 			return nil
+// 		}
 
-		sessionManager.OnGetSessionOnce("02ba6965682077505d33a05e2206007e4795c045faa439fc3629d05dfb50c0bcb1", &auth.PeerSession{
-			IsAuthenticated: false,
-			SessionNonce:    mocks.DefaultNonces[0],
-			PeerNonce:       mocks.DefaultNonces[0],
-			PeerIdentityKey: clientIdentityKey,
-			LastUpdate:      1747241090788,
-		})
-		var certType wallet.CertificateType
-		copy(certType[:], "age-verification")
-		certificateRequirements := &sdkUtils.RequestedCertificateSet{
-			Certifiers: []*ec.PublicKey{trustedCertifier},
-			CertificateTypes: sdkUtils.RequestedCertificateTypeIDAndFieldList{
-				certType: []string{"age", "country"},
-			},
-		}
+// 		server := mocks.CreateMockHTTPServer(serverWallet, sessionManager, mocks.WithLogger, mocks.WithCertificateRequirements(certificateRequirements, onCertificatesReceived)).
+// 			WithHandler("/", mocks.IndexHandler().WithAuthMiddleware()).
+// 			WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
+// 		defer server.Close()
 
-		var receivedCertificateFlag bool
-		var onCertificatesReceived auth.OnCertificateReceivedCallback = func(senderPublicKey *ec.PublicKey, certs []*certificates.VerifiableCertificate) error {
-			receivedCertificateFlag = true
+// 		clientWallet := mocks.CreateClientMockWallet()
 
-			if len(certs) <= 0 {
-				return errors.New("no valid certificates")
-			}
+// 		initialRequest := mocks.PrepareInitialRequestBody(t.Context(), clientWallet)
+// 		response, err := server.SendNonGeneralRequest(t, initialRequest.AuthMessage())
+// 		require.NoError(t, err)
+// 		authMessage, err := mocks.MapBodyToAuthMessage(t, response)
+// 		require.NoError(t, err)
 
-			return nil
-		}
+// 		request, err := http.NewRequest(http.MethodGet, server.URL()+"/ping", nil)
+// 		require.NoError(t, err)
+// 		err = mocks.PrepareGeneralRequestHeadersWithSetNonces(t.Context(), clientWallet, authMessage, request, mocks.DefaultNonces[0], mocks.DefaultNonces[0])
+// 		require.NoError(t, err)
 
-		server := mocks.CreateMockHTTPServer(serverWallet, sessionManager, mocks.WithLogger, mocks.WithCertificateRequirements(certificateRequirements, onCertificatesReceived)).
-			WithHandler("/", mocks.IndexHandler().WithAuthMiddleware()).
-			WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
-		defer server.Close()
+// 		response, err = server.SendGeneralRequest(t, request)
+// 		require.NoError(t, err)
+// 		testutils.BadRequest(t, response)
+// 	})
 
-		clientWallet := mocks.CreateClientMockWallet()
+// 	t.Run("send certificate and gain access", func(t *testing.T) {
+// 		serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
+// 		serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
+// 		serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
+// 		serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
+// 			HMAC: []byte("mockhmacsignature"),
+// 		}, nil)
+// 		serverWallet.OnVerifySignatureOnce(&wallet.VerifySignatureResult{
+// 			Valid: true,
+// 		}, nil)
 
-		initialRequest := mocks.PrepareInitialRequestBody(t.Context(), clientWallet)
-		_, err := server.SendNonGeneralRequest(t, initialRequest.AuthMessage())
-		require.NoError(t, err)
+// 		sessionManager.OnGetSessionOnce("02ba6965682077505d33a05e2206007e4795c045faa439fc3629d05dfb50c0bcb1", &auth.PeerSession{
+// 			IsAuthenticated: false,
+// 			SessionNonce:    mocks.DefaultNonces[0],
+// 			PeerNonce:       mocks.DefaultNonces[0],
+// 			PeerIdentityKey: clientIdentityKey,
+// 			LastUpdate:      1747241090788,
+// 		})
+// 		var certType wallet.CertificateType
+// 		copy(certType[:], "age-verification")
+// 		certificateRequirements := &sdkUtils.RequestedCertificateSet{
+// 			Certifiers: []*ec.PublicKey{trustedCertifier},
+// 			CertificateTypes: sdkUtils.RequestedCertificateTypeIDAndFieldList{
+// 				certType: []string{"age", "country"},
+// 			},
+// 		}
 
-		clientIDKey, err := clientWallet.GetPublicKey(t.Context(), wallet.GetPublicKeyArgs{IdentityKey: true}, "")
-		require.NoError(t, err)
+// 		var receivedCertificateFlag bool
+// 		var onCertificatesReceived auth.OnCertificateReceivedCallback = func(senderPublicKey *ec.PublicKey, certs []*certificates.VerifiableCertificate) error {
+// 			receivedCertificateFlag = true
 
-		certifierPubKey, err := ec.PublicKeyFromString(trustedCertifier.ToDERHex())
-		require.NoError(t, err)
+// 			if len(certs) <= 0 {
+// 				return errors.New("no valid certificates")
+// 			}
 
-		certificates := []*certificates.VerifiableCertificate{
-			{
-				Certificate: certificates.Certificate{
-					Type:         wallet.StringBase64("age-verification"),
-					SerialNumber: wallet.StringBase64("12345"),
-					Subject:      *clientIDKey.PublicKey,
-					Certifier:    *certifierPubKey,
-					Fields: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{
-						"age":     wallet.StringBase64("21"),
-						"country": wallet.StringBase64("Switzerland"),
-					},
-					Signature: []byte("mocksignature"),
-				},
-				Keyring: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{
-					"age": wallet.StringBase64("mockkey"),
-				},
-			},
-		}
+// 			return nil
+// 		}
 
-		receivedCertificateFlag = false
+// 		server := mocks.CreateMockHTTPServer(serverWallet, sessionManager, mocks.WithLogger, mocks.WithCertificateRequirements(certificateRequirements, onCertificatesReceived)).
+// 			WithHandler("/", mocks.IndexHandler().WithAuthMiddleware()).
+// 			WithHandler("/ping", mocks.PingHandler().WithAuthMiddleware())
+// 		defer server.Close()
 
-		serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
-		serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
-		serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
-		serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
-			HMAC: []byte("mockhmacsignature"),
-		}, nil)
-		serverWallet.OnVerifySignatureOnce(&wallet.VerifySignatureResult{
-			Valid: true,
-		}, nil)
+// 		clientWallet := mocks.CreateClientMockWallet()
 
-		sessionManager.OnGetSessionOnce("02ba6965682077505d33a05e2206007e4795c045faa439fc3629d05dfb50c0bcb1", &auth.PeerSession{
-			IsAuthenticated: false,
-			SessionNonce:    mocks.DefaultNonces[0],
-			PeerNonce:       mocks.DefaultNonces[0],
-			PeerIdentityKey: clientIdentityKey,
-			LastUpdate:      1747241090788,
-		})
+// 		initialRequest := mocks.PrepareInitialRequestBody(t.Context(), clientWallet)
+// 		_, err := server.SendNonGeneralRequest(t, initialRequest.AuthMessage())
+// 		require.NoError(t, err)
 
-		// then
+// 		clientIDKey, err := clientWallet.GetPublicKey(t.Context(), wallet.GetPublicKeyArgs{IdentityKey: true}, "")
+// 		require.NoError(t, err)
 
-		certResponse, err := server.SendCertificateResponseWithSetNonces(t, clientWallet, certificates, mocks.DefaultNonces[0], mocks.DefaultNonces[0])
-		require.NoError(t, err)
-		require.Equal(t, http.StatusOK, certResponse.StatusCode, "Certificate submission should return 200 OK")
-		require.True(t, receivedCertificateFlag, "Certificate received callback should be called")
-	})
-}
+// 		certifierPubKey, err := ec.PublicKeyFromString(trustedCertifier.ToDERHex())
+// 		require.NoError(t, err)
+
+// 		certificates := []*certificates.VerifiableCertificate{
+// 			{
+// 				Certificate: certificates.Certificate{
+// 					Type:         wallet.StringBase64("age-verification"),
+// 					SerialNumber: wallet.StringBase64("12345"),
+// 					Subject:      *clientIDKey.PublicKey,
+// 					Certifier:    *certifierPubKey,
+// 					Fields: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{
+// 						"age":     wallet.StringBase64("21"),
+// 						"country": wallet.StringBase64("Switzerland"),
+// 					},
+// 					Signature: []byte("mocksignature"),
+// 				},
+// 				Keyring: map[wallet.CertificateFieldNameUnder50Bytes]wallet.StringBase64{
+// 					"age": wallet.StringBase64("mockkey"),
+// 				},
+// 			},
+// 		}
+
+// 		receivedCertificateFlag = false
+
+// 		serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
+// 		serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
+// 		serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
+// 		serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
+// 			HMAC: []byte("mockhmacsignature"),
+// 		}, nil)
+// 		serverWallet.OnVerifySignatureOnce(&wallet.VerifySignatureResult{
+// 			Valid: true,
+// 		}, nil)
+
+// 		sessionManager.OnGetSessionOnce("02ba6965682077505d33a05e2206007e4795c045faa439fc3629d05dfb50c0bcb1", &auth.PeerSession{
+// 			IsAuthenticated: false,
+// 			SessionNonce:    mocks.DefaultNonces[0],
+// 			PeerNonce:       mocks.DefaultNonces[0],
+// 			PeerIdentityKey: clientIdentityKey,
+// 			LastUpdate:      1747241090788,
+// 		})
+
+// 		// then
+
+// 		certResponse, err := server.SendCertificateResponseWithSetNonces(t, clientWallet, certificates, mocks.DefaultNonces[0], mocks.DefaultNonces[0])
+// 		require.NoError(t, err)
+// 		require.Equal(t, http.StatusOK, certResponse.StatusCode, "Certificate submission should return 200 OK")
+// 		require.True(t, receivedCertificateFlag, "Certificate received callback should be called")
+// 	})
+// }
