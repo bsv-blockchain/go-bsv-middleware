@@ -38,6 +38,7 @@ const ResponseKey contextKey = "http_response"
 const NextKey contextKey = "http_next_handler"
 
 // TODO: Move to pkg/internal/transport
+
 // ResponseRecorder is a custom http.ResponseWriter that records the response status code and body.
 type ResponseRecorder struct {
 	http.ResponseWriter
@@ -81,7 +82,7 @@ func (r *ResponseRecorder) Flush() error {
 	r.ResponseWriter.WriteHeader(r.statusCode)
 	if len(r.body) > 0 {
 		_, err := r.ResponseWriter.Write(r.body)
-		return err
+		return errors.Join(errors.New("Error while writing response"), err)
 	}
 
 	return nil
@@ -435,7 +436,6 @@ func bodyContent(req *http.Request) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read request body: %w", err)
 	}
 
-	// Create new reader for subsequent reads
 	req.Body = io.NopCloser(strings.NewReader(string(body)))
 
 	return body, nil

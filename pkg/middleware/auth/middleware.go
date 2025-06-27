@@ -16,6 +16,8 @@ import (
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/util"
 	httptransport "github.com/bsv-blockchain/go-bsv-middleware/pkg/transport/http"
 	"github.com/bsv-blockchain/go-sdk/auth"
+	"github.com/go-softwarelab/common/pkg/to"
+
 	"github.com/bsv-blockchain/go-sdk/auth/utils"
 )
 
@@ -133,9 +135,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 			m.logger.Error("Failed to process auth message", slog.String("error", err.Error()))
 
 			statusCode := http.StatusInternalServerError
-			// Ensure we handle the error correctly
 			errMsg := "Internal server error"
-			// errors.Join(err, errMsg)
 			// To handle errors more gracefully, we need go-sdk to return specific error types
 			// For now majority of errors will be treated as internal server error
 
@@ -160,7 +160,6 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 				statusCode = http.StatusUnauthorized
 				errMsg = "Session not found"
 			default:
-				// errMsg = errMsg + err.Error()
 				errMsg = fmt.Sprintf("%s: %s", errMsg, err.Error())
 			}
 
@@ -193,7 +192,6 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		if err := wrappedWriter.Flush(); err != nil {
 			m.logger.Error("Failed to flush auth response", slog.String("error", err.Error()))
 		}
-		return
 	})
 }
 
@@ -234,11 +232,6 @@ func getReadableCertTypeName(certTypeID string) string {
 	return certTypeID
 }
 
-type headerPair struct {
-	Key   string
-	Value string
-}
-
 // buildResponsePayload creates a BRC-103 response payload according to BRC-104 section 6.9
 func buildResponsePayload(requestID string, statusCode int, headers http.Header, body []byte) ([]byte, error) {
 	writer := util.NewWriter()
@@ -250,7 +243,11 @@ func buildResponsePayload(requestID string, statusCode int, headers http.Header,
 		return nil, fmt.Errorf("request ID must be 32 bytes, got %d", len(requestIDBytes))
 	}
 	writer.WriteBytes(requestIDBytes)
-	writer.WriteVarInt(uint64(statusCode))
+	statusCodeUInt, err := to.UInt64(statusCode)
+	if err != nil {
+		return nil, fmt.Errorf("invalid status code: %w", err)
+	}
+	writer.WriteVarInt(statusCodeUInt)
 	includedHeaders := filterAndSortResponseHeaders(headers)
 	writer.WriteVarInt(uint64(len(includedHeaders)))
 	for _, header := range includedHeaders {
@@ -265,42 +262,9 @@ func buildResponsePayload(requestID string, statusCode int, headers http.Header,
 		writer.WriteVarInt(uint64(len(body)))
 		writer.WriteBytes(body)
 	} else {
-		writer.WriteVarInt(uint64(^uint64(0)))
+		writer.WriteVarInt(uint64(0))
 	}
 	return writer.Buf, nil
-}
-
-func getWhitelistedHeaders(headers http.Header, isRequest bool) []headerPair {
-	var result []headerPair
-
-	for key, values := range headers {
-		lowerKey := strings.ToLower(key)
-
-		if strings.HasPrefix(lowerKey, constants.AuthHeaderPrefix) {
-			continue
-		}
-
-		if lowerKey == constants.HeaderAuthorization {
-			for _, value := range values {
-				result = append(result, headerPair{Key: lowerKey, Value: value})
-			}
-		} else if isRequest && lowerKey == constants.HeaderContentType {
-			for _, value := range values {
-				contentType := strings.Split(value, ";")[0]
-				result = append(result, headerPair{Key: lowerKey, Value: strings.TrimSpace(contentType)})
-			}
-		} else if strings.HasPrefix(lowerKey, constants.XBSVPrefix) {
-			for _, value := range values {
-				result = append(result, headerPair{Key: lowerKey, Value: value})
-			}
-		}
-	}
-
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Key < result[j].Key
-	})
-
-	return result
 }
 
 // filterAndSortResponseHeaders filters response headers according to BRC-104 rules
