@@ -82,7 +82,9 @@ func (r *ResponseRecorder) Flush() error {
 	r.ResponseWriter.WriteHeader(r.statusCode)
 	if len(r.body) > 0 {
 		_, err := r.ResponseWriter.Write(r.body)
-		return errors.Join(errors.New("Error while writing response"), err)
+		if err != nil {
+			return fmt.Errorf("error while writing response: %w", err)
+		}
 	}
 
 	return nil

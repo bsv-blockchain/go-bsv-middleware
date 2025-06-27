@@ -15,13 +15,12 @@ func NewWriter() *WrappedSdkWriter {
 }
 
 func (w *WrappedSdkWriter) WriteOptionalString(s string) {
-	if s != "" {
-		b := []byte(s)
-		w.WriteVarInt(uint64(len(b)))
-		w.WriteBytes(b)
-	} else {
+	if s == "" {
 		w.writeZero()
+		return
 	}
+	w.WriteVarInt(uint64(len(s)))
+	w.WriteBytes([]byte(s))
 }
 
 func (w *WrappedSdkWriter) WriteIntBytesOptional(b []byte) {

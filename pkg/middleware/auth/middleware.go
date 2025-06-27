@@ -238,7 +238,7 @@ func buildResponsePayload(requestID string, statusCode int, headers http.Header,
 	if err != nil {
 		return nil, fmt.Errorf("invalid request ID format: %w", err)
 	}
-	if len(requestIDBytes) != 32 {
+	if len(requestIDBytes) != constants.RequestIDLength {
 		return nil, fmt.Errorf("request ID must be 32 bytes, got %d", len(requestIDBytes))
 	}
 	writer.WriteBytes(requestIDBytes)
@@ -250,18 +250,14 @@ func buildResponsePayload(requestID string, statusCode int, headers http.Header,
 	includedHeaders := filterAndSortResponseHeaders(headers)
 	writer.WriteVarInt(uint64(len(includedHeaders)))
 	for _, header := range includedHeaders {
-		keyBytes := []byte(header[0])
-		writer.WriteVarInt(uint64(len(keyBytes)))
-		writer.WriteBytes(keyBytes)
-		valueBytes := []byte(header[1])
-		writer.WriteVarInt(uint64(len(valueBytes)))
-		writer.WriteBytes(valueBytes)
+		writer.WriteVarInt(uint64(len(header[0])))
+		writer.WriteBytes([]byte(header[0]))
+		writer.WriteVarInt(uint64(len(header[1])))
+		writer.WriteBytes([]byte(header[1]))
 	}
+	writer.WriteVarInt(uint64(len(body)))
 	if len(body) > 0 {
-		writer.WriteVarInt(uint64(len(body)))
 		writer.WriteBytes(body)
-	} else {
-		writer.WriteVarInt(uint64(0))
 	}
 	return writer.Buf, nil
 }

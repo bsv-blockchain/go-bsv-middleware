@@ -27,12 +27,11 @@ const (
 	// HeaderRequestID contains the request ID for correlation
 	HeaderRequestID = AuthHeaderPrefix + "request-id"
 
-	// HeaderRequestedCertificates contains requested certificates (if used)
-	HeaderRequestedCertificates = AuthHeaderPrefix + "requested-certificates"
-
 	HeaderContentType = "content-type"
 
 	HeaderAuthorization = "authorization"
 
 	XBSVPrefix = "x-bsv-"
+
+	RequestIDLength = 32
 )

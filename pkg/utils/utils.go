@@ -277,22 +277,23 @@ func WriteRequestData(request *http.Request, writer *bytes.Buffer) error {
 // integer is converted to fixed size int64
 func WriteVarIntNum(writer *bytes.Buffer, num int) error {
 	if num < 0 {
-		err := binary.Write(writer, binary.LittleEndian, int64(num))
-		if err != nil {
-			return fmt.Errorf("failed to write negative number: %w", err)
+		if err := binary.Write(writer, binary.LittleEndian, int64(num)); err != nil {
+			return fmt.Errorf("write negative int64: %w", err)
 		}
 
 		return nil
 	}
 
-	if num < 0xFD {
+	switch {
+	case num < 0xFD:
 		err := writer.WriteByte(byte(num))
 		if err != nil {
 			return fmt.Errorf("failed to write single byte varint: %w", err)
 		}
 
 		return nil
-	} else if num <= 0xFFFF {
+
+	case num <= 0xFFFF:
 		if err := writer.WriteByte(0xFD); err != nil {
 			return fmt.Errorf("failed to write varint prefix: %w", err)
 		}
@@ -309,7 +310,7 @@ func WriteVarIntNum(writer *bytes.Buffer, num int) error {
 
 		return nil
 
-	} else if num <= 0xFFFFFFFF {
+	case num <= 0xFFFFFFFF:
 		if err := writer.WriteByte(0xFE); err != nil {
 			return fmt.Errorf("failed to write varint prefix: %w", err)
 		}
@@ -325,7 +326,8 @@ func WriteVarIntNum(writer *bytes.Buffer, num int) error {
 		}
 
 		return nil
-	} else {
+
+	default:
 		if err := writer.WriteByte(0xFF); err != nil {
 			return fmt.Errorf("failed to write varint prefix: %w", err)
 		}
