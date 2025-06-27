@@ -376,10 +376,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		testutils.InternalServerError(t, response)
-		// Go SDK dont check if nonce is present, its used to only in signature verification to create KeyID
-		// so until changed it will return error about invalid signature
-		require.Contains(t, testutils.ReadBodyForTest(t, response), "signature")
+		testutils.NotAuthorized(t, response)
 	})
 
 	t.Run("no your nonce", func(t *testing.T) {
@@ -431,8 +428,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		testutils.InternalServerError(t, response)
-		require.Contains(t, testutils.ReadBodyForTest(t, response), "nonce")
+		testutils.NotAuthorized(t, response)
 	})
 
 	t.Run("no signature", func(t *testing.T) {
@@ -484,8 +480,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		testutils.InternalServerError(t, response)
-		require.Contains(t, testutils.ReadBodyForTest(t, response), "signature")
+		testutils.NotAuthorized(t, response)
 	})
 
 	t.Run("wrong signature format", func(t *testing.T) {
@@ -584,8 +579,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		testutils.InternalServerError(t, response)
-		require.Contains(t, testutils.ReadBodyForTest(t, response), "internal server error")
+		testutils.NotAuthorized(t, response)
 	})
 
 	t.Run("wrong your nonce format", func(t *testing.T) {
@@ -634,7 +628,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		testutils.InternalServerError(t, response)
+		testutils.NotAuthorized(t, response)
 	})
 
 	t.Run("wrong version format", func(t *testing.T) {
