@@ -4,6 +4,7 @@ go 1.24.0
 
 require (
 	github.com/bsv-blockchain/go-sdk v1.1.23
+	github.com/go-softwarelab/common v1.1.0
 	github.com/stretchr/testify v1.10.0
 )
 

@@ -16,9 +16,8 @@ import (
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/util"
 	httptransport "github.com/bsv-blockchain/go-bsv-middleware/pkg/transport/http"
 	"github.com/bsv-blockchain/go-sdk/auth"
-	"github.com/go-softwarelab/common/pkg/to"
-
 	"github.com/bsv-blockchain/go-sdk/auth/utils"
+	"github.com/go-softwarelab/common/pkg/to"
 )
 
 // Middleware is an HTTP middleware that handles authentication messages.
