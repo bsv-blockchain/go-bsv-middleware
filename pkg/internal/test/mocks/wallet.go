@@ -81,22 +81,22 @@ func (m *MockableWallet) Decrypt(ctx context.Context, args wallet.DecryptArgs, o
 	return call.Get(0).(*wallet.DecryptResult), call.Error(1)
 }
 
-// CreateHmac returns a mocked HMAC result
-func (m *MockableWallet) CreateHmac(ctx context.Context, args wallet.CreateHmacArgs, originator string) (*wallet.CreateHmacResult, error) {
-	if !isExpectedMockCall(m.ExpectedCalls, "CreateHmac", args, originator) {
-		return nil, errors.New("unexpected call to CreateHmac")
+// CreateHMAC returns a mocked HMAC result
+func (m *MockableWallet) CreateHMAC(ctx context.Context, args wallet.CreateHMACArgs, originator string) (*wallet.CreateHMACResult, error) {
+	if !isExpectedMockCall(m.ExpectedCalls, "CreateHMAC", args, originator) {
+		return nil, errors.New("unexpected call to CreateHMAC")
 	}
 	call := m.Called(args, originator)
-	return call.Get(0).(*wallet.CreateHmacResult), call.Error(1)
+	return call.Get(0).(*wallet.CreateHMACResult), call.Error(1)
 }
 
-// VerifyHmac returns a mocked HMAC verification result
-func (m *MockableWallet) VerifyHmac(ctx context.Context, args wallet.VerifyHmacArgs, originator string) (*wallet.VerifyHmacResult, error) {
-	if !isExpectedMockCall(m.ExpectedCalls, "VerifyHmac", args, originator) {
-		return nil, errors.New("unexpected call to VerifyHmac")
+// VerifyHMAC returns a mocked HMAC verification result
+func (m *MockableWallet) VerifyHMAC(ctx context.Context, args wallet.VerifyHMACArgs, originator string) (*wallet.VerifyHMACResult, error) {
+	if !isExpectedMockCall(m.ExpectedCalls, "VerifyHMAC", args, originator) {
+		return nil, errors.New("unexpected call to VerifyHMAC")
 	}
 	call := m.Called(args, originator)
-	return call.Get(0).(*wallet.VerifyHmacResult), call.Error(1)
+	return call.Get(0).(*wallet.VerifyHMACResult), call.Error(1)
 }
 
 // CreateSignature returns a mocked signature result
@@ -257,14 +257,14 @@ func (m *MockableWallet) OnDecryptOnce(result *wallet.DecryptResult, err error) 
 	return m.On("Decrypt", mock.Anything, mock.Anything).Return(result, err).Once()
 }
 
-// OnCreateHmacOnce sets up a one-time expectation for CreateHmac
-func (m *MockableWallet) OnCreateHmacOnce(result *wallet.CreateHmacResult, err error) *mock.Call {
-	return m.On("CreateHmac", mock.Anything, mock.Anything).Return(result, err).Once()
+// OnCreateHMACOnce sets up a one-time expectation for CreateHMAC
+func (m *MockableWallet) OnCreateHMACOnce(result *wallet.CreateHMACResult, err error) *mock.Call {
+	return m.On("CreateHMAC", mock.Anything, mock.Anything).Return(result, err).Once()
 }
 
-// OnVerifyHmacOnce sets up a one-time expectation for VerifyHmac
-func (m *MockableWallet) OnVerifyHmacOnce(result *wallet.VerifyHmacResult, err error) *mock.Call {
-	return m.On("VerifyHmac", mock.Anything, mock.Anything).Return(result, err).Once()
+// OnVerifyHMACOnce sets up a one-time expectation for VerifyHMAC
+func (m *MockableWallet) OnVerifyHMACOnce(result *wallet.VerifyHMACResult, err error) *mock.Call {
+	return m.On("VerifyHMAC", mock.Anything, mock.Anything).Return(result, err).Once()
 }
 
 // OnCreateSignatureOnce sets up a one-time expectation for CreateSignature
@@ -374,17 +374,17 @@ func (w *Wallet) Decrypt(ctx context.Context, args wallet.DecryptArgs, _ string)
 	}, nil
 }
 
-// CreateHmac provides a minimal implementation for HMAC creation
-func (w *Wallet) CreateHmac(ctx context.Context, args wallet.CreateHmacArgs, _ string) (*wallet.CreateHmacResult, error) {
+// CreateHMAC provides a minimal implementation for HMAC creation
+func (w *Wallet) CreateHMAC(ctx context.Context, args wallet.CreateHMACArgs, _ string) (*wallet.CreateHMACResult, error) {
 	sum := sha256.Sum256(args.Data)
-	return &wallet.CreateHmacResult{
-		Hmac: sum[:],
+	return &wallet.CreateHMACResult{
+		HMAC: sum[:],
 	}, nil
 }
 
-// VerifyHmac provides a minimal HMAC verification
-func (w *Wallet) VerifyHmac(ctx context.Context, args wallet.VerifyHmacArgs, _ string) (*wallet.VerifyHmacResult, error) {
-	return &wallet.VerifyHmacResult{
+// VerifyHMAC provides a minimal HMAC verification
+func (w *Wallet) VerifyHMAC(ctx context.Context, args wallet.VerifyHMACArgs, _ string) (*wallet.VerifyHMACResult, error) {
+	return &wallet.VerifyHMACResult{
 		Valid: true,
 	}, nil
 }
@@ -421,7 +421,7 @@ func (w *Wallet) CreateSignature(ctx context.Context, args wallet.CreateSignatur
 	}
 
 	return &wallet.CreateSignatureResult{
-		Signature: *signature,
+		Signature: signature,
 	}, nil
 }
 
@@ -460,7 +460,7 @@ func (w *Wallet) VerifySignature(ctx context.Context, args wallet.VerifySignatur
 
 // AcquireCertificate is a simplified mock implementation
 func (w *Wallet) AcquireCertificate(ctx context.Context, args wallet.AcquireCertificateArgs, originator string) (*wallet.Certificate, error) {
-	if args.Type == "" || args.Certifier == "" {
+	if len(args.Type) == 0 || len(args.Certifier.ToDERHex()) == 0 {
 		return nil, errors.New("missing required fields")
 	}
 

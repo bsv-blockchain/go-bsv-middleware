@@ -80,18 +80,11 @@ func (w *ExtendedProtoWallet) RevealSpecificKeyLinkage(ctx context.Context, args
 
 // Certificate methods - implement basic functionality for demo
 func (w *ExtendedProtoWallet) AcquireCertificate(ctx context.Context, args wallet.AcquireCertificateArgs, originator string) (*wallet.Certificate, error) {
-	if args.Type == "" || args.Certifier == "" {
+	if len(args.Type) == 0 || args.Certifier == nil {
 		return nil, fmt.Errorf("certificate type and certifier are required")
 	}
 
-	// Get our identity key for the subject
 	identityResult, err := w.GetPublicKey(ctx, wallet.GetPublicKeyArgs{IdentityKey: true}, originator)
-	if err != nil {
-		return nil, err
-	}
-
-	// Parse certifier key
-	certifierKey, err := ec.PublicKeyFromString(args.Certifier)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +93,7 @@ func (w *ExtendedProtoWallet) AcquireCertificate(ctx context.Context, args walle
 		Type:               args.Type,
 		SerialNumber:       args.SerialNumber,
 		Subject:            identityResult.PublicKey,
-		Certifier:          certifierKey,
+		Certifier:          args.Certifier,
 		RevocationOutpoint: args.RevocationOutpoint,
 		Fields:             args.Fields,
 		Signature:          args.Signature,
@@ -116,7 +109,7 @@ func (w *ExtendedProtoWallet) ListCertificates(ctx context.Context, args wallet.
 }
 
 func (w *ExtendedProtoWallet) ProveCertificate(ctx context.Context, args wallet.ProveCertificateArgs, originator string) (*wallet.ProveCertificateResult, error) {
-	if args.Certificate.Type == "" {
+	if len(args.Certificate.Type) == 0 {
 		return nil, fmt.Errorf("certificate type is required")
 	}
 
@@ -164,7 +157,7 @@ func (w *ExtendedProtoWallet) GetHeight(ctx context.Context, args any, originato
 }
 
 func (w *ExtendedProtoWallet) GetHeaderForHeight(ctx context.Context, args wallet.GetHeaderArgs, originator string) (*wallet.GetHeaderResult, error) {
-	return &wallet.GetHeaderResult{Header: "mock-header"}, nil
+	return &wallet.GetHeaderResult{Header: []byte("mock-header")}, nil
 }
 
 func (w *ExtendedProtoWallet) GetNetwork(ctx context.Context, args any, originator string) (*wallet.GetNetworkResult, error) {

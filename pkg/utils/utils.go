@@ -17,7 +17,9 @@ import (
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
+	"github.com/bsv-blockchain/go-sdk/util"
 	"github.com/bsv-blockchain/go-sdk/wallet"
+	"github.com/go-softwarelab/common/pkg/to"
 )
 
 // RequestData holds the request information used to create auth headers
@@ -274,22 +276,113 @@ func WriteRequestData(request *http.Request, writer *bytes.Buffer) error {
 // WriteVarIntNum writes a variable-length integer to a buffer
 // integer is converted to fixed size int64
 func WriteVarIntNum(writer *bytes.Buffer, num int) error {
-	err := binary.Write(writer, binary.LittleEndian, int64(num))
-	if err != nil {
-		return fmt.Errorf("failed to write varint number: %w", err)
+	if num < 0 {
+		if err := binary.Write(writer, binary.LittleEndian, int64(num)); err != nil {
+			return fmt.Errorf("write negative int64: %w", err)
+		}
+
+		return nil
 	}
-	return nil
+
+	switch {
+	case num < 0xFD:
+		err := writer.WriteByte(byte(num))
+		if err != nil {
+			return fmt.Errorf("failed to write single byte varint: %w", err)
+		}
+
+		return nil
+
+	case num <= 0xFFFF:
+		if err := writer.WriteByte(0xFD); err != nil {
+			return fmt.Errorf("failed to write varint prefix: %w", err)
+		}
+
+		numUInt, err := to.UInt16(num)
+		if err != nil {
+			return fmt.Errorf("failed to convert number to uint16: %w", err)
+		}
+
+		err = binary.Write(writer, binary.LittleEndian, numUInt)
+		if err != nil {
+			return fmt.Errorf("failed to write varint number: %w", err)
+		}
+
+		return nil
+
+	case num <= 0xFFFFFFFF:
+		if err := writer.WriteByte(0xFE); err != nil {
+			return fmt.Errorf("failed to write varint prefix: %w", err)
+		}
+
+		numUInt, err := to.UInt32(num)
+		if err != nil {
+			return fmt.Errorf("failed to convert number to uint32: %w", err)
+		}
+
+		err = binary.Write(writer, binary.LittleEndian, numUInt)
+		if err != nil {
+			return fmt.Errorf("failed to write varint number: %w", err)
+		}
+
+		return nil
+
+	default:
+		if err := writer.WriteByte(0xFF); err != nil {
+			return fmt.Errorf("failed to write varint prefix: %w", err)
+		}
+
+		err := binary.Write(writer, binary.LittleEndian, uint64(num))
+		if err != nil {
+			return fmt.Errorf("failed to write varint number: %w", err)
+		}
+
+		return nil
+	}
 }
 
 // ReadVarIntNum reads a variable-length integer from a buffer
 func ReadVarIntNum(reader *bytes.Reader) (int64, error) {
-	var intByte int64
-	err := binary.Read(reader, binary.LittleEndian, &intByte)
+	firstByte, err := reader.ReadByte()
 	if err != nil {
-		return 0, fmt.Errorf("failed to read varint number: %w", err)
+		return 0, fmt.Errorf("failed to read first byte: %w", err)
 	}
 
-	return intByte, nil
+	switch firstByte {
+	case 0xFD:
+		var val uint16
+		err := binary.Read(reader, binary.LittleEndian, &val)
+		if err != nil {
+			return 0, fmt.Errorf("failed to read 2-byte varint: %w", err)
+		}
+
+		return int64(val), nil
+
+	case 0xFE:
+		var val uint32
+		err := binary.Read(reader, binary.LittleEndian, &val)
+		if err != nil {
+			return 0, fmt.Errorf("failed to read 4-byte varint: %w", err)
+		}
+
+		return int64(val), nil
+
+	case 0xFF:
+		var val uint64
+		err := binary.Read(reader, binary.LittleEndian, &val)
+		if err != nil {
+			return 0, fmt.Errorf("failed to read 8-byte varint: %w", err)
+		}
+
+		valInt64, err := to.Int64FromUnsigned(val)
+		if err != nil {
+			return 0, fmt.Errorf("failed to convert unsigned int64 to int64: %w", err)
+		}
+		return valInt64, nil
+
+	default:
+		return int64(firstByte), nil
+	}
 }
 
 // ExtractHeaders extracts required headers based on conditions
@@ -297,7 +390,7 @@ func ExtractHeaders(headers http.Header) [][]string {
 	var includedHeaders [][]string
 	for k, v := range headers {
 		k = strings.ToLower(k)
-		if (strings.HasPrefix(k, "x-bsv-") || k == "content-type" || k == "authorization") &&
+		if (strings.HasPrefix(k, constants.XBSVPrefix) || k == constants.HeaderContentType || k == constants.HeaderAuthorization) &&
 			!strings.HasPrefix(k, constants.AuthHeaderPrefix) {
 			includedHeaders = append(includedHeaders, []string{k, v[0]})
 		}
@@ -307,11 +400,11 @@ func ExtractHeaders(headers http.Header) [][]string {
 
 // WriteBodyToBuffer writes the request body into a buffer
 func WriteBodyToBuffer(req *http.Request, buf *bytes.Buffer) error {
+	writer := util.NewWriter()
+
 	if req.Body == nil {
-		err := WriteVarIntNum(buf, -1)
-		if err != nil {
-			return fmt.Errorf("failed to write -1 for empty body: %w", err)
-		}
+		writer.WriteNegativeOneByte()
+		buf.Write(writer.Buf)
 		return nil
 	}
 
@@ -321,23 +414,13 @@ func WriteBodyToBuffer(req *http.Request, buf *bytes.Buffer) error {
 	}
 
 	if len(body) > 0 {
-		err = WriteVarIntNum(buf, len(body))
-		if err != nil {
-			return fmt.Errorf("failed to write body length: %w", err)
-		}
-
-		_, err = buf.Write(body)
-		if err != nil {
-			return fmt.Errorf("failed to write body: %w", err)
-		}
-
-		return nil
+		writer.WriteVarInt(uint64(len(body)))
+		writer.WriteBytes(body)
+	} else {
+		writer.WriteNegativeOneByte()
 	}
 
-	err = WriteVarIntNum(buf, -1)
-	if err != nil {
-		return fmt.Errorf("failed to write -1 for empty body: %w", err)
-	}
+	buf.Write(writer.Buf)
 	return nil
 }
 

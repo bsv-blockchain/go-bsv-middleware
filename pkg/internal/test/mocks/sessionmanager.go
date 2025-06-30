@@ -53,11 +53,20 @@ func (m *MockableSessionManager) AddSession(session *auth.PeerSession) error {
 
 // UpdateSession return mocked value or update a session to the manager.
 func (m *MockableSessionManager) UpdateSession(session *auth.PeerSession) {
-	if isExpectedMockCall(m.ExpectedCalls, "UpdateSession", session) {
-		m.Called(session)
-		return
-	}
+	if session != nil {
+		normalizedSession := &auth.PeerSession{
+			IsAuthenticated: session.IsAuthenticated,
+			SessionNonce:    session.SessionNonce,
+			PeerNonce:       session.PeerNonce,
+			PeerIdentityKey: session.PeerIdentityKey,
+			LastUpdate:      0, // Set to predictable value
+		}
 
+		if isExpectedMockCall(m.ExpectedCalls, "UpdateSession", *normalizedSession) {
+			m.Called(*normalizedSession)
+			return
+		}
+	}
 	err := m.AddSession(session)
 	if err != nil {
 		panic(err)

@@ -2,18 +2,22 @@ package auth
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/constants"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/util"
 	httptransport "github.com/bsv-blockchain/go-bsv-middleware/pkg/transport/http"
 	"github.com/bsv-blockchain/go-sdk/auth"
-	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
+	"github.com/bsv-blockchain/go-sdk/auth/utils"
+	"github.com/go-softwarelab/common/pkg/to"
 )
 
 // Middleware is an HTTP middleware that handles authentication messages.
@@ -80,7 +84,7 @@ func New(cfg Config) (*Middleware, error) {
 	}, nil
 }
 
-// Handler returns an HTTP handler that processes authentication messages.
+// Handler returns an HTTP handler that processes incoming requests and handles authentication messages.
 func (m *Middleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		wrappedWriter := httptransport.WrapResponseWriter(w)
@@ -98,41 +102,41 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		authMsg, err := httptransport.ParseAuthMessageFromRequest(r)
 		if err != nil {
 			m.logger.Error("Failed to parse auth message", slog.String("error", err.Error()))
-			http.Error(wrappedWriter, err.Error(), http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		if authMsg == nil {
 			if m.allowUnauthenticated {
 				r = r.WithContext(context.WithValue(r.Context(), httptransport.IdentityKey, constants.UnknownParty))
-				next.ServeHTTP(wrappedWriter, r)
+				next.ServeHTTP(w, r)
 				return
 			} else {
-				http.Error(wrappedWriter, "Authentication required", http.StatusUnauthorized)
+				http.Error(w, "Authentication required", http.StatusUnauthorized)
 				return
 			}
 		}
 
-		// At this point, authMsg.IdentityKey should always be set by ParseAuthMessageFromRequest
-		// If it's not set, that's an internal error
 		if authMsg.IdentityKey == nil {
 			m.logger.Error("Internal error: ParseAuthMessageFromRequest returned message with nil IdentityKey")
-			http.Error(wrappedWriter, "Internal authentication error", http.StatusInternalServerError)
+			http.Error(w, "Internal authentication error", http.StatusInternalServerError)
 			return
 		}
 
 		callback, err := m.transport.GetRegisteredOnData()
 		if err != nil {
 			m.logger.Error("No message handler registered", slog.String("error", err.Error()))
-			http.Error(wrappedWriter, "Server configuration error", http.StatusInternalServerError)
+			http.Error(w, "Server configuration error", http.StatusInternalServerError)
 			return
 		}
 
-		if err := callback(ctx, authMsg); err != nil {
+		if err := callback(ctx, authMsg.AuthMessage); err != nil {
 			m.logger.Error("Failed to process auth message", slog.String("error", err.Error()))
 
 			statusCode := http.StatusInternalServerError
 			errMsg := "Internal server error"
+			// To handle errors more gracefully, we need go-sdk to return specific error types
+			// For now majority of errors will be treated as internal server error
 
 			switch {
 			case errors.Is(err, auth.ErrNotAuthenticated):
@@ -140,7 +144,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 				errMsg = "Authentication failed"
 			case errors.Is(err, auth.ErrMissingCertificate):
 				statusCode = http.StatusBadRequest
-				var certTypes sdkUtils.RequestedCertificateTypeIDAndFieldList
+				var certTypes utils.RequestedCertificateTypeIDAndFieldList
 				if m.peer != nil && m.peer.CertificatesToRequest != nil {
 					certTypes = m.peer.CertificatesToRequest.CertificateTypes
 				}
@@ -154,21 +158,44 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 			case errors.Is(err, auth.ErrSessionNotFound):
 				statusCode = http.StatusUnauthorized
 				errMsg = "Session not found"
+			default:
+				errMsg = fmt.Sprintf("%s: %s", errMsg, err.Error())
 			}
 
-			http.Error(wrappedWriter, errMsg, statusCode)
+			http.Error(w, errMsg, statusCode)
 			return
 		}
 
-		if !httptransport.HasBeenWritten(wrappedWriter) {
-			r = r.WithContext(context.WithValue(r.Context(), httptransport.IdentityKey, authMsg.IdentityKey.ToDERHex()))
+		if authMsg.MessageType == auth.MessageTypeGeneral {
 			next.ServeHTTP(wrappedWriter, r)
+
+			statusCode := wrappedWriter.GetStatusCode()
+			responseBody := wrappedWriter.GetBody()
+			responseHeaders := wrappedWriter.Header()
+
+			createRequestPayload, err := buildResponsePayload(authMsg.RequestID, statusCode, responseHeaders, responseBody)
+			if err != nil {
+				m.logger.Error("Failed to create request payload", slog.String("error", err.Error()))
+				http.Error(w, "Failed to create request payload", http.StatusInternalServerError)
+				return
+			}
+
+			err = m.peer.ToPeer(ctx, createRequestPayload, authMsg.IdentityKey, 30000)
+			if err != nil {
+				m.logger.Error("Failed to send request to peer", slog.String("error", err.Error()), slog.String("identityKey", authMsg.IdentityKey.ToDERHex()))
+				http.Error(w, "Failed to send request to peer", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		if err := wrappedWriter.Flush(); err != nil {
+			m.logger.Error("Failed to flush auth response", slog.String("error", err.Error()))
 		}
 	})
 }
 
 // prepareMissingCertificateTypesErrorMsg prepares a user-friendly error message for missing certificate types.
-func prepareMissingCertificateTypesErrorMsg(missingCertTypes sdkUtils.RequestedCertificateTypeIDAndFieldList) string {
+func prepareMissingCertificateTypesErrorMsg(missingCertTypes utils.RequestedCertificateTypeIDAndFieldList) string {
 	if len(missingCertTypes) == 0 {
 		return ""
 	}
@@ -177,7 +204,8 @@ func prepareMissingCertificateTypesErrorMsg(missingCertTypes sdkUtils.RequestedC
 	var typesWithoutFields []string
 
 	for certType, fields := range missingCertTypes {
-		typeName := getReadableCertTypeName(certType)
+		certTypeIDStr := base64.StdEncoding.EncodeToString(certType[:])
+		typeName := getReadableCertTypeName(certTypeIDStr)
 
 		if len(fields) > 0 {
 			fieldStr := fmt.Sprintf("%s (fields: %s)", typeName, strings.Join(fields, ", "))
@@ -201,4 +229,55 @@ func getReadableCertTypeName(certTypeID string) string {
 		return certTypeID[:8] + "..." + certTypeID[len(certTypeID)-8:]
 	}
 	return certTypeID
+}
+
+// buildResponsePayload creates a BRC-103 response payload according to BRC-104 section 6.9
+func buildResponsePayload(requestID string, statusCode int, headers http.Header, body []byte) ([]byte, error) {
+	writer := util.NewWriter()
+	requestIDBytes, err := base64.StdEncoding.DecodeString(requestID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid request ID format: %w", err)
+	}
+	if len(requestIDBytes) != constants.RequestIDLength {
+		return nil, fmt.Errorf("request ID must be 32 bytes, got %d", len(requestIDBytes))
+	}
+	writer.WriteBytes(requestIDBytes)
+	statusCodeUInt, err := to.UInt64(statusCode)
+	if err != nil {
+		return nil, fmt.Errorf("invalid status code: %w", err)
+	}
+	writer.WriteVarInt(statusCodeUInt)
+	includedHeaders := filterAndSortResponseHeaders(headers)
+	writer.WriteVarInt(uint64(len(includedHeaders)))
+	for _, header := range includedHeaders {
+		writer.WriteVarInt(uint64(len(header[0])))
+		writer.WriteBytes([]byte(header[0]))
+		writer.WriteVarInt(uint64(len(header[1])))
+		writer.WriteBytes([]byte(header[1]))
+	}
+	writer.WriteVarInt(uint64(len(body)))
+	if len(body) > 0 {
+		writer.WriteBytes(body)
+	}
+	return writer.Buf, nil
+}
+
+// filterAndSortResponseHeaders filters response headers according to BRC-104 rules
+// Only includes headers with x-bsv- prefix (excluding x-bsv-auth-*) and authorization header
+func filterAndSortResponseHeaders(headers http.Header) [][2]string {
+	var includedHeaders [][2]string
+	for key, values := range headers {
+		lowerKey := strings.ToLower(key)
+		if (strings.HasPrefix(lowerKey, constants.XBSVPrefix) && !strings.HasPrefix(lowerKey, constants.AuthHeaderPrefix)) ||
+			lowerKey == constants.HeaderAuthorization {
+			for _, value := range values {
+				includedHeaders = append(includedHeaders, [2]string{lowerKey, value})
+			}
+		}
+	}
+	sort.Slice(includedHeaders, func(i, j int) bool {
+		return includedHeaders[i][0] < includedHeaders[j][0]
+	})
+
+	return includedHeaders
 }

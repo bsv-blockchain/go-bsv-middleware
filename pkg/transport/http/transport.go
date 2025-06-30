@@ -1,10 +1,8 @@
 package httptransport
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -18,9 +16,11 @@ import (
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/constants"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/util"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/auth/utils"
 	primitives "github.com/bsv-blockchain/go-sdk/primitives/ec"
+	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
 type contextKey string
@@ -37,45 +37,75 @@ const ResponseKey contextKey = "http_response"
 // NextKey stores the next handler in context.
 const NextKey contextKey = "http_next_handler"
 
-type responseRecorder struct {
+// TODO: Move to pkg/internal/transport
+
+// ResponseRecorder is a custom http.ResponseWriter that records the response status code and body.
+type ResponseRecorder struct {
 	http.ResponseWriter
 	written    bool
 	statusCode int
+	body       []byte
 }
 
-func (r *responseRecorder) WriteHeader(code int) {
-	r.statusCode = code
-	r.ResponseWriter.WriteHeader(code)
-	r.written = true
+// GetBody retrieves the recorded response body.
+func (r *ResponseRecorder) GetBody() []byte {
+	return r.body
 }
 
-func (r *responseRecorder) Write(b []byte) (int, error) {
-	n, err := r.ResponseWriter.Write(b)
-	if err != nil {
-		return n, fmt.Errorf("failed to write response: %w", err)
+// WriteHeader captures the status code
+func (r *ResponseRecorder) WriteHeader(statusCode int) {
+	if r.written {
+		return
 	}
+
+	if statusCode == 0 {
+		statusCode = http.StatusInternalServerError
+	}
+	r.statusCode = statusCode
 	r.written = true
-	return n, nil
 }
 
-func (r *responseRecorder) hasBeenWritten() bool {
+// Write captures the response body and ensures that WriteHeader is called at least once.
+func (r *ResponseRecorder) Write(b []byte) (int, error) {
+	if !r.written {
+		r.WriteHeader(http.StatusOK)
+	}
+	r.body = append(r.body, b...)
+	return len(b), nil
+}
+
+// Flush writes the response header and body if they have not been written yet.
+func (r *ResponseRecorder) Flush() error {
+	if r.statusCode == 0 {
+		r.statusCode = http.StatusOK
+	}
+	r.ResponseWriter.WriteHeader(r.statusCode)
+	if len(r.body) > 0 {
+		_, err := r.ResponseWriter.Write(r.body)
+		if err != nil {
+			return fmt.Errorf("error while writing response: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// HasBeenWritten checks if the response has been written.
+func (r *ResponseRecorder) HasBeenWritten() bool {
 	return r.written
 }
 
 // WrapResponseWriter wraps and tracks write status.
-func WrapResponseWriter(w http.ResponseWriter) *responseRecorder {
-	return &responseRecorder{
+func WrapResponseWriter(w http.ResponseWriter) *ResponseRecorder {
+	return &ResponseRecorder{
 		ResponseWriter: w,
-		statusCode:     http.StatusOK,
+		statusCode:     0,
 	}
 }
 
-// HasBeenWritten checks if a response was written.
-func HasBeenWritten(w http.ResponseWriter) bool {
-	if rw, ok := w.(*responseRecorder); ok {
-		return rw.hasBeenWritten()
-	}
-	return false
+// GetStatusCode retrieves the status code from the ResponseRecorder.
+func (r *ResponseRecorder) GetStatusCode() int {
+	return r.statusCode
 }
 
 // TransportConfig config for Transport.
@@ -193,6 +223,10 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 			requestID = req.Header.Get(constants.HeaderRequestID)
 		}
 
+		if requestID == "" {
+			return errors.New("missing request ID for general message response")
+		}
+
 		resp.Header().Set(constants.HeaderVersion, message.Version)
 		resp.Header().Set(constants.HeaderMessageType, string(message.MessageType))
 		resp.Header().Set(constants.HeaderIdentityKey, message.IdentityKey.ToDERHex())
@@ -209,17 +243,40 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 			resp.Header().Set(constants.HeaderSignature, hex.EncodeToString(message.Signature))
 		}
 
-		if requestID != "" {
-			resp.Header().Set(constants.HeaderRequestID, requestID)
-		}
+		resp.Header().Set(constants.HeaderRequestID, requestID)
 
-		nextVal := ctx.Value(NextKey)
-		if nextVal != nil {
-			if next, ok := nextVal.(func()); ok {
-				next()
-			} else {
-				t.logger.Warn("Next handler has invalid type in context")
+		if t.wallet != nil {
+			peerIdentityKeyStr := req.Header.Get(constants.HeaderIdentityKey)
+			if peerIdentityKeyStr == "" {
+				return fmt.Errorf("missing peer identity key in request")
 			}
+
+			peerIdentityKey, err := primitives.PublicKeyFromString(peerIdentityKeyStr)
+			if err != nil {
+				return fmt.Errorf("invalid peer identity key: %w", err)
+			}
+
+			signatureArgs := wallet.CreateSignatureArgs{
+				EncryptionArgs: wallet.EncryptionArgs{
+					ProtocolID: wallet.Protocol{
+						SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty,
+						Protocol:      auth.AUTH_PROTOCOL_ID,
+					},
+					KeyID: fmt.Sprintf("%s %s", message.Nonce, message.YourNonce),
+					Counterparty: wallet.Counterparty{
+						Type:         wallet.CounterpartyTypeOther,
+						Counterparty: peerIdentityKey,
+					},
+				},
+				Data: message.Payload,
+			}
+
+			signResult, err := t.wallet.CreateSignature(ctx, signatureArgs, "")
+			if err != nil {
+				return fmt.Errorf("failed to sign response payload: %w", err)
+			}
+
+			resp.Header().Set(constants.HeaderSignature, hex.EncodeToString(signResult.Signature.Serialize()))
 		}
 
 		return nil
@@ -232,8 +289,14 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 	}
 }
 
+// AuthMessageWithRequestID wraps auth.AuthMessage with a request ID.
+type AuthMessageWithRequestID struct {
+	*auth.AuthMessage
+	RequestID string
+}
+
 // ParseAuthMessageFromRequest parses auth message from HTTP request.
-func ParseAuthMessageFromRequest(req *http.Request) (*auth.AuthMessage, error) {
+func ParseAuthMessageFromRequest(req *http.Request) (*AuthMessageWithRequestID, error) {
 	if req.URL.Path == constants.WellKnownAuthPath && req.Method == http.MethodPost {
 		var message auth.AuthMessage
 		if err := json.NewDecoder(req.Body).Decode(&message); err != nil {
@@ -251,9 +314,13 @@ func ParseAuthMessageFromRequest(req *http.Request) (*auth.AuthMessage, error) {
 			} else {
 				return nil, errors.New("missing identity key in both request body and header")
 			}
-		}
 
-		return &message, nil
+		}
+		msg := &AuthMessageWithRequestID{
+			AuthMessage: &message,
+			RequestID:   req.Header.Get(constants.HeaderRequestID),
+		}
+		return msg, nil
 	}
 
 	version := req.Header.Get(constants.HeaderVersion)
@@ -270,7 +337,6 @@ func ParseAuthMessageFromRequest(req *http.Request) (*auth.AuthMessage, error) {
 	yourNonce := req.Header.Get(constants.HeaderYourNonce)
 	signature := req.Header.Get(constants.HeaderSignature)
 	requestID := req.Header.Get(constants.HeaderRequestID)
-
 	pubKey, err := primitives.PublicKeyFromString(identityKey)
 	if err != nil {
 		return nil, fmt.Errorf("invalid identity key format: %w", err)
@@ -295,10 +361,14 @@ func ParseAuthMessageFromRequest(req *http.Request) (*auth.AuthMessage, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid signature format: %w", err)
 		}
+
 		message.Signature = sigBytes
 	}
-
-	return message, nil
+	msg := &AuthMessageWithRequestID{
+		AuthMessage: message,
+		RequestID:   requestID,
+	}
+	return msg, nil
 }
 
 func (t *Transport) applyDefaultCertificateRequests(message *auth.AuthMessage) {
@@ -314,28 +384,16 @@ func (t *Transport) shouldApplyDefaultCertificates(message *auth.AuthMessage) bo
 }
 
 func buildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
-	writer := new(bytes.Buffer)
-
+	writer := util.NewWriter()
 	requestIDBytes, err := base64.StdEncoding.DecodeString(requestID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid request ID format: %w", err)
 	}
-	_, err = writer.Write(requestIDBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to write request ID: %w", err)
-	}
 
-	if err = writeString(writer, req.Method); err != nil {
-		return nil, fmt.Errorf("failed to write request method: %w", err)
-	}
-
-	if err = writeOptionalString(writer, req.URL.Path); err != nil {
-		return nil, fmt.Errorf("failed to write request path: %w", err)
-	}
-
-	if err = writeOptionalString(writer, req.URL.RawQuery); err != nil {
-		return nil, fmt.Errorf("failed to write request query: %w", err)
-	}
+	writer.WriteBytes(requestIDBytes)
+	writer.WriteString(req.Method)
+	writer.WriteOptionalString(req.URL.Path)
+	writer.WriteOptionalString(req.URL.RawQuery)
 
 	var includedHeaders [][]string
 	for k, v := range req.Header {
@@ -343,23 +401,15 @@ func buildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 			includedHeaders = append(includedHeaders, []string{strings.ToLower(k), v[0]})
 		}
 	}
-
 	sort.Slice(includedHeaders, func(i, j int) bool {
 		return includedHeaders[i][0] < includedHeaders[j][0]
 	})
 
-	if err := writeVarInt(writer, len(includedHeaders)); err != nil {
-		return nil, fmt.Errorf("failed to write headers count: %w", err)
-	}
+	writer.WriteVarInt(uint64(len(includedHeaders)))
 
 	for _, header := range includedHeaders {
-		if err := writeString(writer, header[0]); err != nil {
-			return nil, fmt.Errorf("failed to write header key: %w", err)
-		}
-
-		if err := writeString(writer, header[1]); err != nil {
-			return nil, fmt.Errorf("failed to write header value: %w", err)
-		}
+		writer.WriteString(header[0])
+		writer.WriteString(header[1])
 	}
 
 	body, err := bodyContent(req)
@@ -367,56 +417,15 @@ func buildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read request body: %w", err)
 	}
 
-	if len(body) > 0 {
-		req.Body = io.NopCloser(bytes.NewBuffer(body))
+	writer.WriteIntBytesOptional(body)
 
-		if err = writeBytes(writer, body); err != nil {
-			return nil, fmt.Errorf("failed to write request body: %w", err)
-		}
-	} else {
-		if err := writeVarInt(writer, -1); err != nil {
-			return nil, fmt.Errorf("failed to write nil body marker: %w", err)
-		}
-	}
-	return writer.Bytes(), nil
+	return writer.Buf, nil
 }
 
 func isIncludedHeader(headerKey string) bool {
 	k := strings.ToLower(headerKey)
-	return (strings.HasPrefix(k, "x-bsv-") || k == "content-type" || k == "authorization") &&
+	return (strings.HasPrefix(k, constants.XBSVPrefix) || k == constants.HeaderContentType || k == constants.HeaderAuthorization) &&
 		!strings.HasPrefix(k, constants.AuthHeaderPrefix)
-}
-
-func writeString(writer *bytes.Buffer, str string) error {
-	if err := writeVarInt(writer, len(str)); err != nil {
-		return fmt.Errorf("failed to write string length: %w", err)
-	}
-	if _, err := writer.WriteString(str); err != nil {
-		return fmt.Errorf("failed to write string: %w", err)
-	}
-	return nil
-}
-
-func writeOptionalString(writer *bytes.Buffer, str string) error {
-	if str == "" {
-		if err := writeVarInt(writer, -1); err != nil {
-			return fmt.Errorf("failed to write empty string placeholder: %w", err)
-		}
-		return nil
-	}
-
-	if err := writeString(writer, str); err != nil {
-		return fmt.Errorf("failed to write optional string: %w", err)
-	}
-	return nil
-}
-
-func writeVarInt(w *bytes.Buffer, n int) error {
-	err := binary.Write(w, binary.LittleEndian, int64(n))
-	if err != nil {
-		return fmt.Errorf("failed to write variable integer: %w", err)
-	}
-	return nil
 }
 
 func bodyContent(req *http.Request) ([]byte, error) {
@@ -429,15 +438,7 @@ func bodyContent(req *http.Request) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read request body: %w", err)
 	}
 
-	return body, nil
-}
+	req.Body = io.NopCloser(strings.NewReader(string(body)))
 
-func writeBytes(writer *bytes.Buffer, data []byte) error {
-	if err := writeVarInt(writer, len(data)); err != nil {
-		return fmt.Errorf("failed to write bytes length: %w", err)
-	}
-	if _, err := writer.Write(data); err != nil {
-		return fmt.Errorf("failed to write bytes: %w", err)
-	}
-	return nil
+	return body, nil
 }

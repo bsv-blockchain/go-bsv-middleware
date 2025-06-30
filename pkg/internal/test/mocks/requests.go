@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/constants"
@@ -111,6 +112,10 @@ func PrepareGeneralRequestHeaders(
 		yourNonce = previousResponse.Nonce
 	}
 
+	if yourNonce == "" && previousResponse.InitialNonce != "" {
+		yourNonce = previousResponse.InitialNonce
+	}
+
 	if yourNonce == "" {
 		return errors.New("previous response has no nonce to use")
 	}
@@ -125,6 +130,11 @@ func PrepareGeneralRequestHeaders(
 	headers, err := utils.PrepareGeneralRequestHeaders(ctx, mockedWallet, normalizedResponse, utils.RequestData{Request: request})
 	if err != nil {
 		return errors.New("failed to prepare general request headers: " + err.Error())
+	}
+
+	if headers[constants.HeaderYourNonce] == "" && previousResponse.YourNonce != "" {
+		log.Println("We manually override YourNonce to not be empty")
+		headers[constants.HeaderYourNonce] = previousResponse.YourNonce
 	}
 
 	for _, opt := range opts {
@@ -197,11 +207,11 @@ func prepareGeneralRequestHeadersFixesNonce(ctx context.Context, walletInstance 
 	if err != nil {
 		return nil, errors.New("failed to get client identity key")
 	}
+	newNonce := DefaultNonces[0]
 
 	requestID := []byte(DefaultNonces[0])
 	encodedRequestID := base64.StdEncoding.EncodeToString(requestID)
 
-	newNonce := DefaultNonces[0]
 	var writer bytes.Buffer
 
 	_, err = writer.Write(requestID)
