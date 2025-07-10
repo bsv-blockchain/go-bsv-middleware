@@ -1,0 +1,30 @@
+{
+  "name": "regressiontests",
+  "version": "0.0.0",
+  "description": "go lang to typescript client adapter",
+  "main": "index.js",
+  "scripts": {
+    "prerun": "npm install && npm run format",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "authFetch": "npm run --silent prerun > prerun.log 2>&1 && tsx index.ts",
+    "authFetch.get": "tsx index.ts -v --url http://localhost:8888/ping",
+    "authFetch.post": "tsx index.ts -v --url http://localhost:8888/ping --method post",
+    "authFetch.postQuery": "tsx index.ts -v --url http://localhost:8888/ping?test=true --method post",
+    "authFetch.postHeaders": "tsx index.ts -v --url http://localhost:8888/ping --header Authorization:123 --header Content-Type:text/plain  --method post",
+    "authFetch.postBody": "tsx index.ts -v --url http://localhost:8888/ping --header Content-Type:application/json --method post --body '{\"test\":\"123\", \"other\":\"something\"}'"
+  },
+  "private": true,
+  "devDependencies": {
+    "@types/minimist": "^1.2.5",
+    "@types/node": "^20.11.5",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "prettier": "^3.1.1",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@bsv/sdk": "^1.6.12",
+    "minimist": "^1.2.5"
+  }
+}
