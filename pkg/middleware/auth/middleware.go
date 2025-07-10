@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"mime"
 	"net/http"
 	"sort"
 	"strings"
@@ -91,9 +92,6 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 
 		ctx := context.WithValue(r.Context(), httptransport.RequestKey, r)
 		ctx = context.WithValue(ctx, httptransport.ResponseKey, wrappedWriter)
-		ctx = context.WithValue(ctx, httptransport.NextKey, func() {
-			next.ServeHTTP(wrappedWriter, r)
-		})
 
 		m.logger.Debug("Processing request",
 			slog.String("path", r.URL.Path),
@@ -158,11 +156,35 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 			case errors.Is(err, auth.ErrSessionNotFound):
 				statusCode = http.StatusUnauthorized
 				errMsg = "Session not found"
+			case errors.Is(err, auth.ErrInvalidSignature):
+				// TODO: change to Unauthorized respond with valid message so the ts could print it properly
+				statusCode = http.StatusInternalServerError
+				errMsg = "Invalid signature"
 			default:
 				errMsg = fmt.Sprintf("%s: %s", errMsg, err.Error())
 			}
 
-			http.Error(w, errMsg, statusCode)
+			acceptType := r.Header.Get("Accept")
+			mediaType, _, err := mime.ParseMediaType(acceptType)
+			if err != nil {
+				m.logger.Error("Failed to parse Accept header value", slog.String("error", err.Error()))
+			}
+
+			var response string
+			switch mediaType {
+			case "text/plain":
+				w.Header().Set("Content-Type", "text/plain")
+				response = errMsg
+			default:
+				w.Header().Set("Content-Type", "application/json")
+				response = fmt.Sprintf(`{"error":"%s"}`, errMsg)
+			}
+			w.Header().Set("X-Content-Type-Options", "nosniff")
+			w.WriteHeader(statusCode)
+			_, err = w.Write([]byte(response))
+			if err != nil {
+				m.logger.Error("Failed to write error response", slog.String("error", err.Error()), slog.String("response", response))
+			}
 			return
 		}
 
