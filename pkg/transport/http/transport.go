@@ -393,7 +393,12 @@ func buildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 	writer.WriteBytes(requestIDBytes)
 	writer.WriteString(req.Method)
 	writer.WriteOptionalString(req.URL.Path)
-	writer.WriteOptionalString(req.URL.RawQuery)
+
+	seachParams := req.URL.RawQuery
+	if seachParams != "" {
+		seachParams = "?" + seachParams
+	}
+	writer.WriteOptionalString(seachParams)
 
 	var includedHeaders [][]string
 	for k, v := range req.Header {
