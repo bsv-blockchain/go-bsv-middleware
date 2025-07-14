@@ -5,8 +5,8 @@ go 1.24.3
 toolchain go1.24.4
 
 require (
-	github.com/bsv-blockchain/go-sdk v1.2.1
-	github.com/go-softwarelab/common v1.1.0
+	github.com/bsv-blockchain/go-sdk v1.2.4
+	github.com/go-softwarelab/common v1.3.1
 	github.com/stretchr/testify v1.10.0
 )
 
