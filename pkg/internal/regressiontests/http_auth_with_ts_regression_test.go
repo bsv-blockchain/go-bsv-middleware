@@ -1,19 +1,14 @@
+//go:build regressiontest
+// +build regressiontest
+
 package regressiontests
 
 import (
-	"encoding/json"
-	"io"
 	"net/http"
-	"net/http/httptest"
-	"net/url"
 	"testing"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/regressiontests/internal/typescript"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/auth"
-	"github.com/bsv-blockchain/go-sdk/auth/utils"
-	primitives "github.com/bsv-blockchain/go-sdk/primitives/ec"
-	"github.com/stretchr/testify/assert"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/regressiontests/testabilities"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,7 +16,7 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 	testCases := map[string]struct {
 		method  string
 		query   string
-		body    any
+		body    map[string]string
 		headers map[string]string
 	}{
 		"get request": {
@@ -62,75 +57,45 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
 			// given:
-			key, err := primitives.NewPrivateKey()
-			require.NoError(t, err)
-			wallet, err := utils.NewCompletedProtoWallet(key)
-			require.NoError(t, err)
+			given, then := testabilities.New(t)
 
 			// and:
-			authMiddleware, err := auth.New(auth.Config{
-				AllowUnauthenticated: false,
-				Wallet:               wallet,
-				Logger:               logging.NewTestLogger(t),
-			})
-			require.NoError(t, err)
+			authMiddleware := given.Middleware().NewAuth()
 
-			mux := http.NewServeMux()
+			// and:
+			url, cleanup := given.Server().
+				WithMiddleware(authMiddleware.Handler).
+				WithRoute("/ping", func(w http.ResponseWriter, r *http.Request) {
+					then.Request(r).
+						HasMethod(test.method).
+						HasHeadersContaining(test.headers).
+						HasQueryMatching(test.query).
+						HasBodyMatching(test.body)
 
-			mux.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
-				if r.Method != test.method {
-					w.WriteHeader(http.StatusMethodNotAllowed)
-					return
-				}
+					// TODO check indentity key
 
-				bytes, err2 := io.ReadAll(r.Body)
-				assert.NoError(t, err2, "failed to read request body: invalid test setup")
-
-				if test.body == nil {
-					assert.Empty(t, bytes, "request body should be empty")
-				} else {
-					var body map[string]string
-					err2 = json.Unmarshal(bytes, &body)
-					assert.NoError(t, err2, "failed to unmarshal request body")
-					assert.Equal(t, test.body, body, "request body should match")
-				}
-
-				assert.Equal(t, test.query, r.URL.RawQuery, "query params received by handler should match")
-
-				for headerName, headerValue := range test.headers {
-					assert.Equalf(t, headerValue, r.Header.Get(headerName), "header %s received by handler should match", headerName)
-				}
-
-				// TODO check indentity key
-				_, err2 = w.Write([]byte("Pong!"))
-				require.NoError(t, err)
-			})
-
-			server := httptest.NewServer(authMiddleware.Handler(mux))
-			defer server.Close()
+					_, err := w.Write([]byte("Pong!"))
+					require.NoError(t, err)
+				}).
+				Started()
+			defer cleanup()
 
 			// when:
-			requestURL, err := url.Parse(server.URL)
-			require.NoError(t, err, "invalid server url: invalid test setup")
-			requestURL.Path = "/ping"
-			requestURL.RawQuery = test.query
+			url.Path = "/ping"
+			url.RawQuery = test.query
 
 			response, err := typescript.AuthFetch(t,
-				requestURL.String(),
+				url.String(),
 				typescript.WithMethod(test.method),
 				typescript.WithHeaders(test.headers),
 				typescript.WithBody(test.body),
 			)
 
 			// then:
-			assert.NoError(t, err, "fetch should connect without error")
-
-			// and:
-			require.NotNil(t, response)
-			assert.Equal(t, 200, response.Status, "fetch should return status 200")
-			assert.Contains(t, response.Headers, "x-bsv-auth-identity-key")
-			assert.NotEmpty(t, response.Body, "Pong!")
-
+			then.Response(response).WithNoError(err).
+				HasStatus(200).
+				HasHeader("x-bsv-auth-identity-key").
+				HasBody("Pong!")
 		})
 	}
 }

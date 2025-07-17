@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/test/testutils"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 	"github.com/stretchr/testify/mock"
@@ -345,11 +346,16 @@ func (w *Wallet) GetPublicKey(ctx context.Context, args wallet.GetPublicKeyArgs,
 		}
 	}
 
+	var forSelf bool
+	if args.ForSelf != nil && *args.ForSelf {
+		forSelf = true
+	}
+
 	pubKey, err := w.keyDeriver.DerivePublicKey(
 		args.ProtocolID,
 		args.KeyID,
 		counterparty,
-		args.ForSelf,
+		forSelf,
 	)
 	if err != nil {
 		return nil, err
@@ -377,8 +383,9 @@ func (w *Wallet) Decrypt(ctx context.Context, args wallet.DecryptArgs, _ string)
 // CreateHMAC provides a minimal implementation for HMAC creation
 func (w *Wallet) CreateHMAC(ctx context.Context, args wallet.CreateHMACArgs, _ string) (*wallet.CreateHMACResult, error) {
 	sum := sha256.Sum256(args.Data)
+
 	return &wallet.CreateHMACResult{
-		HMAC: sum[:],
+		HMAC: testutils.BytesAsHMAC(sum[:32]),
 	}, nil
 }
 
@@ -442,11 +449,16 @@ func (w *Wallet) VerifySignature(ctx context.Context, args wallet.VerifySignatur
 		}
 	}
 
+	var forSelf bool
+	if args.ForSelf != nil && *args.ForSelf {
+		forSelf = true
+	}
+
 	pubKey, err := w.keyDeriver.DerivePublicKey(
 		args.ProtocolID,
 		args.KeyID,
 		counterparty,
-		args.ForSelf,
+		forSelf,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to derive public key: %w", err)
@@ -460,13 +472,18 @@ func (w *Wallet) VerifySignature(ctx context.Context, args wallet.VerifySignatur
 
 // AcquireCertificate is a simplified mock implementation
 func (w *Wallet) AcquireCertificate(ctx context.Context, args wallet.AcquireCertificateArgs, originator string) (*wallet.Certificate, error) {
-	if len(args.Type) == 0 || len(args.Certifier.ToDERHex()) == 0 {
+	if len(args.Certifier.ToDERHex()) == 0 {
 		return nil, errors.New("missing required fields")
+	}
+
+	var serialNumber wallet.SerialNumber
+	if args.SerialNumber != nil {
+		serialNumber = *args.SerialNumber
 	}
 
 	return &wallet.Certificate{
 		Type:         args.Type,
-		SerialNumber: args.SerialNumber,
+		SerialNumber: serialNumber,
 		Fields:       args.Fields,
 		Signature:    args.Signature,
 	}, nil

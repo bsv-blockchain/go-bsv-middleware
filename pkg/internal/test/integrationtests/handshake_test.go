@@ -27,7 +27,7 @@ func TestHandshake_HappyPath(t *testing.T) {
 	serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
 	serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
 	serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
-		HMAC: []byte("mockhmacsignature"),
+		HMAC: testutils.StringAsHMAC("mockhmacsignature"),
 	}, nil)
 
 	// when
@@ -111,7 +111,7 @@ func TestHandshake_InvalidNonceFormat(t *testing.T) {
 
 	serverWallet.OnCreateNonceOnce("", errors.New("invalid nonce format"))
 	serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
-		HMAC: []byte("mockhmacsignature"),
+		HMAC: testutils.StringAsHMAC("mockhmacsignature"),
 	}, nil)
 
 	// when

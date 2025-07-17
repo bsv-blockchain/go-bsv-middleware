@@ -98,7 +98,7 @@ package integrationtests
 // 	defer server.Close()
 
 // 	clientWallet := mocks.CreateClientMockWallet()
-// 	opts := wallet.GetPublicKeyArgs{IdentityKey: true}
+// 	opts := wallet.GetPublicKeyArgs{Identity: true}
 // 	clientIdentityKey, err := clientWallet.GetPublicKey(t.Context(), opts, "")
 // 	require.NoError(t, err)
 
@@ -427,7 +427,7 @@ package integrationtests
 // 		_, err := server.SendNonGeneralRequest(t, initialRequest.AuthMessage())
 // 		require.NoError(t, err)
 
-// 		clientIDKey, err := clientWallet.GetPublicKey(t.Context(), wallet.GetPublicKeyArgs{IdentityKey: true}, "")
+// 		clientIDKey, err := clientWallet.GetPublicKey(t.Context(), wallet.GetPublicKeyArgs{Identity: true}, "")
 // 		require.NoError(t, err)
 
 // 		certifierPubKey, err := ec.PublicKeyFromString(trustedCertifier.ToDERHex())
