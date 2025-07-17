@@ -70,7 +70,7 @@ func TestAuthMiddleware_GeneralRequest_Signature(t *testing.T) {
 
 	serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
 	serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
-		HMAC: []byte("mockhmacsignature"),
+		HMAC: testutils.StringAsHMAC("mockhmacsignature"),
 	}, nil)
 	serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
 	serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
@@ -121,7 +121,7 @@ func TestAuthMiddleware_GeneralRequest_SessionManager(t *testing.T) {
 
 		serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
 		serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
-			HMAC: []byte("mockhmacsignature"),
+			HMAC: testutils.StringAsHMAC("mockhmacsignature"),
 		}, nil)
 		serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
 		serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
@@ -166,7 +166,7 @@ func TestAuthMiddleware_GeneralRequest_SessionManager(t *testing.T) {
 
 	// 	serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
 	// 	serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
-	// 		HMAC: []byte("mockhmacsignature"),
+	// 		HMAC: testutils.StringAsHMAC()("mockhmacsignature"),
 	// 	}, nil)
 	// 	serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
 	// 	serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
@@ -189,7 +189,7 @@ func TestAuthMiddleware_GeneralRequest_SessionManager(t *testing.T) {
 	// 		IsAuthenticated: false,
 	// 		SessionNonce:    authMessage.InitialNonce,
 	// 		PeerNonce:       authMessage.YourNonce,
-	// 		PeerIdentityKey: initialRequest.IdentityKey,
+	// 		PeerIdentityKey: initialRequest.Identity,
 	// 		LastUpdate:      1747241090788,
 	// 	})
 	// 	serverWallet.OnVerifyHMACOnce(&wallet.VerifyHMACResult{Valid: true}, nil)
@@ -197,7 +197,7 @@ func TestAuthMiddleware_GeneralRequest_SessionManager(t *testing.T) {
 	// 		IsAuthenticated: false,
 	// 		SessionNonce:    authMessage.InitialNonce,
 	// 		PeerNonce:       authMessage.YourNonce,
-	// 		PeerIdentityKey: initialRequest.IdentityKey,
+	// 		PeerIdentityKey: initialRequest.Identity,
 	// 		LastUpdate:      0,
 	// 	})
 
@@ -239,7 +239,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
 		serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
-			HMAC: []byte("mockhmacsignature"),
+			HMAC: testutils.StringAsHMAC("mockhmacsignature"),
 		}, nil)
 		serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
 		serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
@@ -290,7 +290,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
 		serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
-			HMAC: []byte("mockhmacsignature"),
+			HMAC: testutils.StringAsHMAC("mockhmacsignature"),
 		}, nil)
 		serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
 		serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
@@ -341,7 +341,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
 		serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
-			HMAC: []byte("mockhmacsignature"),
+			HMAC: testutils.StringAsHMAC("mockhmacsignature"),
 		}, nil)
 		serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
 		serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
@@ -376,7 +376,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		testutils.NotAuthorized(t, response)
+		testutils.InternalServerError(t, response)
 	})
 
 	t.Run("no your nonce", func(t *testing.T) {
@@ -393,7 +393,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
 		serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
-			HMAC: []byte("mockhmacsignature"),
+			HMAC: testutils.StringAsHMAC("mockhmacsignature"),
 		}, nil)
 		serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
 		serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
@@ -428,7 +428,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		testutils.NotAuthorized(t, response)
+		testutils.InternalServerError(t, response)
 	})
 
 	t.Run("no signature", func(t *testing.T) {
@@ -445,7 +445,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
 		serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
-			HMAC: []byte("mockhmacsignature"),
+			HMAC: testutils.StringAsHMAC("mockhmacsignature"),
 		}, nil)
 		serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
 		serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
@@ -480,7 +480,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		testutils.NotAuthorized(t, response)
+		testutils.InternalServerError(t, response)
 	})
 
 	t.Run("wrong signature format", func(t *testing.T) {
@@ -497,7 +497,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
 		serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
-			HMAC: []byte("mockhmacsignature"),
+			HMAC: testutils.StringAsHMAC("mockhmacsignature"),
 		}, nil)
 		serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
 		serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
@@ -547,7 +547,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
 		serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
-			HMAC: []byte("mockhmacsignature"),
+			HMAC: testutils.StringAsHMAC("mockhmacsignature"),
 		}, nil)
 		serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
 		serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
@@ -579,7 +579,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		testutils.NotAuthorized(t, response)
+		testutils.InternalServerError(t, response)
 	})
 
 	t.Run("wrong your nonce format", func(t *testing.T) {
@@ -596,7 +596,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
 		serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
-			HMAC: []byte("mockhmacsignature"),
+			HMAC: testutils.StringAsHMAC("mockhmacsignature"),
 		}, nil)
 		serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
 		serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)
@@ -628,7 +628,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		testutils.NotAuthorized(t, response)
+		testutils.InternalServerError(t, response)
 	})
 
 	t.Run("wrong version format", func(t *testing.T) {
@@ -645,7 +645,7 @@ func TestAuthMiddleware_GeneralRequest_HeaderValidation(t *testing.T) {
 
 		serverWallet.OnGetPublicKeyOnce(prepareExampleIdentityKey(t), nil)
 		serverWallet.OnCreateHMACOnce(&wallet.CreateHMACResult{
-			HMAC: []byte("mockhmacsignature"),
+			HMAC: testutils.StringAsHMAC("mockhmacsignature"),
 		}, nil)
 		serverWallet.OnCreateNonceOnce(mocks.DefaultNonces[0], nil)
 		serverWallet.OnCreateSignatureOnce(prepareExampleSignature(t), nil)

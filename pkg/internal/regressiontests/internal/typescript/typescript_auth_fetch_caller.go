@@ -98,7 +98,7 @@ func AuthFetch(t testing.TB, url string, opts ...func(*Options)) (*AuthFetchResp
 	command, args := authFetchCommand()
 	args = append(args, options.toArgs()...)
 
-	cmd := exec.CommandContext(t.Context(), command, args...)
+	cmd := exec.CommandContext(t.Context(), command, args...) //nolint:gosec // should be used only in tests
 	cmd.Dir = getCurrentFileDir()
 
 	outputBytes, err := cmd.CombinedOutput()

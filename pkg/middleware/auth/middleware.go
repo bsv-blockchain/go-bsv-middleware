@@ -116,7 +116,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		}
 
 		if authMsg.IdentityKey == nil {
-			m.logger.Error("Internal error: ParseAuthMessageFromRequest returned message with nil IdentityKey")
+			m.logger.Error("Internal error: ParseAuthMessageFromRequest returned message with nil Identity")
 			http.Error(w, "Internal authentication error", http.StatusInternalServerError)
 			return
 		}

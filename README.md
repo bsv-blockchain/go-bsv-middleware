@@ -19,8 +19,11 @@ We're always looking for contributors to help us improve the SDK. Whether it's b
 2. **Set Up**: Run `go mod tidy` to install all dependencies.
 3. **Make Changes**: Create a new branch and make your changes.
 4. **Test**: Ensure all tests pass by running `go test ./...`.
-5. **Commit**: Commit your changes and push to your fork.
-6. **Pull Request**: Open a pull request from your fork to this repository.
+5. **Regression Tests**: Ensure compatibility with typescript client by running
+   `go test -tags regressiontest ./pkg/internal/regressiontests/...`
+   * For a detailed guide on regression tests, see [Regression Tests Guide](./pkg/internal/regressiontests/README.md)
+6. **Commit**: Commit your changes and push to your fork.
+7. **Pull Request**: Open a pull request from your fork to this repository.
    For more details, check the [contribution guidelines](./CONTRIBUTING.md).
 
 ## Support & Contacts

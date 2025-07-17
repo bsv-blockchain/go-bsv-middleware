@@ -2,6 +2,7 @@ package payment
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/auth"
 	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
+	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
@@ -135,7 +137,7 @@ func processPayment(
 	ctx context.Context,
 	walletInstance interfaces.Payment,
 	paymentData *Payment,
-	identityKey string,
+	identityKeyHex string,
 	price int,
 ) (*PaymentInfo, error) {
 	valid, err := sdkUtils.VerifyNonce(ctx, paymentData.DerivationPrefix, walletInstance, wallet.Counterparty{Type: wallet.CounterpartyTypeSelf})
@@ -147,6 +149,21 @@ func processPayment(
 		return nil, errors.New("invalid derivation prefix")
 	}
 
+	derivationPrefix, err := base64.StdEncoding.DecodeString(paymentData.DerivationPrefix)
+	if err != nil {
+		return nil, fmt.Errorf("invalid derivation prefix: must be base64: %w", err)
+	}
+
+	derivationSuffix, err := base64.StdEncoding.DecodeString(paymentData.DerivationSuffix)
+	if err != nil {
+		return nil, fmt.Errorf("invalid derivation suffix: must be base64: %w", err)
+	}
+
+	identityKey, err := ec.PublicKeyFromString(identityKeyHex)
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity key hex: %w", err)
+	}
+
 	result, err := walletInstance.InternalizeAction(ctx, wallet.InternalizeActionArgs{
 		Tx: paymentData.Transaction,
 		Outputs: []wallet.InternalizeOutput{
@@ -154,15 +171,15 @@ func processPayment(
 				OutputIndex: 0,
 				Protocol:    wallet.InternalizeProtocolWalletPayment,
 				PaymentRemittance: &wallet.Payment{
-					DerivationPrefix:  paymentData.DerivationPrefix,
-					DerivationSuffix:  paymentData.DerivationSuffix,
+					DerivationPrefix:  derivationPrefix,
+					DerivationSuffix:  derivationSuffix,
 					SenderIdentityKey: identityKey,
 				},
 			},
 		},
 		Description: "Payment for request",
 	},
-		identityKey,
+		identityKeyHex,
 	)
 
 	if err != nil {
