@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/regressiontests/internal/typescript"
+	"github.com/stretchr/testify/require"
 )
 
 type RegressionTestAssertion interface {
@@ -28,6 +29,9 @@ func (a *regressionTestAssertion) Request(request *http.Request) RequestAssertio
 }
 
 func (a *regressionTestAssertion) Response(response *typescript.AuthFetchResponse) AuthFetchResponseAssertion {
+	a.Helper()
+	require.NotNil(a, response, "response should not be nil")
+
 	return &authFetchResponseAssertion{
 		TB:       a,
 		response: response,

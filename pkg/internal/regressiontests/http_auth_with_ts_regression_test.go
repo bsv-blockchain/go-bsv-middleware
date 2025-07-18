@@ -1,10 +1,10 @@
 //go:build regressiontest
-// +build regressiontest
 
 package regressiontests
 
 import (
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/regressiontests/internal/typescript"
@@ -20,19 +20,19 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 		headers map[string]string
 	}{
 		"get request": {
-			method:  "GET",
+			method:  http.MethodGet,
 			query:   "",
 			body:    nil,
 			headers: nil,
 		},
 		"get request with query params": {
-			method:  "GET",
+			method:  http.MethodGet,
 			query:   "test=123&other=abc",
 			body:    nil,
 			headers: nil,
 		},
 		"get request with headers": {
-			method: "GET",
+			method: http.MethodGet,
 			query:  "",
 			body:   nil,
 			headers: map[string]string{
@@ -42,7 +42,7 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 			},
 		},
 		"post request": {
-			method: "POST",
+			method: http.MethodPost,
 			query:  "",
 			body: map[string]string{
 				"test":  "123",
@@ -52,6 +52,10 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 				// WARNING: Content-Type is required for request with body by auth fetch
 				"Content-Type": "application/json",
 			},
+		},
+		"invalid query params": {
+			method: http.MethodPost,
+			query:  "shirts size",
 		},
 	}
 	for name, test := range testCases {
@@ -69,10 +73,10 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 					then.Request(r).
 						HasMethod(test.method).
 						HasHeadersContaining(test.headers).
-						HasQueryMatching(test.query).
+						HasQueryMatching(url.PathEscape(test.query)).
 						HasBodyMatching(test.body)
 
-					// TODO check indentity key
+					// TODO check identity key
 
 					_, err := w.Write([]byte("Pong!"))
 					require.NoError(t, err)
@@ -84,7 +88,7 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 			url.Path = "/ping"
 			url.RawQuery = test.query
 
-			response, err := typescript.AuthFetch(t,
+			response := typescript.AuthFetch(t,
 				url.String(),
 				typescript.WithMethod(test.method),
 				typescript.WithHeaders(test.headers),
@@ -92,7 +96,7 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 			)
 
 			// then:
-			then.Response(response).WithNoError(err).
+			then.Response(response).
 				HasStatus(200).
 				HasHeader("x-bsv-auth-identity-key").
 				HasBody("Pong!")

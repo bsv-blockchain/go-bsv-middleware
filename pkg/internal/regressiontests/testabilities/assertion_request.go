@@ -25,11 +25,13 @@ type requestAssertion struct {
 }
 
 func (a *requestAssertion) HasMethod(httpMethod string) RequestAssertion {
+	a.Helper()
 	assert.Equalf(a, httpMethod, a.request.Method, "Expect to receive %s request", httpMethod)
 	return a
 }
 
 func (a *requestAssertion) HasHeadersContaining(headers map[string]string) RequestAssertion {
+	a.Helper()
 	for headerName, headerValue := range headers {
 		assert.Equalf(a, headerValue, a.request.Header.Get(headerName), "Header %s value received by handler should match", headerName)
 	}
@@ -38,11 +40,13 @@ func (a *requestAssertion) HasHeadersContaining(headers map[string]string) Reque
 }
 
 func (a *requestAssertion) HasQueryMatching(query string) RequestAssertion {
+	a.Helper()
 	assert.Equal(a, query, a.request.URL.RawQuery, "query params received by handler should match")
 	return a
 }
 
 func (a *requestAssertion) HasBodyMatching(expectedBody map[string]string) RequestAssertion {
+	a.Helper()
 	bodyBytes, err := io.ReadAll(a.request.Body)
 	assert.NoError(a, err, "failed to read request body: invalid test setup")
 	// ensure the body is not closed.

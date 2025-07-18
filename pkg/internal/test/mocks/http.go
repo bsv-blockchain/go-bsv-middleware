@@ -13,7 +13,6 @@ import (
 	"testing"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 	middleware "github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/auth"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/transport"
 	"github.com/bsv-blockchain/go-sdk/auth"
@@ -290,14 +289,6 @@ func WithLogger(s *MockHTTPServer) *MockHTTPServer {
 	logHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
 	s.logger = slog.New(logHandler)
 	return s
-}
-
-// WithTestLogger wraps a MockHTTPServer with a test logger for capturing log output during tests.
-func WithTestLogger(t testing.TB) func(s *MockHTTPServer) *MockHTTPServer {
-	return func(s *MockHTTPServer) *MockHTTPServer {
-		s.logger = logging.NewTestLogger(t)
-		return s
-	}
 }
 
 func prepareAndCallRequest(t *testing.T, method, authURL string, headers map[string]string, jsonData []byte) *http.Response {

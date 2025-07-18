@@ -3,6 +3,7 @@ package typescript
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -69,15 +70,6 @@ func WithHeaders(headers map[string]string) func(*Options) {
 	}
 }
 
-func WithHeader(key string, value string) func(*Options) {
-	return func(options *Options) {
-		if options.headers == nil {
-			options.headers = make([]string, 0)
-		}
-		options.headers = append(options.headers, key+":"+value)
-	}
-}
-
 var validMethods = []string{"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"}
 
 const resultIndicator = "==================RESULT==============="
@@ -89,10 +81,10 @@ type AuthFetchResponse struct {
 	Body       string            `json:"body"`
 }
 
-func AuthFetch(t testing.TB, url string, opts ...func(*Options)) (*AuthFetchResponse, error) {
+func AuthFetch(t testing.TB, url string, opts ...func(*Options)) *AuthFetchResponse {
 	options := to.OptionsWithDefault(Options{
 		url:    url,
-		method: "GET",
+		method: http.MethodGet,
 	}, opts...)
 
 	command, args := authFetchCommand()
@@ -116,15 +108,13 @@ func AuthFetch(t testing.TB, url string, opts ...func(*Options)) (*AuthFetchResp
 
 	t.Log(log)
 
-	if err != nil {
-		return nil, fmt.Errorf("AuthFetch failed: %w, %s", err, result)
-	}
+	require.NoErrorf(t, err, "Failed to run auth fetch command\n%s", output)
 
 	var response AuthFetchResponse
 	err = json.Unmarshal([]byte(result), &response)
 	require.NoErrorf(t, err, "Result from js script must be json with response\n%s", result)
 
-	return &response, nil
+	return &response
 }
 
 func authFetchCommand() (string, []string) {
