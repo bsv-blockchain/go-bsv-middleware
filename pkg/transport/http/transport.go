@@ -394,11 +394,12 @@ func buildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
 	writer.WriteString(req.Method)
 	writer.WriteOptionalString(req.URL.Path)
 
-	seachParams := req.URL.RawQuery
-	if seachParams != "" {
-		seachParams = "?" + seachParams
+	searchParams := req.URL.RawQuery
+	if searchParams != "" {
+		// auth client is using query string with leading "?", so the middleware need to include that character also.
+		searchParams = "?" + searchParams
 	}
-	writer.WriteOptionalString(seachParams)
+	writer.WriteOptionalString(searchParams)
 
 	var includedHeaders [][]string
 	for k, v := range req.Header {
