@@ -12,7 +12,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	exampleWallet "github.com/bsv-blockchain/go-bsv-middleware-examples/example-wallet"
+	exampleWallet "github.com/bsv-blockchain/go-bsv-middleware/examples/example-wallet"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/auth"
 	primitives "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )

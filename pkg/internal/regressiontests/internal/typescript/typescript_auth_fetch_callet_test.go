@@ -12,7 +12,6 @@ func TestCheckTypescriptAuthFetchCaller(t *testing.T) {
 	t.Skip("used for auth fetch caller development purposes")
 
 	response := typescript.AuthFetch(t, "http://localhost:8100")
-	assert.NoError(t, err)
 	require.NotNil(t, response)
 	assert.NotEmpty(t, response.Status)
 	assert.NotEmpty(t, response.StatusText)

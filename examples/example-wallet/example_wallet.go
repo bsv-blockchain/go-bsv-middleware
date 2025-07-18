@@ -89,9 +89,14 @@ func (w *ExtendedProtoWallet) AcquireCertificate(ctx context.Context, args walle
 		return nil, err
 	}
 
+	var serialNumber wallet.SerialNumber
+	if args.SerialNumber != nil {
+		serialNumber = *args.SerialNumber
+	}
+
 	return &wallet.Certificate{
 		Type:               args.Type,
-		SerialNumber:       args.SerialNumber,
+		SerialNumber:       serialNumber,
 		Subject:            identityResult.PublicKey,
 		Certifier:          args.Certifier,
 		RevocationOutpoint: args.RevocationOutpoint,
