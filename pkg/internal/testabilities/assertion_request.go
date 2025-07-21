@@ -15,6 +15,8 @@ type RequestAssertion interface {
 	HasHeadersContaining(map[string]string) RequestAssertion
 	HasQueryMatching(string) RequestAssertion
 	HasBodyMatching(map[string]string) RequestAssertion
+	HasBody(string) RequestAssertion
+	HasPath(path string) RequestAssertion
 	// TODO
 	// IsAuthenticatedFor(identityKey ???) RequestAssertion
 }
@@ -24,9 +26,29 @@ type requestAssertion struct {
 	request *http.Request
 }
 
+func NewRequestAssertion(t testing.TB, request *http.Request) RequestAssertion {
+	return &requestAssertion{
+		TB:      t,
+		request: request,
+	}
+}
+
 func (a *requestAssertion) HasMethod(httpMethod string) RequestAssertion {
 	a.Helper()
+	if httpMethod == "" {
+		httpMethod = http.MethodGet
+	}
 	assert.Equalf(a, httpMethod, a.request.Method, "Expect to receive %s request", httpMethod)
+	return a
+}
+
+func (a *requestAssertion) HasPath(path string) RequestAssertion {
+	a.Helper()
+	if path == "" {
+		// server will add "/" to path automatically so the assertion must adjust to this behavior.
+		path = "/"
+	}
+	assert.Equal(a, path, a.request.URL.Path, "request path received by handler should match")
 	return a
 }
 
@@ -47,20 +69,38 @@ func (a *requestAssertion) HasQueryMatching(query string) RequestAssertion {
 
 func (a *requestAssertion) HasBodyMatching(expectedBody map[string]string) RequestAssertion {
 	a.Helper()
-	bodyBytes, err := io.ReadAll(a.request.Body)
-	assert.NoError(a, err, "failed to read request body: invalid test setup")
-	// ensure the body is not closed.
-	a.request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+	bodyBytes := a.extractRequestBody()
 
 	if expectedBody == nil {
 		assert.Empty(a, bodyBytes, "request body should be empty")
 	} else {
 		var body map[string]string
-		err = json.Unmarshal(bodyBytes, &body)
+		err := json.Unmarshal(bodyBytes, &body)
 		if assert.NoError(a, err, "failed to unmarshal request body") {
 			assert.Equal(a, expectedBody, body, "request body should match")
 		}
 	}
 
 	return a
+}
+
+func (a *requestAssertion) HasBody(expectedBody string) RequestAssertion {
+	a.Helper()
+	bodyBytes := a.extractRequestBody()
+
+	if expectedBody == "" {
+		assert.Empty(a, bodyBytes, "request body should be empty")
+	} else {
+		assert.Equal(a, expectedBody, string(bodyBytes), "request body should match")
+	}
+	return a
+}
+
+func (a *requestAssertion) extractRequestBody() []byte {
+	a.Helper()
+	bodyBytes, err := io.ReadAll(a.request.Body)
+	assert.NoError(a, err, "failed to read request body: invalid test setup")
+	// ensure the body is not closed.
+	a.request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+	return bodyBytes
 }

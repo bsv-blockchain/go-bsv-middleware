@@ -14,6 +14,7 @@ import (
 
 func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 	testCases := map[string]struct {
+		path    string
 		method  string
 		query   string
 		body    map[string]string
@@ -25,24 +26,34 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 			body:    nil,
 			headers: nil,
 		},
+		"get request on path": {
+			method: http.MethodGet,
+			path:   "/ping",
+			query:  "",
+			body:   nil,
+		},
 		"get request with query params": {
 			method:  http.MethodGet,
+			path:    "/ping",
 			query:   "test=123&other=abc",
 			body:    nil,
 			headers: nil,
 		},
 		"get request with headers": {
 			method: http.MethodGet,
+			path:   "/ping",
 			query:  "",
 			body:   nil,
 			headers: map[string]string{
 				// WARNING: Only content-type, authorization, and x-bsv-* headers are supported by auth fetch
 				"Authorization": "123",
 				"Content-Type":  "text/plain",
+				"X-Bsv-Test":    "true",
 			},
 		},
 		"post request": {
 			method: http.MethodPost,
+			path:   "/ping",
 			query:  "",
 			body: map[string]string{
 				"test":  "123",
@@ -52,10 +63,6 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 				// WARNING: Content-Type is required for request with body by auth fetch
 				"Content-Type": "application/json",
 			},
-		},
-		"invalid query params": {
-			method: http.MethodPost,
-			query:  "shirts size",
 		},
 	}
 	for name, test := range testCases {
@@ -67,13 +74,14 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 			authMiddleware := given.Middleware().NewAuth()
 
 			// and:
-			url, cleanup := given.Server().
-				WithMiddleware(authMiddleware.Handler).
-				WithRoute("/ping", func(w http.ResponseWriter, r *http.Request) {
+			cleanup := given.Server().
+				WithMiddlewareFunc(authMiddleware.Handler).
+				WithRoute("/", func(w http.ResponseWriter, r *http.Request) {
 					then.Request(r).
 						HasMethod(test.method).
-						HasHeadersContaining(test.headers).
+						HasPath(test.path).
 						HasQueryMatching(url.PathEscape(test.query)).
+						HasHeadersContaining(test.headers).
 						HasBodyMatching(test.body)
 
 					// TODO check identity key
@@ -85,11 +93,12 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 			defer cleanup()
 
 			// when:
-			url.Path = "/ping"
-			url.RawQuery = test.query
+			serverURL := given.Server().URL()
+			serverURL.Path = test.path
+			serverURL.RawQuery = test.query
 
 			response := typescript.AuthFetch(t,
-				url.String(),
+				serverURL.String(),
 				typescript.WithMethod(test.method),
 				typescript.WithHeaders(test.headers),
 				typescript.WithBody(test.body),

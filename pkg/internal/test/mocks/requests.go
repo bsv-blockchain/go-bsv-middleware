@@ -14,6 +14,7 @@ import (
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/utils"
 	"github.com/bsv-blockchain/go-sdk/auth"
+	"github.com/bsv-blockchain/go-sdk/auth/brc104"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
@@ -30,17 +31,17 @@ func WithWrongVersion(h map[string]string) {
 
 // WithWrongSignature adds a wrong signature to the headers
 func WithWrongSignature(h map[string]string) {
-	h[constants.HeaderSignature] = "wrong_signature"
+	h[brc104.HeaderSignature] = "wrong_signature"
 }
 
 // WithWrongYourNonce adds a wrong your nonce to the headers
 func WithWrongYourNonce(h map[string]string) {
-	h[constants.HeaderYourNonce] = "wrong_your_nonce"
+	h[brc104.HeaderYourNonce] = "wrong_your_nonce"
 }
 
 // WithWrongNonce adds a wrong nonce to the headers
 func WithWrongNonce(h map[string]string) {
-	h[constants.HeaderNonce] = "wrong_nonce"
+	h[brc104.HeaderNonce] = "wrong_nonce"
 }
 
 // NewRequestBody creates a new RequestBody from an AuthMessage
@@ -132,9 +133,9 @@ func PrepareGeneralRequestHeaders(
 		return errors.New("failed to prepare general request headers: " + err.Error())
 	}
 
-	if headers[constants.HeaderYourNonce] == "" && previousResponse.YourNonce != "" {
+	if headers[brc104.HeaderYourNonce] == "" && previousResponse.YourNonce != "" {
 		log.Println("We manually override YourNonce to not be empty")
-		headers[constants.HeaderYourNonce] = previousResponse.YourNonce
+		headers[brc104.HeaderYourNonce] = previousResponse.YourNonce
 	}
 
 	for _, opt := range opts {
@@ -246,12 +247,12 @@ func prepareGeneralRequestHeadersFixesNonce(ctx context.Context, walletInstance 
 	}
 
 	headers := map[string]string{
-		constants.HeaderVersion:     "0.1",
-		constants.HeaderIdentityKey: clientIdentityKey.PublicKey.ToDERHex(),
-		constants.HeaderNonce:       newNonce,
-		constants.HeaderYourNonce:   serverNonce,
-		constants.HeaderSignature:   hex.EncodeToString(signature.Signature.Serialize()),
-		constants.HeaderRequestID:   encodedRequestID,
+		brc104.HeaderVersion:     "0.1",
+		brc104.HeaderIdentityKey: clientIdentityKey.PublicKey.ToDERHex(),
+		brc104.HeaderNonce:       newNonce,
+		brc104.HeaderYourNonce:   serverNonce,
+		brc104.HeaderSignature:   hex.EncodeToString(signature.Signature.Serialize()),
+		brc104.HeaderRequestID:   encodedRequestID,
 	}
 
 	return headers, nil

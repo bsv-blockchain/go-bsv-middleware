@@ -40,7 +40,7 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /ping", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		bytes, err := io.ReadAll(r.Body)
 		if err != nil {
 			slog.Error("Error reading request body", "error", err)
@@ -48,6 +48,7 @@ func main() {
 
 		response := map[string]string{
 			"method": r.Method,
+			"path":   r.URL.Path,
 			"query":  r.URL.RawQuery,
 			"body":   string(bytes),
 		}
@@ -72,8 +73,10 @@ func main() {
 	})
 
 	server := http.Server{
-		Addr:    ":8888",
-		Handler: authMiddleware.Handler(mux),
+		Addr: ":8888",
+		Handler: &AllowAllCORSHandler{
+			Next: authMiddleware.Handler(mux),
+		},
 	}
 
 	go func() {
@@ -108,4 +111,22 @@ func main() {
 	if err := server.Shutdown(context.Background()); err != nil {
 		slog.Error("Error during server shutdown", "error", err)
 	}
+}
+
+// AllowAllCORSHandler Such a middleware is needed before auth middleware to handle requests from browsers.
+type AllowAllCORSHandler struct {
+	Next http.Handler
+}
+
+func (h *AllowAllCORSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "*")
+	w.Header().Set("Access-Control-Expose-Headers", "*")
+	w.Header().Set("Access-Control-Allow-Private-Network", "true")
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	h.Next.ServeHTTP(w, r)
 }

@@ -5,8 +5,11 @@ import (
 	"testing"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/regressiontests/internal/typescript"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/testabilities"
 	"github.com/stretchr/testify/require"
 )
+
+type RequestAssertion = testabilities.RequestAssertion
 
 type RegressionTestAssertion interface {
 	Request(*http.Request) RequestAssertion
@@ -22,10 +25,7 @@ func Then(t testing.TB) RegressionTestAssertion {
 }
 
 func (a *regressionTestAssertion) Request(request *http.Request) RequestAssertion {
-	return &requestAssertion{
-		TB:      a,
-		request: request,
-	}
+	return testabilities.NewRequestAssertion(a, request)
 }
 
 func (a *regressionTestAssertion) Response(response *typescript.AuthFetchResponse) AuthFetchResponseAssertion {

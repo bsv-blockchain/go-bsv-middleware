@@ -7,19 +7,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
-	"sort"
-	"strings"
+	"strconv"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/constants"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 	"github.com/bsv-blockchain/go-sdk/auth"
+	"github.com/bsv-blockchain/go-sdk/auth/authpayload"
+	"github.com/bsv-blockchain/go-sdk/auth/brc104"
 	"github.com/bsv-blockchain/go-sdk/auth/utils"
 	primitives "github.com/bsv-blockchain/go-sdk/primitives/ec"
-	"github.com/bsv-blockchain/go-sdk/util"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
@@ -42,9 +41,9 @@ const NextKey contextKey = "http_next_handler"
 // ResponseRecorder is a custom http.ResponseWriter that records the response status code and body.
 type ResponseRecorder struct {
 	http.ResponseWriter
-	written    bool
-	statusCode int
-	body       []byte
+	headersWritten bool
+	statusCode     int
+	body           []byte
 }
 
 // GetBody retrieves the recorded response body.
@@ -54,30 +53,31 @@ func (r *ResponseRecorder) GetBody() []byte {
 
 // WriteHeader captures the status code
 func (r *ResponseRecorder) WriteHeader(statusCode int) {
-	if r.written {
+	if r.headersWritten {
 		return
 	}
 
-	if statusCode == 0 {
-		statusCode = http.StatusInternalServerError
+	if statusCode < 100 || statusCode > 999 {
+		panic("invalid status code: " + strconv.Itoa(statusCode))
 	}
+
 	r.statusCode = statusCode
-	r.written = true
+	r.headersWritten = true
 }
 
 // Write captures the response body and ensures that WriteHeader is called at least once.
 func (r *ResponseRecorder) Write(b []byte) (int, error) {
-	if !r.written {
+	r.body = append(r.body, b...)
+	if !r.headersWritten {
 		r.WriteHeader(http.StatusOK)
 	}
-	r.body = append(r.body, b...)
 	return len(b), nil
 }
 
-// Flush writes the response header and body if they have not been written yet.
+// Flush writes the response header and body from the ResponseRecorder to the underlying http.ResponseWriter.
 func (r *ResponseRecorder) Flush() error {
-	if r.statusCode == 0 {
-		r.statusCode = http.StatusOK
+	if r.statusCode < 100 {
+		return fmt.Errorf("response status code is not set")
 	}
 	r.ResponseWriter.WriteHeader(r.statusCode)
 	if len(r.body) > 0 {
@@ -90,9 +90,9 @@ func (r *ResponseRecorder) Flush() error {
 	return nil
 }
 
-// HasBeenWritten checks if the response has been written.
+// HasBeenWritten checks if the response has been headersWritten.
 func (r *ResponseRecorder) HasBeenWritten() bool {
-	return r.written
+	return r.headersWritten
 }
 
 // WrapResponseWriter wraps and tracks write status.
@@ -187,20 +187,20 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 
 	switch message.MessageType {
 	case auth.MessageTypeInitialResponse, auth.MessageTypeCertificateResponse:
-		resp.Header().Set(constants.HeaderVersion, message.Version)
-		resp.Header().Set(constants.HeaderMessageType, string(message.MessageType))
-		resp.Header().Set(constants.HeaderIdentityKey, message.IdentityKey.ToDERHex())
+		resp.Header().Set(brc104.HeaderVersion, message.Version)
+		resp.Header().Set(brc104.HeaderMessageType, string(message.MessageType))
+		resp.Header().Set(brc104.HeaderIdentityKey, message.IdentityKey.ToDERHex())
 
 		if message.Nonce != "" {
-			resp.Header().Set(constants.HeaderNonce, message.Nonce)
+			resp.Header().Set(brc104.HeaderNonce, message.Nonce)
 		}
 
 		if message.YourNonce != "" {
-			resp.Header().Set(constants.HeaderYourNonce, message.YourNonce)
+			resp.Header().Set(brc104.HeaderYourNonce, message.YourNonce)
 		}
 
 		if message.Signature != nil {
-			resp.Header().Set(constants.HeaderSignature, hex.EncodeToString(message.Signature))
+			resp.Header().Set(brc104.HeaderSignature, hex.EncodeToString(message.Signature))
 		}
 
 		t.applyDefaultCertificateRequests(message)
@@ -220,33 +220,33 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 
 		requestID := ""
 		if req != nil {
-			requestID = req.Header.Get(constants.HeaderRequestID)
+			requestID = req.Header.Get(brc104.HeaderRequestID)
 		}
 
 		if requestID == "" {
 			return errors.New("missing request ID for general message response")
 		}
 
-		resp.Header().Set(constants.HeaderVersion, message.Version)
-		resp.Header().Set(constants.HeaderMessageType, string(message.MessageType))
-		resp.Header().Set(constants.HeaderIdentityKey, message.IdentityKey.ToDERHex())
+		resp.Header().Set(brc104.HeaderVersion, message.Version)
+		resp.Header().Set(brc104.HeaderMessageType, string(message.MessageType))
+		resp.Header().Set(brc104.HeaderIdentityKey, message.IdentityKey.ToDERHex())
 
 		if message.Nonce != "" {
-			resp.Header().Set(constants.HeaderNonce, message.Nonce)
+			resp.Header().Set(brc104.HeaderNonce, message.Nonce)
 		}
 
 		if message.YourNonce != "" {
-			resp.Header().Set(constants.HeaderYourNonce, message.YourNonce)
+			resp.Header().Set(brc104.HeaderYourNonce, message.YourNonce)
 		}
 
 		if message.Signature != nil {
-			resp.Header().Set(constants.HeaderSignature, hex.EncodeToString(message.Signature))
+			resp.Header().Set(brc104.HeaderSignature, hex.EncodeToString(message.Signature))
 		}
 
-		resp.Header().Set(constants.HeaderRequestID, requestID)
+		resp.Header().Set(brc104.HeaderRequestID, requestID)
 
 		if t.wallet != nil {
-			peerIdentityKeyStr := req.Header.Get(constants.HeaderIdentityKey)
+			peerIdentityKeyStr := req.Header.Get(brc104.HeaderIdentityKey)
 			if peerIdentityKeyStr == "" {
 				return fmt.Errorf("missing peer identity key in request")
 			}
@@ -276,7 +276,7 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 				return fmt.Errorf("failed to sign response payload: %w", err)
 			}
 
-			resp.Header().Set(constants.HeaderSignature, hex.EncodeToString(signResult.Signature.Serialize()))
+			resp.Header().Set(brc104.HeaderSignature, hex.EncodeToString(signResult.Signature.Serialize()))
 		}
 
 		return nil
@@ -292,11 +292,18 @@ func (t *Transport) Send(ctx context.Context, message *auth.AuthMessage) error {
 // AuthMessageWithRequestID wraps auth.AuthMessage with a request ID.
 type AuthMessageWithRequestID struct {
 	*auth.AuthMessage
-	RequestID string
+	RequestID      string
+	RequestIDBytes []byte
 }
 
 // ParseAuthMessageFromRequest parses auth message from HTTP request.
 func ParseAuthMessageFromRequest(req *http.Request) (*AuthMessageWithRequestID, error) {
+	requestID := req.Header.Get(brc104.HeaderRequestID)
+	requestIDBytes, err := base64.StdEncoding.DecodeString(requestID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid request ID format: %w", err)
+	}
+
 	if req.URL.Path == constants.WellKnownAuthPath && req.Method == http.MethodPost {
 		var message auth.AuthMessage
 		if err := json.NewDecoder(req.Body).Decode(&message); err != nil {
@@ -304,7 +311,7 @@ func ParseAuthMessageFromRequest(req *http.Request) (*AuthMessageWithRequestID, 
 		}
 
 		if message.IdentityKey == nil {
-			identityKeyHeader := req.Header.Get(constants.HeaderIdentityKey)
+			identityKeyHeader := req.Header.Get(brc104.HeaderIdentityKey)
 			if identityKeyHeader != "" {
 				pubKey, err := primitives.PublicKeyFromString(identityKeyHeader)
 				if err != nil {
@@ -317,56 +324,64 @@ func ParseAuthMessageFromRequest(req *http.Request) (*AuthMessageWithRequestID, 
 
 		}
 		msg := &AuthMessageWithRequestID{
-			AuthMessage: &message,
-			RequestID:   req.Header.Get(constants.HeaderRequestID),
+			RequestID:      requestID,
+			RequestIDBytes: requestIDBytes,
+			AuthMessage:    &message,
 		}
 		return msg, nil
 	}
 
-	version := req.Header.Get(constants.HeaderVersion)
+	version := req.Header.Get(brc104.HeaderVersion)
 	if version == "" {
 		return nil, nil
 	}
 
-	identityKey := req.Header.Get(constants.HeaderIdentityKey)
+	identityKey := req.Header.Get(brc104.HeaderIdentityKey)
 	if identityKey == "" {
 		return nil, errors.New("missing identity key header")
 	}
-
-	nonce := req.Header.Get(constants.HeaderNonce)
-	yourNonce := req.Header.Get(constants.HeaderYourNonce)
-	signature := req.Header.Get(constants.HeaderSignature)
-	requestID := req.Header.Get(constants.HeaderRequestID)
 	pubKey, err := primitives.PublicKeyFromString(identityKey)
 	if err != nil {
 		return nil, fmt.Errorf("invalid identity key format: %w", err)
 	}
 
-	payload, err := buildRequestPayload(req, requestID)
+	signature := req.Header.Get(brc104.HeaderSignature)
+	sigBytes, err := hex.DecodeString(signature)
+	if err != nil {
+		return nil, fmt.Errorf("invalid signature format: %w", err)
+	}
+
+	nonce := req.Header.Get(brc104.HeaderNonce)
+	yourNonce := req.Header.Get(brc104.HeaderYourNonce)
+
+	msgPayload, err := authpayload.FromHTTPRequest(requestIDBytes, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build request payload: %w", err)
 	}
 
-	message := &auth.AuthMessage{
-		Version:     version,
-		MessageType: auth.MessageTypeGeneral,
-		IdentityKey: pubKey,
-		Nonce:       nonce,
-		YourNonce:   yourNonce,
-		Payload:     payload,
-	}
+	requestedCertificatesJson := req.Header.Get(brc104.HeaderRequestedCertificates)
 
-	if signature != "" {
-		sigBytes, err := hex.DecodeString(signature)
+	var requestedCertificates utils.RequestedCertificateSet
+	if requestedCertificatesJson != "" {
+		err = json.Unmarshal([]byte(requestedCertificatesJson), &requestedCertificates)
 		if err != nil {
-			return nil, fmt.Errorf("invalid signature format: %w", err)
+			return nil, fmt.Errorf("invalid format of requested certificates in response: %w", err)
 		}
-
-		message.Signature = sigBytes
 	}
+
 	msg := &AuthMessageWithRequestID{
-		AuthMessage: message,
-		RequestID:   requestID,
+		RequestID:      requestID,
+		RequestIDBytes: requestIDBytes,
+		AuthMessage: &auth.AuthMessage{
+			Version:               version,
+			MessageType:           auth.MessageTypeGeneral,
+			IdentityKey:           pubKey,
+			Nonce:                 nonce,
+			YourNonce:             yourNonce,
+			RequestedCertificates: requestedCertificates,
+			Payload:               msgPayload,
+			Signature:             sigBytes,
+		},
 	}
 	return msg, nil
 }
@@ -381,70 +396,4 @@ func (t *Transport) shouldApplyDefaultCertificates(message *auth.AuthMessage) bo
 	return message.MessageType == auth.MessageTypeInitialResponse &&
 		len(message.RequestedCertificates.CertificateTypes) == 0 &&
 		t.certificatesToRequest != nil
-}
-
-func buildRequestPayload(req *http.Request, requestID string) ([]byte, error) {
-	writer := util.NewWriter()
-	requestIDBytes, err := base64.StdEncoding.DecodeString(requestID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid request ID format: %w", err)
-	}
-
-	writer.WriteBytes(requestIDBytes)
-	writer.WriteString(req.Method)
-	writer.WriteOptionalString(req.URL.Path)
-
-	searchParams := req.URL.RawQuery
-	if searchParams != "" {
-		// auth client is using query string with leading "?", so the middleware need to include that character also.
-		searchParams = "?" + searchParams
-	}
-	writer.WriteOptionalString(searchParams)
-
-	var includedHeaders [][]string
-	for k, v := range req.Header {
-		if isIncludedHeader(k) {
-			includedHeaders = append(includedHeaders, []string{strings.ToLower(k), v[0]})
-		}
-	}
-	sort.Slice(includedHeaders, func(i, j int) bool {
-		return includedHeaders[i][0] < includedHeaders[j][0]
-	})
-
-	writer.WriteVarInt(uint64(len(includedHeaders)))
-
-	for _, header := range includedHeaders {
-		writer.WriteString(header[0])
-		writer.WriteString(header[1])
-	}
-
-	body, err := bodyContent(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read request body: %w", err)
-	}
-
-	writer.WriteIntBytesOptional(body)
-
-	return writer.Buf, nil
-}
-
-func isIncludedHeader(headerKey string) bool {
-	k := strings.ToLower(headerKey)
-	return (strings.HasPrefix(k, constants.XBSVPrefix) || k == constants.HeaderContentType || k == constants.HeaderAuthorization) &&
-		!strings.HasPrefix(k, constants.AuthHeaderPrefix)
-}
-
-func bodyContent(req *http.Request) ([]byte, error) {
-	if req.Body == nil {
-		return nil, nil
-	}
-
-	body, err := io.ReadAll(req.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read request body: %w", err)
-	}
-
-	req.Body = io.NopCloser(strings.NewReader(string(body)))
-
-	return body, nil
 }
