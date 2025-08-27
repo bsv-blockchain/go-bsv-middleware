@@ -1,11 +1,13 @@
 package testabilities
 
 import (
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 
+	"github.com/go-softwarelab/common/pkg/to"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,20 +30,28 @@ type ServerBuilder interface {
 	Started() (cleanup func())
 }
 
+type ServerFixtureOptions struct {
+	serverPorts []int
+}
+
 type serverFixture struct {
 	testing.TB
 	mux        *http.ServeMux
 	middleware []middlewareFunc
 	server     *httptest.Server
+	ports      []int
 }
 
 type middlewareFunc func(next http.Handler) http.Handler
 
-func NewServerFixture(t testing.TB) ServerFixture {
+func NewServerFixture(t testing.TB, opts ...func(*ServerFixtureOptions)) ServerFixture {
+	options := to.OptionsWithDefault(ServerFixtureOptions{}, opts...)
+
 	return &serverFixture{
 		TB:         t,
 		mux:        http.NewServeMux(),
 		middleware: make([]middlewareFunc, 0),
+		ports:      options.serverPorts,
 	}
 }
 
@@ -90,7 +100,28 @@ func (f *serverFixture) handler() http.Handler {
 }
 
 func (f *serverFixture) newServer() (server *httptest.Server, cleanup func()) {
-	server = httptest.NewServer(f.handler())
+	if len(f.ports) == 0 {
+		server = httptest.NewServer(f.handler())
+	} else {
+		f.Log("trying to find free port from ports list to start the server")
+		var listener net.Listener
+		var err error
+		for _, port := range f.ports {
+			listener, err = net.Listen("tcp", "127.0.0.1:"+to.StringFromInteger(port))
+			if err == nil && listener != nil {
+				f.Log("starting server on port:", port)
+				break
+			}
+		}
+		require.NotNilf(f, listener, "failed to find free port from ports list %v", f.ports)
+
+		server = &httptest.Server{
+			Listener: listener,
+			Config:   &http.Server{Handler: f.handler()},
+		}
+		server.Start()
+	}
+
 	cleanup = func() {
 		server.Close()
 	}

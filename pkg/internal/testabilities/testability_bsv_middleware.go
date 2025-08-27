@@ -35,7 +35,9 @@ func Given(t testing.TB, opts ...func(*Options)) BSVMiddlewareTestsFixture {
 	}, opts...)
 
 	f.logger = options.logger
-	f.serverFixture = NewServerFixture(f)
+	f.serverFixture = NewServerFixture(f, func(serverOptions *ServerFixtureOptions) {
+		serverOptions.serverPorts = options.serverPorts
+	})
 	f.middlewareFixture = NewMiddlewareFixture(f, WithMiddlewareLogger(f.logger))
 
 	return f

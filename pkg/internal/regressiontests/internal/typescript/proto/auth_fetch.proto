@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package typescript;
+
+option go_package = "github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/regressiontests/internal/typescriptnew;typescript";
+
+service AuthFetch {
+  rpc fetch (FetchRequest) returns (FetchResponse);
+  rpc cleanUp(CleanUpRequest) returns (CleanUpResponse);
+}
+
+message Config {
+  string method = 1;                      // optional
+  map<string, string> headers = 2;        // optional
+  string body = 3;                        // optional (serialized as string)
+  int32 retryCounter = 4;                 // optional
+}
+
+// Additional options for fetch call
+message Options {
+  string clientId = 1; // optional
+  string privKeyHex = 2; // optional
+}
+
+message FetchRequest {
+  string url = 1;
+  Config config = 2; // optional
+  Options options = 3; // optional
+}
+
+message FetchResponse {
+  int32 status = 1;
+  string statusText = 2;
+  map<string, string> headers = 3;
+  string body = 4;
+}
+
+message CleanUpRequest {
+  string clientId = 1;
+}
+
+message CleanUpResponse {
+}
