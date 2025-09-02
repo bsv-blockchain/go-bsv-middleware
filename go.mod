@@ -5,13 +5,13 @@ go 1.24.3
 toolchain go1.24.4
 
 require (
-	github.com/bsv-blockchain/go-sdk v1.2.5
-	github.com/go-softwarelab/common v1.3.1
-	github.com/stretchr/testify v1.10.0
+	github.com/bsv-blockchain/go-sdk v1.2.8
+	github.com/go-softwarelab/common v1.7.1
+	github.com/stretchr/testify v1.11.1
 )
 
 require (
-	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
