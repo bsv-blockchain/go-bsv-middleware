@@ -10,8 +10,8 @@ import (
 	"net/http"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/authentication"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/auth"
 	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/bsv-blockchain/go-sdk/wallet"
@@ -46,7 +46,7 @@ func New(opts Options) (*Middleware, error) {
 // Handler returns a middleware handler function that processes payments
 func (m *Middleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		identityKey, ok := auth.GetIdentityFromContext(r.Context())
+		identityKey, ok := authentication.GetIdentityFromContext(r.Context())
 		if !ok {
 			respondWithError(w, http.StatusInternalServerError, ErrCodeServerMisconfigured,
 				ErrAuthMiddlewareMissing.Error())
