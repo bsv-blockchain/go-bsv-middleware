@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/interfaces"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/authentication"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
@@ -20,7 +19,7 @@ import (
 // Middleware is the payment middleware handler that implements Direct Payment Protocol (DPP) for HTTP-based micropayments
 type Middleware struct {
 	logger                *slog.Logger
-	wallet                interfaces.Payment
+	wallet                wallet.Interface
 	calculateRequestPrice func(r *http.Request) (int, error)
 }
 
@@ -115,7 +114,7 @@ func extractPaymentData(r *http.Request) (*Payment, error) {
 	return &payment, nil
 }
 
-func requestPayment(w http.ResponseWriter, r *http.Request, walletInstance interfaces.Payment, price int) {
+func requestPayment(w http.ResponseWriter, r *http.Request, walletInstance wallet.Interface, price int) {
 	derivationPrefix, err := sdkUtils.CreateNonce(r.Context(), walletInstance, wallet.Counterparty{Type: wallet.CounterpartyTypeSelf})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, ErrCodePaymentInternal,
@@ -135,7 +134,7 @@ func requestPayment(w http.ResponseWriter, r *http.Request, walletInstance inter
 
 func processPayment(
 	ctx context.Context,
-	walletInstance interfaces.Payment,
+	walletInstance wallet.Interface,
 	paymentData *Payment,
 	identityKeyHex string,
 	price int,
