@@ -6,10 +6,9 @@ import (
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/testabilities/fixture"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/auth"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 	"github.com/go-softwarelab/common/pkg/to"
-	"github.com/stretchr/testify/require"
 )
 
 type MiddlewareFixtureOptions struct {
@@ -23,7 +22,7 @@ func WithMiddlewareLogger(logger *slog.Logger) func(options *MiddlewareFixtureOp
 }
 
 type MiddlewareFixture interface {
-	NewAuth() *auth.Middleware
+	NewAuth() *middleware.AuthMiddlewareFactory
 }
 
 type middlewareFixture struct {
@@ -47,13 +46,6 @@ func NewMiddlewareFixture(t testing.TB, opts ...func(*MiddlewareFixtureOptions))
 	return f
 }
 
-func (f *middlewareFixture) NewAuth() *auth.Middleware {
-	authMiddleware, err := auth.New(auth.Config{
-		AllowUnauthenticated: false,
-		Wallet:               f.wallet,
-		Logger:               f.logger,
-	})
-	require.NoError(f, err)
-
-	return authMiddleware
+func (f *middlewareFixture) NewAuth() *middleware.AuthMiddlewareFactory {
+	return middleware.NewAuth(f.wallet, middleware.WithAuthLogger(f.logger))
 }

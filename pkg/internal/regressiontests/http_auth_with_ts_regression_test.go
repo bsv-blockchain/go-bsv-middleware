@@ -71,8 +71,7 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 			authMiddleware := given.Middleware().NewAuth()
 
 			// and:
-			cleanup := given.Server().
-				WithMiddlewareFunc(authMiddleware.Handler).
+			cleanup := given.Server().WithMiddleware(authMiddleware).
 				WithRoute("/", func(w http.ResponseWriter, r *http.Request) {
 					then.Request(r).
 						HasMethod(test.method).

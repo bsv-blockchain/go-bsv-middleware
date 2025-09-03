@@ -11,13 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type MiddlewareHandler interface {
-	Handler(next http.Handler) http.Handler
+type MiddlewareHTTPHandlerFactory interface {
+	HTTPHandler(next http.Handler) http.Handler
 }
 
 type ServerFixture interface {
 	WithRoute(pattern string, handler func(w http.ResponseWriter, r *http.Request)) ServerBuilder
-	WithMiddleware(MiddlewareHandler) ServerBuilder
+	WithMiddleware(MiddlewareHTTPHandlerFactory) ServerBuilder
 	WithMiddlewareFunc(func(next http.Handler) http.Handler) ServerBuilder
 
 	URL() *url.URL
@@ -25,7 +25,7 @@ type ServerFixture interface {
 
 type ServerBuilder interface {
 	WithRoute(pattern string, handler func(w http.ResponseWriter, r *http.Request)) ServerBuilder
-	WithMiddleware(MiddlewareHandler) ServerBuilder
+	WithMiddleware(MiddlewareHTTPHandlerFactory) ServerBuilder
 	WithMiddlewareFunc(func(next http.Handler) http.Handler) ServerBuilder
 	Started() (cleanup func())
 }
@@ -62,8 +62,8 @@ func (f *serverFixture) WithRoute(pattern string, handler func(w http.ResponseWr
 
 // WithMiddleware adds a middleware handler to the server fixture, wrapping the HTTP handler chain in the specified middleware.
 // Middleware will be applied in opposite order - so the call chain will go from the first to the last.
-func (f *serverFixture) WithMiddleware(handler MiddlewareHandler) ServerBuilder {
-	return f.WithMiddlewareFunc(handler.Handler)
+func (f *serverFixture) WithMiddleware(handler MiddlewareHTTPHandlerFactory) ServerBuilder {
+	return f.WithMiddlewareFunc(handler.HTTPHandler)
 }
 
 // WithMiddlewareFunc adds a middleware function to the server fixture, wrapping the HTTP handler chain in the specified middleware.

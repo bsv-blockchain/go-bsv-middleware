@@ -1,4 +1,5 @@
-package integrationtests
+//goland:noinspection DuplicatedCode // intentionally those tests looks the very similar to regression tests.
+package middleware_test
 
 import (
 	"net/http"
@@ -203,7 +204,6 @@ func TestAuthMiddlewareAndAuthFetchIntegration(t *testing.T) {
 	}
 }
 
-//goland:noinspection DuplicatedCode
 func TestAuthMiddlewareHandleSubsequentRequests(t *testing.T) {
 	t.Run("multiple requests with the same client", func(t *testing.T) {
 		// given:
