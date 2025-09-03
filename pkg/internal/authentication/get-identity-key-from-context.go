@@ -1,14 +1,10 @@
-package auth
+package authentication
 
-import (
-	"context"
-
-	httptransport "github.com/bsv-blockchain/go-bsv-middleware/pkg/transport/http"
-)
+import "context"
 
 // GetIdentityFromContext retrieves identity from the request context
 func GetIdentityFromContext(ctx context.Context) (string, bool) {
-	value := ctx.Value(httptransport.IdentityKey)
+	value := ctx.Value(IdentityKey)
 	if value == nil {
 		return "", false
 	}
