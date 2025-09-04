@@ -8,18 +8,18 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"mime"
 	"net/http"
 	"strings"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/constants"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/httperror"
 	"github.com/bsv-blockchain/go-sdk/auth"
-	"github.com/bsv-blockchain/go-sdk/auth/authpayload"
 	"github.com/bsv-blockchain/go-sdk/auth/brc104"
 	"github.com/bsv-blockchain/go-sdk/auth/utils"
 	primitives "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/bsv-blockchain/go-sdk/wallet"
+	"github.com/go-softwarelab/common/pkg/optional"
 	"github.com/go-softwarelab/common/pkg/to"
 )
 
@@ -39,6 +39,7 @@ type Middleware struct {
 	sessionManager       auth.SessionManager
 	peer                 *auth.Peer
 	onDataCallback       func(context.Context, *auth.AuthMessage) error
+	errorHandler         func(context.Context, *slog.Logger, *httperror.Error, http.ResponseWriter, *http.Request)
 }
 
 func NewMiddleware(next http.Handler, wallet wallet.Interface, opts ...func(*Config)) *Middleware {
@@ -58,6 +59,7 @@ func NewMiddleware(next http.Handler, wallet wallet.Interface, opts ...func(*Con
 		log:                  logger,
 		allowUnauthenticated: cfg.AllowUnauthenticated,
 		sessionManager:       cfg.SessionManager,
+		errorHandler:         DefaultErrorHandler,
 	}
 
 	peerCfg := &auth.PeerOptions{
@@ -82,127 +84,21 @@ func NewMiddleware(next http.Handler, wallet wallet.Interface, opts ...func(*Con
 	return m
 }
 
-func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	if ctx == nil {
-		r = r.WithContext(context.Background())
-	}
+func (m *Middleware) ServeHTTP(response http.ResponseWriter, request *http.Request) {
+	ctx := optional.OfValue(request.Context()).OrElseGet(context.Background)
+	ctx = context.WithValue(ctx, RequestKey, request)
+	ctx = context.WithValue(ctx, ResponseKey, response)
+	request = request.WithContext(ctx)
 
-	wrappedWriter := WrapResponseWriter(w)
+	log := m.log.With(slog.String("path", request.URL.Path), slog.String("method", request.Method))
 
-	ctx = context.WithValue(ctx, RequestKey, r)
-	ctx = context.WithValue(ctx, ResponseKey, wrappedWriter)
+	handler := m.requestHandler(request, log)
 
-	m.log.DebugContext(ctx, "Processing request",
-		slog.String("path", r.URL.Path),
-		slog.String("method", r.Method))
-
-	authMsg, err := ParseAuthMessageFromRequest(r)
+	err := handler.Handle(ctx, response, request)
 	if err != nil {
-		m.log.Error("Failed to parse auth message", slog.String("error", err.Error()))
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	if authMsg == nil {
-		if m.allowUnauthenticated {
-			m.log.DebugContext(ctx, "Allowing unauthenticated request to pass through", slog.String("path", r.URL.Path), slog.String("method", r.Method))
-			r = r.WithContext(context.WithValue(r.Context(), IdentityKey, constants.UnknownParty))
-			m.nextHandler.ServeHTTP(w, r)
-			return
-		} else {
-			m.log.WarnContext(ctx, "Rejecting unauthenticated request", slog.String("path", r.URL.Path), slog.String("method", r.Method))
-			http.Error(w, "Authentication required", http.StatusUnauthorized)
-			return
-		}
-	}
-
-	if err := m.onDataCallback(ctx, authMsg.AuthMessage); err != nil {
-		m.log.Error("Failed to process auth message", slog.String("error", err.Error()))
-
-		statusCode := http.StatusInternalServerError
-		errMsg := "Internal server error"
-		// To handle errors more gracefully, we need go-sdk to return specific error types
-		// For now majority of errors will be treated as internal server error
-
-		switch {
-		case errors.Is(err, auth.ErrNotAuthenticated):
-			statusCode = http.StatusUnauthorized
-			errMsg = "Authentication failed"
-		case errors.Is(err, auth.ErrMissingCertificate):
-			statusCode = http.StatusBadRequest
-			var certTypes utils.RequestedCertificateTypeIDAndFieldList
-			if m.peer != nil && m.peer.CertificatesToRequest != nil {
-				certTypes = m.peer.CertificatesToRequest.CertificateTypes
-			}
-			errMsg = prepareMissingCertificateTypesErrorMsg(certTypes)
-		case errors.Is(err, auth.ErrInvalidNonce):
-			statusCode = http.StatusBadRequest
-			errMsg = "Invalid nonce"
-		case errors.Is(err, auth.ErrInvalidMessage):
-			statusCode = http.StatusBadRequest
-			errMsg = "Invalid message format"
-		case errors.Is(err, auth.ErrSessionNotFound):
-			statusCode = http.StatusUnauthorized
-			errMsg = "Session not found"
-		case errors.Is(err, auth.ErrInvalidSignature):
-			// TODO: change to Unauthorized respond with valid message so the ts could print it properly
-			statusCode = http.StatusInternalServerError
-			errMsg = "Invalid signature"
-		default:
-			errMsg = fmt.Sprintf("%s: %s", errMsg, err.Error())
-		}
-
-		acceptType := r.Header.Get("Accept")
-		mediaType, _, err := mime.ParseMediaType(acceptType)
-		if err != nil {
-			m.log.Error("Failed to parse Accept header value", slog.String("error", err.Error()))
-		}
-
-		var response string
-		switch mediaType {
-		case "text/plain":
-			w.Header().Set("Content-Type", "text/plain")
-			response = errMsg
-		default:
-			w.Header().Set("Content-Type", "application/json")
-			response = fmt.Sprintf(`{"error":"%s"}`, errMsg)
-		}
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.WriteHeader(statusCode)
-		_, err = w.Write([]byte(response))
-		if err != nil {
-			m.log.Error("Failed to write error response", slog.String("error", err.Error()), slog.String("response", response))
-		}
-		return
-	}
-
-	if authMsg.MessageType == auth.MessageTypeGeneral {
-		m.nextHandler.ServeHTTP(wrappedWriter, r)
-
-		response := authpayload.SimplifiedHttpResponse{
-			StatusCode: wrappedWriter.GetStatusCode(),
-			Header:     wrappedWriter.Header(),
-			Body:       wrappedWriter.GetBody(),
-		}
-
-		responsePayload, err := authpayload.FromResponse(authMsg.RequestIDBytes, response)
-		if err != nil {
-			m.log.Error("Failed to create request payload", slog.String("error", err.Error()))
-			http.Error(w, "Failed to create request payload", http.StatusInternalServerError)
-			return
-		}
-
-		err = m.peer.ToPeer(ctx, responsePayload, authMsg.IdentityKey, 30000)
-		if err != nil {
-			m.log.Error("Failed to send request to peer", slog.String("error", err.Error()), slog.String("identityKey", authMsg.IdentityKey.ToDERHex()))
-			http.Error(w, "Failed to send request to peer", http.StatusInternalServerError)
-			return
-		}
-	}
-
-	if err := wrappedWriter.Flush(); err != nil {
-		m.log.Error("Failed to flush auth response", slog.String("error", err.Error()))
+		log.ErrorContext(ctx, "Failed to handle request", logging.Error(err))
+		httpErr := m.toHTTPError(err)
+		m.errorHandler(ctx, log, httpErr, response, request)
 	}
 }
 
@@ -222,6 +118,7 @@ func (m *Middleware) Send(ctx context.Context, message *auth.AuthMessage) error 
 		return errors.New("invalid response writer type in context")
 	}
 
+	//nolint:exhaustive // intentionally all the rest types are handled by default case
 	switch message.MessageType {
 	case auth.MessageTypeInitialResponse, auth.MessageTypeCertificateResponse:
 		resp.Header().Set(brc104.HeaderVersion, message.Version)
@@ -367,6 +264,79 @@ func (m *Middleware) shouldApplyDefaultCertificates(message *auth.AuthMessage) b
 	return message.MessageType == auth.MessageTypeInitialResponse &&
 		len(message.RequestedCertificates.CertificateTypes) == 0 &&
 		certificatesToRequest != nil
+}
+
+func (m *Middleware) requestHandler(request *http.Request, log *slog.Logger) AuthRequestHandler {
+	var handler AuthRequestHandler
+	if isNonGeneralRequest(request) {
+		handler = &NonGeneralRequestHandler{
+			log:                   log.With(slog.String("requestType", "non-general")),
+			handleMessageWithPeer: m.onDataCallback,
+		}
+	} else {
+		handler = &GeneralRequestHandler{
+			log:                   log.With(slog.String("requestType", "general")),
+			handleMessageWithPeer: m.onDataCallback,
+			peer:                  m.peer,
+			nextHandler:           m.nextHandler,
+			allowUnauthenticated:  m.allowUnauthenticated,
+		}
+	}
+	return handler
+}
+
+func isNonGeneralRequest(request *http.Request) bool {
+	return request.Method == http.MethodPost && request.URL.Path == constants.WellKnownAuthPath
+}
+
+func (m *Middleware) toHTTPError(err error) *httperror.Error {
+	httpErr := &httperror.Error{
+		Err: err,
+	}
+
+	// To handle errors more gracefully, we need go-sdk to return specific error types
+	// For now majority of errors will be treated as internal server error
+	switch {
+	case errors.Is(err, auth.ErrNotAuthenticated):
+		httpErr.StatusCode = http.StatusUnauthorized
+		httpErr.Message = "Authentication failed"
+	case errors.Is(err, auth.ErrMissingCertificate):
+		httpErr.StatusCode = http.StatusBadRequest
+		var certTypes utils.RequestedCertificateTypeIDAndFieldList
+		if m.peer != nil && m.peer.CertificatesToRequest != nil {
+			certTypes = m.peer.CertificatesToRequest.CertificateTypes
+		}
+		httpErr.Message = prepareMissingCertificateTypesErrorMsg(certTypes)
+	case errors.Is(err, auth.ErrInvalidNonce):
+		httpErr.StatusCode = http.StatusBadRequest
+		httpErr.Message = "Invalid nonce"
+	case errors.Is(err, auth.ErrInvalidMessage):
+		httpErr.StatusCode = http.StatusBadRequest
+		httpErr.Message = "Invalid message format"
+	case errors.Is(err, auth.ErrSessionNotFound):
+		httpErr.StatusCode = http.StatusUnauthorized
+		httpErr.Message = "Session not found"
+	case errors.Is(err, auth.ErrInvalidSignature):
+		httpErr.StatusCode = http.StatusBadRequest
+		httpErr.Message = "Invalid signature"
+	case errors.Is(err, ErrAuthenticationRequired):
+		httpErr.StatusCode = http.StatusUnauthorized
+		httpErr.Message = err.Error()
+	case errors.Is(err, ErrGeneralMessageInNonGeneralRequest):
+		httpErr.StatusCode = http.StatusBadRequest
+		httpErr.Message = err.Error()
+	case errors.Is(err, ErrInvalidNonGeneralRequest):
+		httpErr.StatusCode = http.StatusBadRequest
+		httpErr.Message = err.Error()
+	case errors.Is(err, ErrInvalidGeneralRequest):
+		httpErr.StatusCode = http.StatusBadRequest
+		httpErr.Message = err.Error()
+	default:
+		httpErr.StatusCode = http.StatusInternalServerError
+		httpErr.Message = "Internal Server Error: " + err.Error()
+	}
+
+	return httpErr
 }
 
 // prepareMissingCertificateTypesErrorMsg prepares a user-friendly error message for missing certificate types.
