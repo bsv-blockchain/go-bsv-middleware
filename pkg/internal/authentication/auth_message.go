@@ -17,18 +17,13 @@ import (
 
 var ErrGeneralMessageInNonGeneralRequest = fmt.Errorf("invalid message type")
 
-type AuthMessage struct {
+type AuthMessageWithRequestID struct {
 	*auth.AuthMessage
 	RequestID      string
 	RequestIDBytes []byte
 }
 
-func extractNonGeneralAuthMessage(req *http.Request) (*AuthMessage, error) {
-	requestID, requestIDBytes, err := requestIDFromHeader(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read request id: %w", err)
-	}
-
+func extractNonGeneralAuthMessage(req *http.Request) (msg *auth.AuthMessage, err error) {
 	var message auth.AuthMessage
 	if err = json.NewDecoder(req.Body).Decode(&message); err != nil {
 		return nil, fmt.Errorf("invalid request body: %w", err)
@@ -45,15 +40,10 @@ func extractNonGeneralAuthMessage(req *http.Request) (*AuthMessage, error) {
 		return nil, ErrGeneralMessageInNonGeneralRequest
 	}
 
-	msg := &AuthMessage{
-		RequestID:      requestID,
-		RequestIDBytes: requestIDBytes,
-		AuthMessage:    &message,
-	}
-	return msg, nil
+	return &message, nil
 }
 
-func extractGeneralAuthMessage(req *http.Request) (*AuthMessage, error) {
+func extractGeneralAuthMessage(req *http.Request) (*AuthMessageWithRequestID, error) {
 	version := req.Header.Get(brc104.HeaderVersion)
 	if version == "" {
 		return nil, ErrAuthenticationRequired
@@ -97,7 +87,7 @@ func extractGeneralAuthMessage(req *http.Request) (*AuthMessage, error) {
 		}
 	}
 
-	msg := &AuthMessage{
+	msg := &AuthMessageWithRequestID{
 		RequestID:      requestID,
 		RequestIDBytes: requestIDBytes,
 		AuthMessage: &auth.AuthMessage{

@@ -17,7 +17,6 @@ import (
 	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/auth/brc104"
 	"github.com/bsv-blockchain/go-sdk/auth/utils"
-	primitives "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 	"github.com/go-softwarelab/common/pkg/optional"
 	"github.com/go-softwarelab/common/pkg/to"
@@ -86,8 +85,8 @@ func NewMiddleware(next http.Handler, wallet wallet.Interface, opts ...func(*Con
 
 func (m *Middleware) ServeHTTP(response http.ResponseWriter, request *http.Request) {
 	ctx := optional.OfValue(request.Context()).OrElseGet(context.Background)
-	ctx = context.WithValue(ctx, RequestKey, request)
-	ctx = context.WithValue(ctx, ResponseKey, response)
+	ctx = WithRequest(ctx, request)
+	ctx = WithResponse(ctx, response)
 	request = request.WithContext(ctx)
 
 	log := m.log.With(slog.String("path", request.URL.Path), slog.String("method", request.Method))
@@ -102,126 +101,57 @@ func (m *Middleware) ServeHTTP(response http.ResponseWriter, request *http.Reque
 	}
 }
 
-// Send implementation of auth.Transport
+// Send implementation of auth.Transport, will be called by middleware peer whenever it wants to send some response.
 func (m *Middleware) Send(ctx context.Context, message *auth.AuthMessage) error {
+	// TODO: add logging
+
 	if message.IdentityKey == nil {
-		return errors.New("message identity key cannot be nil")
+		return fmt.Errorf("peer is trying to send message without identity key")
 	}
 
-	respVal := ctx.Value(ResponseKey)
-	if respVal == nil {
-		return errors.New("response writer not found in context")
-	}
-
-	resp, ok := respVal.(http.ResponseWriter)
-	if !ok {
-		return errors.New("invalid response writer type in context")
+	resp, err := ShouldGetResponse(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve response writer in transport: %w", err)
 	}
 
 	//nolint:exhaustive // intentionally all the rest types are handled by default case
 	switch message.MessageType {
 	case auth.MessageTypeInitialResponse, auth.MessageTypeCertificateResponse:
-		resp.Header().Set(brc104.HeaderVersion, message.Version)
-		resp.Header().Set(brc104.HeaderMessageType, string(message.MessageType))
-		resp.Header().Set(brc104.HeaderIdentityKey, message.IdentityKey.ToDERHex())
-
-		if message.Nonce != "" {
-			resp.Header().Set(brc104.HeaderNonce, message.Nonce)
-		}
-
-		if message.YourNonce != "" {
-			resp.Header().Set(brc104.HeaderYourNonce, message.YourNonce)
-		}
-
-		if message.Signature != nil {
-			resp.Header().Set(brc104.HeaderSignature, hex.EncodeToString(message.Signature))
-		}
-
-		m.applyDefaultCertificateRequests(message)
-
 		resp.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(resp).Encode(message); err != nil {
 			return fmt.Errorf("failed to encode message to JSON: %w", err)
 		}
-
-		return nil
-
 	case auth.MessageTypeGeneral:
-		req, ok := ctx.Value(RequestKey).(*http.Request)
-		if !ok {
-			return errors.New("invalid request type in context")
+		req, err := ShouldGetRequest(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve request in transport: %w", err)
 		}
-
-		requestID := ""
-		if req != nil {
-			requestID = req.Header.Get(brc104.HeaderRequestID)
-		}
-
+		requestID := req.Header.Get(brc104.HeaderRequestID)
 		if requestID == "" {
-			return errors.New("missing request ID for general message response")
+			return fmt.Errorf("missing request ID in general message request")
 		}
-
-		resp.Header().Set(brc104.HeaderVersion, message.Version)
-		resp.Header().Set(brc104.HeaderMessageType, string(message.MessageType))
-		resp.Header().Set(brc104.HeaderIdentityKey, message.IdentityKey.ToDERHex())
-
-		if message.Nonce != "" {
-			resp.Header().Set(brc104.HeaderNonce, message.Nonce)
-		}
-
-		if message.YourNonce != "" {
-			resp.Header().Set(brc104.HeaderYourNonce, message.YourNonce)
-		}
-
-		if message.Signature != nil {
-			resp.Header().Set(brc104.HeaderSignature, hex.EncodeToString(message.Signature))
-		}
-
 		resp.Header().Set(brc104.HeaderRequestID, requestID)
-
-		// TODO: wallet cannot be nil here
-		if m.wallet != nil {
-			peerIdentityKeyStr := req.Header.Get(brc104.HeaderIdentityKey)
-			if peerIdentityKeyStr == "" {
-				return fmt.Errorf("missing peer identity key in request")
-			}
-
-			peerIdentityKey, err := primitives.PublicKeyFromString(peerIdentityKeyStr)
-			if err != nil {
-				return fmt.Errorf("invalid peer identity key: %w", err)
-			}
-
-			signatureArgs := wallet.CreateSignatureArgs{
-				EncryptionArgs: wallet.EncryptionArgs{
-					ProtocolID: wallet.Protocol{
-						SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty,
-						Protocol:      auth.AUTH_PROTOCOL_ID,
-					},
-					KeyID: fmt.Sprintf("%s %s", message.Nonce, message.YourNonce),
-					Counterparty: wallet.Counterparty{
-						Type:         wallet.CounterpartyTypeOther,
-						Counterparty: peerIdentityKey,
-					},
-				},
-				Data: message.Payload,
-			}
-
-			signResult, err := m.wallet.CreateSignature(ctx, signatureArgs, "")
-			if err != nil {
-				return fmt.Errorf("failed to sign response payload: %w", err)
-			}
-
-			resp.Header().Set(brc104.HeaderSignature, hex.EncodeToString(signResult.Signature.Serialize()))
-		}
-
-		return nil
-
-	case auth.MessageTypeCertificateRequest, auth.MessageTypeInitialRequest:
-		return fmt.Errorf("message type %s is not supported in Send method", message.MessageType)
-
 	default:
-		return fmt.Errorf("unsupported message type: %s", message.MessageType)
+		return fmt.Errorf("message type %s is not supported in auth middleware Send method", message.MessageType)
 	}
+
+	resp.Header().Set(brc104.HeaderVersion, message.Version)
+	resp.Header().Set(brc104.HeaderMessageType, string(message.MessageType))
+	resp.Header().Set(brc104.HeaderIdentityKey, message.IdentityKey.ToDERHex())
+
+	if message.Nonce != "" {
+		resp.Header().Set(brc104.HeaderNonce, message.Nonce)
+	}
+
+	if message.YourNonce != "" {
+		resp.Header().Set(brc104.HeaderYourNonce, message.YourNonce)
+	}
+
+	if message.Signature != nil {
+		resp.Header().Set(brc104.HeaderSignature, hex.EncodeToString(message.Signature))
+	}
+
+	return nil
 }
 
 // OnData implementation of auth.Transport.
@@ -246,24 +176,6 @@ func (m *Middleware) GetRegisteredOnData() (func(context.Context, *auth.AuthMess
 	}
 
 	return m.onDataCallback, nil
-}
-
-func (m *Middleware) applyDefaultCertificateRequests(message *auth.AuthMessage) {
-	// TODO: check if this is needed
-	var certificatesToRequest utils.RequestedCertificateSet
-
-	if m.shouldApplyDefaultCertificates(message) {
-		message.RequestedCertificates = certificatesToRequest
-	}
-}
-
-func (m *Middleware) shouldApplyDefaultCertificates(message *auth.AuthMessage) bool {
-	// TODO: check if this is needed
-	var certificatesToRequest *utils.RequestedCertificateSet
-
-	return message.MessageType == auth.MessageTypeInitialResponse &&
-		len(message.RequestedCertificates.CertificateTypes) == 0 &&
-		certificatesToRequest != nil
 }
 
 func (m *Middleware) requestHandler(request *http.Request, log *slog.Logger) AuthRequestHandler {
