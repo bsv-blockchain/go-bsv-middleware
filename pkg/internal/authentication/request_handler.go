@@ -39,7 +39,6 @@ func (h *NonGeneralRequestHandler) Handle(ctx context.Context, _ http.ResponseWr
 	}
 
 	log = log.With(slog.Group("authMsg",
-		slog.String("requestID", authMessage.RequestID),
 		slogx.String("type", authMessage.MessageType)),
 		slog.String("identityKey", authMessage.IdentityKey.ToDERHex()),
 		slog.String("nonce", authMessage.InitialNonce),
@@ -47,7 +46,7 @@ func (h *NonGeneralRequestHandler) Handle(ctx context.Context, _ http.ResponseWr
 
 	log.DebugContext(ctx, "auth message extracted from request")
 
-	if err := h.handleMessageWithPeer(ctx, authMessage.AuthMessage); err != nil {
+	if err := h.handleMessageWithPeer(ctx, authMessage); err != nil {
 		return errors.Join(ErrProcessingMessageByPeer, err)
 	}
 
