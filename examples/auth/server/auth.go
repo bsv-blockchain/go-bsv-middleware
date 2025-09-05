@@ -13,7 +13,7 @@ import (
 	"syscall"
 
 	exampleWallet "github.com/bsv-blockchain/go-bsv-middleware/examples/example-wallet"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/auth"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware"
 	primitives "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )
 
@@ -30,14 +30,7 @@ func main() {
 		panic(err)
 	}
 
-	authMiddleware, err := auth.New(auth.Config{
-		AllowUnauthenticated: false,
-		Wallet:               wallet,
-		Logger:               slog.Default(),
-	})
-	if err != nil {
-		panic(err)
-	}
+	authMiddleware := middleware.NewAuth(wallet)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -75,7 +68,7 @@ func main() {
 	server := http.Server{
 		Addr: ":8888",
 		Handler: &AllowAllCORSHandler{
-			Next: authMiddleware.Handler(mux),
+			Next: authMiddleware.HTTPHandler(mux),
 		},
 	}
 
