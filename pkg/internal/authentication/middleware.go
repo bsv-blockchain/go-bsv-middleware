@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/constants"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/httperror"
 	"github.com/bsv-blockchain/go-sdk/auth"
@@ -19,8 +18,12 @@ import (
 	"github.com/bsv-blockchain/go-sdk/auth/utils"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 	"github.com/go-softwarelab/common/pkg/optional"
+	"github.com/go-softwarelab/common/pkg/slogx"
 	"github.com/go-softwarelab/common/pkg/to"
 )
+
+const UnknownParty = "unknown"
+const WellKnownAuthPath = "/.well-known/auth"
 
 type Config struct {
 	AllowUnauthenticated   bool
@@ -50,7 +53,7 @@ func NewMiddleware(next http.Handler, wallet wallet.Interface, opts ...func(*Con
 		OnCertificatesReceived: nil,
 	}, opts...)
 
-	logger := logging.Child(cfg.Logger, "AuthenticationMiddleware")
+	logger := slogx.Child(cfg.Logger, "AuthenticationMiddleware")
 
 	m := &Middleware{
 		wallet:               wallet,
@@ -95,7 +98,7 @@ func (m *Middleware) ServeHTTP(response http.ResponseWriter, request *http.Reque
 
 	err := handler.Handle(ctx, response, request)
 	if err != nil {
-		log.ErrorContext(ctx, "Failed to handle request", logging.Error(err))
+		log.ErrorContext(ctx, "Failed to handle request", slogx.Error(err))
 		httpErr := m.toHTTPError(err)
 		m.errorHandler(ctx, log, httpErr, response, request)
 	}
@@ -103,12 +106,15 @@ func (m *Middleware) ServeHTTP(response http.ResponseWriter, request *http.Reque
 
 // Send implementation of auth.Transport, will be called by middleware peer whenever it wants to send some response.
 func (m *Middleware) Send(ctx context.Context, message *auth.AuthMessage) error {
-	// TODO: add logging
+	log := m.log.With(logging.AuthMessage(message))
+
+	log.DebugContext(ctx, "Preparing response based on auth message")
 
 	if message.IdentityKey == nil {
 		return fmt.Errorf("peer is trying to send message without identity key")
 	}
 
+	log.Handler()
 	resp, err := ShouldGetResponse(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve response writer in transport: %w", err)
@@ -131,6 +137,8 @@ func (m *Middleware) Send(ctx context.Context, message *auth.AuthMessage) error 
 			return fmt.Errorf("missing request ID in general message request")
 		}
 		resp.Header().Set(brc104.HeaderRequestID, requestID)
+
+		log = log.With(logging.RequestID(requestID))
 	default:
 		return fmt.Errorf("message type %s is not supported in auth middleware Send method", message.MessageType)
 	}
@@ -150,6 +158,9 @@ func (m *Middleware) Send(ctx context.Context, message *auth.AuthMessage) error 
 	if message.Signature != nil {
 		resp.Header().Set(brc104.HeaderSignature, hex.EncodeToString(message.Signature))
 	}
+
+	log.DebugContext(ctx, "Sending response")
+	resp.WriteHeader(http.StatusOK)
 
 	return nil
 }
@@ -198,7 +209,7 @@ func (m *Middleware) requestHandler(request *http.Request, log *slog.Logger) Aut
 }
 
 func isNonGeneralRequest(request *http.Request) bool {
-	return request.Method == http.MethodPost && request.URL.Path == constants.WellKnownAuthPath
+	return request.Method == http.MethodPost && request.URL.Path == WellKnownAuthPath
 }
 
 func (m *Middleware) toHTTPError(err error) *httperror.Error {

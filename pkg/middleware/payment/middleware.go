@@ -10,10 +10,10 @@ import (
 	"net/http"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/authentication"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/bsv-blockchain/go-sdk/wallet"
+	"github.com/go-softwarelab/common/pkg/slogx"
 )
 
 // Middleware is the payment middleware handler that implements Direct Payment Protocol (DPP) for HTTP-based micropayments
@@ -33,7 +33,7 @@ func New(opts Options) (*Middleware, error) {
 		opts.CalculateRequestPrice = DefaultPriceFunc
 	}
 
-	logger := logging.Child(nil, "payment-middleware")
+	logger := slogx.Child(nil, "payment-middleware")
 
 	return &Middleware{
 		logger:                logger,

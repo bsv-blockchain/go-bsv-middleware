@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/constants"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/auth/authpayload"
@@ -38,11 +37,7 @@ func (h *NonGeneralRequestHandler) Handle(ctx context.Context, _ http.ResponseWr
 		return errors.Join(ErrInvalidNonGeneralRequest, err)
 	}
 
-	log = log.With(slog.Group("authMsg",
-		slogx.String("type", authMessage.MessageType)),
-		slog.String("identityKey", authMessage.IdentityKey.ToDERHex()),
-		slog.String("nonce", authMessage.InitialNonce),
-	)
+	log = log.With(logging.AuthMessage(authMessage))
 
 	log.DebugContext(ctx, "auth message extracted from request")
 
@@ -78,12 +73,8 @@ func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.Re
 
 	request = request.WithContext(context.WithValue(request.Context(), IdentityKey, authMessage.IdentityKey))
 
-	log = log.With(slog.Group("authMsg",
-		slog.String("requestID", authMessage.RequestID),
-		slogx.String("type", authMessage.MessageType)),
-		slog.String("identityKey", authMessage.IdentityKey.ToDERHex()),
-		slog.String("nonce", authMessage.InitialNonce),
-	)
+	log = log.With(logging.RequestID(authMessage.RequestID), logging.AuthMessage(authMessage.AuthMessage))
+
 	log.DebugContext(ctx, "auth message extracted from request")
 
 	if err := h.handleMessageWithPeer(ctx, authMessage.AuthMessage); err != nil {
@@ -116,7 +107,7 @@ func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.Re
 	h.log.DebugContext(ctx, "writing http response")
 	err = response.Flush()
 	if err != nil {
-		h.log.Error("Failed to write http response", logging.Error(err))
+		h.log.Error("Failed to write http response", slogx.Error(err))
 		// if this failed we can't do anything more about this error.
 		return nil
 	}
@@ -127,7 +118,7 @@ func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.Re
 func (h *GeneralRequestHandler) handleUnauthenticated(ctx context.Context, httpResponse http.ResponseWriter, request *http.Request) error {
 	if h.allowUnauthenticated {
 		h.log.DebugContext(ctx, "Allowing unauthenticated request to pass through")
-		request = request.WithContext(context.WithValue(request.Context(), IdentityKey, constants.UnknownParty))
+		request = request.WithContext(context.WithValue(request.Context(), IdentityKey, UnknownParty))
 		h.nextHandler.ServeHTTP(httpResponse, request)
 		return nil
 	}

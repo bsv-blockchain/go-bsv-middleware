@@ -4,9 +4,9 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/testabilities/testusers"
 	clients "github.com/bsv-blockchain/go-sdk/auth/clients/authhttp"
+	"github.com/go-softwarelab/common/pkg/slogx"
 	"github.com/go-softwarelab/common/pkg/to"
 )
 
@@ -35,7 +35,7 @@ func newClientFixture(t testing.TB, opts ...func(*ClientFixtureOptions)) ClientF
 	}
 
 	options := to.OptionsWithDefault(ClientFixtureOptions{
-		logger: logging.NewTestLogger(f),
+		logger: slogx.NewTestLogger(f),
 	}, opts...)
 
 	f.logger = options.logger

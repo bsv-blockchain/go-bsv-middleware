@@ -9,10 +9,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 	clients "github.com/bsv-blockchain/go-sdk/auth/clients/authhttp"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 	"github.com/go-softwarelab/common/pkg/must"
+	"github.com/go-softwarelab/common/pkg/slogx"
 	"github.com/go-softwarelab/common/pkg/to"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -72,7 +72,7 @@ func NewAuthFetch[PrivKeySource wallet.PrivateKeySource](privKeySource PrivKeySo
 
 	fetchClient := NewAuthFetchClient(conn)
 
-	logger := logging.Child(options.logger, "AuthFetchClient")
+	logger := slogx.Child(options.logger, "AuthFetchClient")
 
 	cleanup = func() {
 		if _, err := fetchClient.CleanUp(context.Background(), &CleanUpRequest{ClientId: id}); err != nil {
