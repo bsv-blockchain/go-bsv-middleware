@@ -7,17 +7,17 @@ import (
 	"mime"
 	"net/http"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/httperror"
+	"github.com/go-softwarelab/common/pkg/slogx"
 )
 
 func DefaultErrorHandler(ctx context.Context, log *slog.Logger, httpErr *httperror.Error, res http.ResponseWriter, req *http.Request) {
-	log = logging.Child(log, "DefaultErrorHandler")
+	log = slogx.Child(log, "DefaultErrorHandler")
 
 	acceptType := req.Header.Get("Accept")
 	mediaType, _, err := mime.ParseMediaType(acceptType)
 	if err != nil {
-		log.WarnContext(ctx, "Failed to parse Accept header value", logging.Error(err))
+		log.WarnContext(ctx, "Failed to parse Accept header value", slogx.Error(err))
 	}
 
 	var body string
@@ -34,6 +34,6 @@ func DefaultErrorHandler(ctx context.Context, log *slog.Logger, httpErr *httperr
 	res.WriteHeader(httpErr.StatusCode)
 	_, err = res.Write([]byte(body))
 	if err != nil {
-		log.ErrorContext(ctx, "Failed to write error body", logging.Error(err), slog.String("body", body))
+		log.ErrorContext(ctx, "Failed to write error body", slogx.Error(err), slog.String("body", body))
 	}
 }

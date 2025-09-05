@@ -4,9 +4,9 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 	"github.com/bsv-blockchain/go-sdk/wallet/testcertificates"
+	"github.com/go-softwarelab/common/pkg/slogx"
 	"github.com/go-softwarelab/common/pkg/to"
 )
 
@@ -39,7 +39,7 @@ func NewAlice(t testing.TB, opts ...func(*UserWithWalletOptions)) *UserWithWalle
 
 func newUserWithWallet(t testing.TB, user User, opts ...func(*UserWithWalletOptions)) *UserWithWallet {
 	options := to.OptionsWithDefault(UserWithWalletOptions{
-		logger: logging.NewTestLogger(t),
+		logger: slogx.NewTestLogger(t),
 	}, opts...)
 
 	logger := options.logger.With("actor", user.Name)

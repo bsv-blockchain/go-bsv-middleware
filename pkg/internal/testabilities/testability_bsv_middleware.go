@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
+	"github.com/go-softwarelab/common/pkg/slogx"
 	"github.com/go-softwarelab/common/pkg/to"
 	"github.com/stretchr/testify/require"
 )
@@ -31,7 +31,7 @@ func Given(t testing.TB, opts ...func(*Options)) BSVMiddlewareTestsFixture {
 	}
 
 	options := to.OptionsWithDefault(Options{
-		logger: logging.NewTestLogger(f),
+		logger: slogx.NewTestLogger(f),
 	}, opts...)
 
 	f.logger = options.logger
