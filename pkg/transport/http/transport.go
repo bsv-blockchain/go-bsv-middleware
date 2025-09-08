@@ -76,7 +76,7 @@ func (r *ResponseRecorder) Write(b []byte) (int, error) {
 
 // Flush writes the response header and body from the ResponseRecorder to the underlying http.ResponseWriter.
 func (r *ResponseRecorder) Flush() error {
-	if r.statusCode < 100 {
+	if r.statusCode == 0 {
 		return fmt.Errorf("response status code is not set")
 	}
 	r.ResponseWriter.WriteHeader(r.statusCode)

@@ -20,12 +20,6 @@ func WithClientLogger(logger *slog.Logger) func(options *ClientFixtureOptions) {
 	}
 }
 
-func WithoutLoggingFromClient() func(*ClientFixtureOptions) {
-	return func(options *ClientFixtureOptions) {
-		options.logger = slog.New(slog.DiscardHandler)
-	}
-}
-
 type ClientFixture interface {
 	ForUser(*testusers.UserWithWallet) (client *clients.AuthFetch, cleanup func())
 }

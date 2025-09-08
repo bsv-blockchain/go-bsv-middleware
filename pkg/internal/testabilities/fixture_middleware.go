@@ -22,12 +22,6 @@ func WithMiddlewareLogger(logger *slog.Logger) func(options *MiddlewareFixtureOp
 	}
 }
 
-func WithoutLoggingFromMiddleware() func(*MiddlewareFixtureOptions) {
-	return func(options *MiddlewareFixtureOptions) {
-		options.logger = slog.New(slog.DiscardHandler)
-	}
-}
-
 type MiddlewareFixture interface {
 	NewAuth() *auth.Middleware
 }
