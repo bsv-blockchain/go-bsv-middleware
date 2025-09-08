@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/authctx"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/httperror"
 	"github.com/bsv-blockchain/go-sdk/auth"
@@ -21,7 +22,6 @@ import (
 	"github.com/go-softwarelab/common/pkg/to"
 )
 
-const UnknownParty = "unknown"
 const WellKnownAuthPath = "/.well-known/auth"
 
 type Config struct {
@@ -88,8 +88,8 @@ func NewMiddleware(next http.Handler, wallet wallet.Interface, opts ...func(*Con
 
 func (m *Middleware) ServeHTTP(response http.ResponseWriter, request *http.Request) {
 	ctx := request.Context()
-	ctx = WithRequest(ctx, request)
-	ctx = WithResponse(ctx, response)
+	ctx = authctx.WithRequest(ctx, request)
+	ctx = authctx.WithResponse(ctx, response)
 	request = request.WithContext(ctx)
 
 	log := m.log.With(slog.String("path", request.URL.Path), slog.String("method", request.Method))
@@ -114,7 +114,7 @@ func (m *Middleware) Send(ctx context.Context, message *auth.AuthMessage) error 
 		return fmt.Errorf("peer is trying to send message without identity key")
 	}
 
-	resp, err := ShouldGetResponse(ctx)
+	resp, err := authctx.ShouldGetResponse(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve response writer in transport: %w", err)
 	}
@@ -131,7 +131,7 @@ func (m *Middleware) Send(ctx context.Context, message *auth.AuthMessage) error 
 		}
 
 	case auth.MessageTypeGeneral:
-		req, err := ShouldGetRequest(ctx)
+		req, err := authctx.ShouldGetRequest(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve request in transport: %w", err)
 		}

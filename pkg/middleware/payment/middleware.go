@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/authentication"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/authctx"
 	sdkUtils "github.com/bsv-blockchain/go-sdk/auth/utils"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/bsv-blockchain/go-sdk/wallet"
@@ -44,8 +44,8 @@ func New(opts Options) (*Middleware, error) {
 // Handler returns a middleware handler function that processes payments
 func (m *Middleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		identityKey, ok := authentication.GetIdentityFromContext(r.Context())
-		if !ok {
+		identityKey, err := authctx.ShouldGetIdentity(r.Context())
+		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, ErrCodeServerMisconfigured,
 				ErrAuthMiddlewareMissing.Error())
 			return
@@ -135,7 +135,7 @@ func processPayment(
 	ctx context.Context,
 	walletInstance wallet.Interface,
 	paymentData *Payment,
-	identityKeyHex string,
+	identityKey *ec.PublicKey,
 	price int,
 ) (*PaymentInfo, error) {
 	valid, err := sdkUtils.VerifyNonce(ctx, paymentData.DerivationPrefix, walletInstance, wallet.Counterparty{Type: wallet.CounterpartyTypeSelf})
@@ -157,11 +157,6 @@ func processPayment(
 		return nil, fmt.Errorf("invalid derivation suffix: must be base64: %w", err)
 	}
 
-	identityKey, err := ec.PublicKeyFromString(identityKeyHex)
-	if err != nil {
-		return nil, fmt.Errorf("invalid identity key hex: %w", err)
-	}
-
 	result, err := walletInstance.InternalizeAction(ctx, wallet.InternalizeActionArgs{
 		Tx: paymentData.Transaction,
 		Outputs: []wallet.InternalizeOutput{
@@ -177,7 +172,7 @@ func processPayment(
 		},
 		Description: "Payment for request",
 	},
-		identityKeyHex,
+		"",
 	)
 
 	if err != nil {

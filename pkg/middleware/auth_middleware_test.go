@@ -8,8 +8,10 @@ import (
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/testabilities"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/testabilities/testusers"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware"
 	clients "github.com/bsv-blockchain/go-sdk/auth/clients/authhttp"
 	"github.com/go-softwarelab/common/pkg/to"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -153,6 +155,9 @@ func TestAuthMiddlewareAndAuthFetchIntegration(t *testing.T) {
 			given, then := testabilities.New(t)
 
 			// and:
+			alice := testusers.NewAlice(t)
+
+			// and:
 			authMiddleware := given.Middleware().NewAuth()
 
 			// and:
@@ -163,18 +168,14 @@ func TestAuthMiddlewareAndAuthFetchIntegration(t *testing.T) {
 						HasPath(test.path).
 						HasQueryMatching(url.PathEscape(test.query)).
 						HasHeadersContaining(test.headers).
-						HasBody(test.body)
-
-					// TODO check identity key
+						HasBody(test.body).
+						HasIdentityOfUser(alice)
 
 					_, err := w.Write([]byte("Pong!"))
 					require.NoError(t, err)
 				}).
 				Started()
 			defer cleanup()
-
-			// and:
-			alice := testusers.NewAlice(t)
 
 			// and:
 			httpClient, cleanup := given.Client().ForUser(alice)
@@ -215,8 +216,7 @@ func TestAuthMiddlewareHandleSubsequentRequests(t *testing.T) {
 		// and:
 		cleanup := given.Server().WithMiddleware(authMiddleware).
 			WithRoute("/", func(w http.ResponseWriter, r *http.Request) {
-				_, err := w.Write([]byte("Pong!"))
-				require.NoError(t, err)
+				w.WriteHeader(204)
 			}).
 			Started()
 		defer cleanup()
@@ -234,7 +234,7 @@ func TestAuthMiddlewareHandleSubsequentRequests(t *testing.T) {
 		// then:
 		require.NoError(t, err, "first request should succeed")
 		require.NotNil(t, response, "first response should not be nil")
-		require.Equal(t, 200, response.StatusCode, "first response status code should be 200")
+		require.Equal(t, 204, response.StatusCode, "first response status code should be 200")
 
 		// when:
 		response, err = httpClient.Fetch(t.Context(), given.Server().URL().String(), &clients.SimplifiedFetchRequestOptions{})
@@ -242,7 +242,7 @@ func TestAuthMiddlewareHandleSubsequentRequests(t *testing.T) {
 		// then:
 		require.NoError(t, err, "second request should succeed")
 		require.NotNil(t, response, "second response should not be nil")
-		require.Equal(t, 200, response.StatusCode, "second response status code should be 200")
+		require.Equal(t, 204, response.StatusCode, "second response status code should be 200")
 	})
 
 	t.Run("multiple requests with different clients for the same user", func(t *testing.T) {
@@ -255,8 +255,7 @@ func TestAuthMiddlewareHandleSubsequentRequests(t *testing.T) {
 		// and:
 		cleanup := given.Server().WithMiddleware(authMiddleware).
 			WithRoute("/", func(w http.ResponseWriter, r *http.Request) {
-				_, err := w.Write([]byte("Pong!"))
-				require.NoError(t, err)
+				w.WriteHeader(204)
 			}).
 			Started()
 		defer cleanup()
@@ -274,7 +273,7 @@ func TestAuthMiddlewareHandleSubsequentRequests(t *testing.T) {
 		// then:
 		require.NoError(t, err, "first request should succeed")
 		require.NotNil(t, response, "first response should not be nil")
-		require.Equal(t, 200, response.StatusCode, "first response status code should be 200")
+		require.Equal(t, 204, response.StatusCode, "first response status code should be 200")
 
 		// when:
 		newHttpClient, newClientCleanup := given.Client().ForUser(alice)
@@ -286,7 +285,70 @@ func TestAuthMiddlewareHandleSubsequentRequests(t *testing.T) {
 		// then:
 		require.NoError(t, err, "second request should succeed")
 		require.NotNil(t, response, "second response should not be nil")
-		require.Equal(t, 200, response.StatusCode, "second response status code should be 200")
+		require.Equal(t, 204, response.StatusCode, "second response status code should be 200")
 	})
 
+}
+
+func TestHandlingUnauthenticatedRequests(t *testing.T) {
+	t.Run("return error for unauthenticated requests when they are not allowed", func(t *testing.T) {
+		// given:
+		given, then := testabilities.New(t)
+
+		// and:
+		authMiddleware := given.Middleware().NewAuth(middleware.WithAuthDisallowUnauthenticated())
+
+		// and:
+		cleanup := given.Server().WithMiddleware(authMiddleware).
+			WithRoute("/", func(w http.ResponseWriter, r *http.Request) {
+				require.Fail(t, "handler shouldn't be called when unauthenticated access is disallowed")
+			}).
+			Started()
+		defer cleanup()
+
+		// and:
+		unauthenticatedClient := &http.Client{}
+
+		// when:
+		response, err := unauthenticatedClient.Get(given.Server().URL().String())
+
+		// then:
+		assert.NoError(t, err)
+
+		// and:
+		then.Response(response).HasStatus(401)
+	})
+
+	t.Run("pass the unauthenticated requests when they are allowed", func(t *testing.T) {
+		// given:
+		given, then := testabilities.New(t)
+
+		// and:
+		authMiddleware := given.Middleware().NewAuth(middleware.WithAuthAllowUnauthenticated())
+
+		// and:
+		cleanup := given.Server().WithMiddleware(authMiddleware).
+			WithRoute("/", func(w http.ResponseWriter, r *http.Request) {
+				identity, err := middleware.ShouldGetIdentity(r.Context())
+				assert.NoError(t, err, "should be able to get identity from request context")
+
+				assert.True(t, middleware.IsUnknownIdentity(identity), "unexpected authenticated identity in unauthenticated request")
+
+				w.WriteHeader(204)
+			}).
+			Started()
+		defer cleanup()
+
+		// and:
+		unauthenticatedClient := &http.Client{}
+
+		// when:
+		response, err := unauthenticatedClient.Get(given.Server().URL().String())
+
+		// then:
+		assert.NoError(t, err)
+
+		// and:
+		then.Response(response).HasStatus(204)
+	})
 }

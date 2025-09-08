@@ -22,7 +22,7 @@ func WithMiddlewareLogger(logger *slog.Logger) func(options *MiddlewareFixtureOp
 }
 
 type MiddlewareFixture interface {
-	NewAuth() *middleware.AuthMiddlewareFactory
+	NewAuth(opts ...func(*middleware.AuthMiddlewareConfig)) *middleware.AuthMiddlewareFactory
 }
 
 type middlewareFixture struct {
@@ -46,6 +46,7 @@ func NewMiddlewareFixture(t testing.TB, opts ...func(*MiddlewareFixtureOptions))
 	return f
 }
 
-func (f *middlewareFixture) NewAuth() *middleware.AuthMiddlewareFactory {
-	return middleware.NewAuth(f.wallet, middleware.WithAuthLogger(f.logger))
+func (f *middlewareFixture) NewAuth(opts ...func(*middleware.AuthMiddlewareConfig)) *middleware.AuthMiddlewareFactory {
+	opts = append(opts, middleware.WithAuthLogger(f.logger))
+	return middleware.NewAuth(f.wallet, opts...)
 }
