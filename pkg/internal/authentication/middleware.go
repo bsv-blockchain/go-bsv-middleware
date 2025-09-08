@@ -120,11 +120,13 @@ func (m *Middleware) Send(ctx context.Context, message *auth.AuthMessage) error 
 		return fmt.Errorf("failed to retrieve response writer in transport: %w", err)
 	}
 
+	var body []byte
 	//nolint:exhaustive // intentionally all the rest types are handled by default case
 	switch message.MessageType {
 	case auth.MessageTypeInitialResponse, auth.MessageTypeCertificateResponse:
 		resp.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(resp).Encode(message); err != nil {
+		body, err = json.Marshal(message)
+		if err != nil {
 			return fmt.Errorf("failed to encode message to JSON: %w", err)
 		}
 	case auth.MessageTypeGeneral:
@@ -161,6 +163,12 @@ func (m *Middleware) Send(ctx context.Context, message *auth.AuthMessage) error 
 
 	log.DebugContext(ctx, "Sending response")
 	resp.WriteHeader(http.StatusOK)
+	_, err = resp.Write(body)
+	if err != nil {
+		log.ErrorContext(ctx, "Failed to write response body", slogx.Error(err), slog.String("body", string(body)))
+		// if we cannot write the response body, then we can't do anything more about the error, beside logging it.
+		return nil
+	}
 
 	return nil
 }

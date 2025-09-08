@@ -83,7 +83,12 @@ func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.Re
 	h.log.DebugContext(ctx, "message successfully processed with peer")
 
 	h.log.DebugContext(ctx, "passing request to next handler")
+
 	response := WrapResponseWriter(httpResponse)
+
+	ctx = WithResponse(ctx, response)
+	request = request.WithContext(ctx)
+
 	h.nextHandler.ServeHTTP(response, request)
 
 	h.log.DebugContext(ctx, "preparing payload from response for signing")
