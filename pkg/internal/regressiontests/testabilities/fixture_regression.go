@@ -2,27 +2,19 @@ package testabilities
 
 import (
 	"testing"
+
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/testabilities"
 )
+
+type ServerFixture = testabilities.ServerFixture
+type MiddlewareFixture = testabilities.MiddlewareFixture
 
 type RegressionTestFixture interface {
 	Server() ServerFixture
 	Middleware() MiddlewareFixture
 }
 
-type regressionTestFixture struct {
-	testing.TB
-}
-
 func Given(t testing.TB) RegressionTestFixture {
-	return &regressionTestFixture{
-		TB: t,
-	}
-}
-
-func (f *regressionTestFixture) Server() ServerFixture {
-	return newServerFixture(f)
-}
-
-func (f *regressionTestFixture) Middleware() MiddlewareFixture {
-	return newMiddlewareFixture(f)
+	f := testabilities.Given(t)
+	return f
 }

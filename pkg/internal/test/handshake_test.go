@@ -1,4 +1,4 @@
-package integrationtests
+package test
 
 import (
 	"errors"
