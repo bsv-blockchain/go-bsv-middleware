@@ -36,19 +36,6 @@ func WithPort(port int) func(*AuthFetchClientOptions) {
 	}
 }
 
-func WithTarget(target string) func(*AuthFetchClientOptions) {
-	return func(options *AuthFetchClientOptions) {
-		if target == "" {
-			return
-		}
-		parts := strings.SplitN(target, ":", 2)
-		options.host = parts[0]
-		if len(parts) == 2 {
-			options.port = parts[1]
-		}
-	}
-}
-
 func WithLogger(logger *slog.Logger) func(*AuthFetchClientOptions) {
 	return func(options *AuthFetchClientOptions) {
 		options.logger = logger
@@ -87,20 +74,22 @@ func NewAuthFetch[PrivKeySource wallet.PrivateKeySource](privKeySource PrivKeySo
 
 	logger := logging.Child(options.logger, "AuthFetchClient")
 
-	return &AuthFetch{
-			id:         id,
-			privKeyHex: privKeyHex,
-			client:     fetchClient,
-			logger:     logger,
-		}, func() {
-			if _, err := fetchClient.CleanUp(context.Background(), &CleanUpRequest{ClientId: id}); err != nil {
-				logger.Error("Failed to clean up the client on gRPC server")
-			}
-
-			if err := conn.Close(); err != nil {
-				logger.Error("Failed to close the gRPC connection")
-			}
+	cleanup = func() {
+		if _, err := fetchClient.CleanUp(context.Background(), &CleanUpRequest{ClientId: id}); err != nil {
+			logger.Error("Failed to clean up the client on gRPC server")
 		}
+
+		if err := conn.Close(); err != nil {
+			logger.Error("Failed to close the gRPC connection")
+		}
+	}
+
+	return &AuthFetch{
+		id:         id,
+		privKeyHex: privKeyHex,
+		client:     fetchClient,
+		logger:     logger,
+	}, cleanup
 }
 
 // Fetch forwards the call to the underlying generated client.
@@ -121,7 +110,7 @@ func (a *AuthFetch) Fetch(ctx context.Context, url string, config *clients.Simpl
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("gRPC call failed: %w", err)
+		return nil, fmt.Errorf("AuthFetchClient.Fetch() failed on gRPC call:\n\t %w", err)
 	}
 
 	result := &http.Response{

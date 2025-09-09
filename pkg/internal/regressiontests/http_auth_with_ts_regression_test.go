@@ -16,8 +16,8 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 	t.Parallel()
 	givenBeforeAll := testabilities.Given(t)
 
-	_ = givenBeforeAll.TypescriptGrpcServerStarted()
-	// defer grpcCleanup()
+	grpcCleanup := givenBeforeAll.TypescriptGrpcServerStarted()
+	defer grpcCleanup()
 
 	testCases := map[string]struct {
 		path    string

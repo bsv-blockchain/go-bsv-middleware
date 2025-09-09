@@ -55,16 +55,12 @@ export class AuthFetchAdapter {
             } as FetchResponse;
         } catch (error) {
             this.show.that('Error on making fetch', 'REQUEST:', {url, ...config}, 'ERROR:', error);
-            if (typeof error === 'object') {
-                // translate error message in case of connection refused to more detailed one
-                if (error && 'cause' in error && typeof error.cause === 'object' && error.cause && 'code' in error.cause && error.cause.code === 'ECONNREFUSED') {
-                    if ('errors' in error.cause && Array.isArray(error.cause.errors) && error.cause.errors.length > 0) {
-                        try {
-                            error = new Error(error.cause.errors.map(err => err.message).join(" & "))
-                        } catch (err) {
-                            this.show.that('error when trying to provide more detailed error', err)
-                        }
-                    }
+            // translate error message in case of connection refused to more detailed one
+            if (isConnectionRefusedError(error)) {
+                try {
+                    error = new Error(error.cause.errors.map(err => err.message).join(" & "))
+                } catch (err) {
+                    this.show.that('error when trying to provide more detailed error', err)
                 }
             }
 
@@ -74,18 +70,36 @@ export class AuthFetchAdapter {
 
     private extractUrl(req: AuthFetchRequest) {
         let {url} = req;
-        if (!!process.env.FETCH_LOCALHOST_REPLACEMENT) {
-            const parsedUrl = URL.parse(url)
-            if (!parsedUrl) {
-                return url
-            }
-            if (parsedUrl?.hostname === 'localhost' || parsedUrl?.hostname === '127.0.0.1') {
-                parsedUrl.hostname = process.env.FETCH_LOCALHOST_REPLACEMENT
-                url = parsedUrl.toString()
-                this.show.that('Calling from docker', `original url: ${req.url}`, `rewritten url: ${url}`)
-            }
 
+        if (!process.env.FETCH_LOCALHOST_REPLACEMENT) {
+            return url;
         }
-        return url;
+
+        const parsedUrl = URL.parse(url)
+        if (!parsedUrl) {
+            return url
+        }
+        if (parsedUrl?.hostname === 'localhost' || parsedUrl?.hostname === '127.0.0.1') {
+            parsedUrl.hostname = process.env.FETCH_LOCALHOST_REPLACEMENT
+            url = parsedUrl.toString()
+            this.show.that('Calling from docker', `original url: ${req.url}`, `rewritten url: ${url}`)
+        }
+        return url
     }
+}
+
+interface ConnectionRefusedError {
+    cause: {
+        code: "ECONNREFUSED",
+        errors: Array<{ message: string }>
+    }
+}
+
+
+function isConnectionRefusedError(error: unknown): error is ConnectionRefusedError {
+    return !!error && typeof error == 'object' &&
+        'cause' in error && typeof error.cause === 'object' && !!error.cause &&
+        'code' in error.cause && error.cause.code === 'ECONNREFUSED' &&
+        'errors' in error.cause && Array.isArray(error.cause.errors) &&
+        error.cause.errors.length > 0
 }

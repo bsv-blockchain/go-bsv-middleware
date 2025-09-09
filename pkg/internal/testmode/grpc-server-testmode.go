@@ -5,8 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/go-softwarelab/common/pkg/is"
-	"github.com/go-softwarelab/common/pkg/seq"
 	"github.com/go-softwarelab/common/pkg/to"
 )
 
@@ -24,10 +22,6 @@ const (
 
 type Mode interface {
 	ModeName() string
-}
-
-type modeReader interface {
-	read() Mode
 }
 
 type GrpcMode interface {
@@ -192,23 +186,15 @@ func (m DockerGrpcMode) read() Mode {
 
 // GetGrpcServerMode returns the test grpc server mode
 func GetGrpcServerMode() Mode {
-	modeReaders := seq.Of[modeReader](LocalGrpcMode{}, DockerGrpcMode{})
-
-	modes := seq.Map(modeReaders, func(mode modeReader) Mode {
-		return mode.read()
-	})
-
-	foundMode := seq.Find(modes, notNil)
-
-	mode, err := foundMode.OrErrorGet(func() error {
-		return fmt.Errorf("failed to determine grpc server mode based on env %s: %s", grpcModeEnvVar, os.Getenv(grpcModeEnvVar))
-	})
-	if err != nil {
-		panic(err)
+	mode := LocalGrpcMode{}.read()
+	if mode != nil {
+		return mode
 	}
-	return mode
-}
 
-func notNil[T any](t T) bool {
-	return is.NotNil(t)
+	mode = DockerGrpcMode{}.read()
+	if mode != nil {
+		return mode
+	}
+
+	panic(fmt.Errorf("failed to determine grpc server mode based on env %s: %s", grpcModeEnvVar, os.Getenv(grpcModeEnvVar)))
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/regressiontests/internal/typescript"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/testabilities/testusers"
 	"github.com/bsv-blockchain/go-sdk/wallet"
+	"github.com/go-softwarelab/common/pkg/slogx"
 )
 
 type ClientFixture interface {
@@ -30,5 +31,6 @@ func (f *clientFixture) ForUser(user *testusers.UserWithWallet) (client *typescr
 }
 
 func (f *clientFixture) ForKey(key string) (client *typescript.AuthFetch, cleanup func()) {
-	return typescript.NewAuthFetch(wallet.PrivHex(key), f.opts...)
+	opts := []func(*typescript.AuthFetchClientOptions){typescript.WithLogger(slogx.NewTestLogger(f))}
+	return typescript.NewAuthFetch(wallet.PrivHex(key), append(opts, f.opts...)...)
 }

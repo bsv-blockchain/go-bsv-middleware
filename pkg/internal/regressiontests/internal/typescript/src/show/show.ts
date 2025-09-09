@@ -1,14 +1,3 @@
-import process from 'node:process';
-
-export function createDebugHandler(parsedArgs: any) {
-    const isDebug =
-        process.env.REGRESSION_TEST_DEBUG === 'true' ||
-        parsedArgs.verbose === true ||
-        parsedArgs.v === true;
-
-    return new Show(isDebug);
-}
-
 export class Show {
     constructor(public readonly debug: boolean) {
     }
@@ -32,9 +21,5 @@ export class Show {
             });
             console.log(`-------------------------------------------------------------------`);
         }
-    }
-
-    result(result: any) {
-        console.log(result);
     }
 }

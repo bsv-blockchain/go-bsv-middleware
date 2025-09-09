@@ -25,10 +25,10 @@ import (
 const serverMinPort int = 55000
 
 // regressionTestServerPorts is a list (range) of ports that we allow regression test go server to listen to.
-// This is important part, because on linux host.docker.internal is not working.
-// But instead testcontainers allows to set a list of host ports that are accessible from docker container.
-// Unfortunately, this list must be provided upfront (when creating docker container).
-// But often, we are creating single docker container with typescript grpc server,
+// This is an important part because on Linux host.docker.internal is not working.
+// But instead, testcontainers allow setting a list of host ports that are accessible from docker container.
+// Unfortunately, this list must be provided upfront (when creating a docker container).
+// But often, we are creating single docker container with TypeScript grpc server,
 // and in each subtest (t.Run), we are creating a new Go test server,
 // and we know the port only after the Go test server is created.
 // So thanks to that list and special way of starting the Go test server,
@@ -38,7 +38,7 @@ const serverMinPort int = 55000
 // (which is the case in regression tests), we won't get port conflict (hopefully).
 //
 // So in case, when there are too many parallel regression tests, just increase the list of ports,
-// although 200 ports seems to me like more than enough.
+// although 200 ports seems more than enough to me.
 var regressionTestServerPorts = seq.Collect(seq.Range(serverMinPort, serverMinPort+200))
 
 type ServerFixture = testabilities.ServerFixture

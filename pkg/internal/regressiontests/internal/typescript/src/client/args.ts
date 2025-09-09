@@ -1,7 +1,7 @@
 // @ts-ignore
 import minimist from 'minimist';
 import process from 'node:process';
-import {createDebugHandler, Show} from '../show/show';
+import {Show} from '../show/show';
 import {Config, Options} from "../gen/auth_fetch";
 import {alicePrivKey} from "../constants/actors_constants";
 import {randomUUID} from "node:crypto";
@@ -25,7 +25,7 @@ export function prepareOptions(): ProgramOptions {
 
     const result: ProgramOptions = {
         help: !!parsedArgs.help || !!parsedArgs.h,
-        show: createDebugHandler(parsedArgs),
+        show: new Show(true),
         url: extractURL(parsedArgs),
         grpcAddress: parsedArgs.addr || process.env.GRPC_ADDR || "localhost:50050",
         config: {
