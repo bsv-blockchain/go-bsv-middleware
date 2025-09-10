@@ -3,7 +3,10 @@ import {AuthFetchClient, type FetchRequest, type FetchResponse} from "../gen/aut
 import {prepareOptions} from "./args";
 import {printHelp} from "./help";
 
-
+// NOTICE: this client is not a part of the regression test mechanism,
+// it is used for development purposes, to check the grpc functionality,
+// It was used to confirm that the server was working correctly, but the Go client has some issue.
+// That's why it stays in the repo.
 async function main() {
     const options = prepareOptions()
 
@@ -11,7 +14,6 @@ async function main() {
         printHelp();
         process.exit(0);
     }
-
 
     const client = new AuthFetchClient(options.grpcAddress, ChannelCredentials.createInsecure());
 
