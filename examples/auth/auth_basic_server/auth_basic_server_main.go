@@ -12,58 +12,24 @@ import (
 	"os/signal"
 	"syscall"
 
-	exampleWallet "github.com/bsv-blockchain/go-bsv-middleware/examples/example-wallet"
+	"github.com/bsv-blockchain/go-bsv-middleware/examples/internal/example_wallet"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware"
-	primitives "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )
 
 const serverWIF = "L1cReZseWmqcYra3vrqj9TPBGHhvDQFD2jYuu1RUj5rrfpVLiKHs"
 
 func main() {
-	key, err := primitives.PrivateKeyFromWif(serverWIF)
-	if err != nil {
-		panic(err)
-	}
+	// The wallet here is tweaked for example purposes.
+	// For a real-world application, you should use
+	// - a wallet implementation from github.com/bsv-blockchain/go-wallet-toolbox package
+	// - a wallet client provided by github.com/bsv-blockchain/go-sdk package
+	// - or any custom wallet implementation you have.
+	serverWallet := example_wallet.New(example_wallet.WIF(serverWIF))
 
-	wallet, err := exampleWallet.NewExtendedProtoWallet(key)
-	if err != nil {
-		panic(err)
-	}
-
-	authMiddleware := middleware.NewAuth(wallet)
+	authMiddleware := middleware.NewAuth(serverWallet)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		bytes, err := io.ReadAll(r.Body)
-		if err != nil {
-			slog.Error("Error reading request body", "error", err)
-		}
-
-		response := map[string]string{
-			"method": r.Method,
-			"path":   r.URL.Path,
-			"query":  r.URL.RawQuery,
-			"body":   string(bytes),
-		}
-
-		for hKey, hValue := range r.Header {
-			response[hKey] = hValue[0]
-		}
-
-		responseBody, err := json.Marshal(response)
-		if err != nil {
-			slog.Error("Error marshaling response body", "error", err)
-			w.WriteHeader(500)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, err = w.Write(responseBody)
-		if err != nil {
-			slog.Error("Error writing response body", "error", err)
-			return
-		}
-	})
+	mux.HandleFunc("/", handlerEchoingRequest())
 
 	server := http.Server{
 		Addr: ":8888",
@@ -103,6 +69,40 @@ func main() {
 	// Graceful shutdown
 	if err := server.Shutdown(context.Background()); err != nil {
 		slog.Error("Error during server shutdown", "error", err)
+	}
+}
+
+func handlerEchoingRequest() func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			slog.Error("Error reading request body", "error", err)
+		}
+
+		response := map[string]string{
+			"method": r.Method,
+			"path":   r.URL.Path,
+			"query":  r.URL.RawQuery,
+			"body":   string(bytes),
+		}
+
+		for hKey, hValue := range r.Header {
+			response[hKey] = hValue[0]
+		}
+
+		responseBody, err := json.Marshal(response)
+		if err != nil {
+			slog.Error("Error marshaling response body", "error", err)
+			w.WriteHeader(500)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, err = w.Write(responseBody)
+		if err != nil {
+			slog.Error("Error writing response body", "error", err)
+			return
+		}
 	}
 }
 
