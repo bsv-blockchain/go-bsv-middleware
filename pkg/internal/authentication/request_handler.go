@@ -32,7 +32,7 @@ func (h *NonGeneralRequestHandler) Handle(ctx context.Context, _ http.ResponseWr
 
 	log.DebugContext(ctx, "handling non-general request")
 
-	authMessage, err := extractNonGeneralAuthMessage(request)
+	authMessage, err := extractNonGeneralAuthMessage(h.log, request)
 	if err != nil {
 		return errors.Join(ErrInvalidNonGeneralRequest, err)
 	}
