@@ -1,0 +1,1 @@
+export const alicePrivKey = '143ab18a84d3b25e1a13cefa90038411e5d2014590a2a4a57263d1593c8dee1c';
