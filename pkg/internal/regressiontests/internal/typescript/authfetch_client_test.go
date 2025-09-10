@@ -14,6 +14,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestAuthFetchClientCallForDevelopmentPurposes this test is used for developing bridge between Go and Typescript
+// For development phase, feel free to comment out t.Skip and run it (or extend)
+// To make it working, you need to:
+// 1. run typescript grpc server - see README.md
+// 2. run some Go server (you can use examples/auth/server/auth.go)
+// 3. run this test
 func TestAuthFetchClientCallForDevelopmentPurposes(t *testing.T) {
 	t.Skip("used for auth fetch client development purposes")
 
