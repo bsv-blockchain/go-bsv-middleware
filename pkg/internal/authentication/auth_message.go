@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/bsv-blockchain/go-sdk/auth"
@@ -13,6 +14,7 @@ import (
 	"github.com/bsv-blockchain/go-sdk/auth/brc104"
 	"github.com/bsv-blockchain/go-sdk/auth/utils"
 	primitives "github.com/bsv-blockchain/go-sdk/primitives/ec"
+	"github.com/go-softwarelab/common/pkg/slogx"
 )
 
 var ErrGeneralMessageInNonGeneralRequest = fmt.Errorf("invalid message type")
@@ -23,10 +25,14 @@ type AuthMessageWithRequestID struct {
 	RequestIDBytes []byte
 }
 
-func extractNonGeneralAuthMessage(req *http.Request) (msg *auth.AuthMessage, err error) {
+func extractNonGeneralAuthMessage(log *slog.Logger, req *http.Request) (msg *auth.AuthMessage, err error) {
 	var message auth.AuthMessage
 	if err = json.NewDecoder(req.Body).Decode(&message); err != nil {
 		return nil, fmt.Errorf("invalid request body: %w", err)
+	}
+	err = req.Body.Close()
+	if err != nil {
+		log.WarnContext(req.Context(), "failed to close request body", slogx.Error(err))
 	}
 
 	if message.IdentityKey == nil {

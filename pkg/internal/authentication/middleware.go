@@ -114,7 +114,6 @@ func (m *Middleware) Send(ctx context.Context, message *auth.AuthMessage) error 
 		return fmt.Errorf("peer is trying to send message without identity key")
 	}
 
-	log.Handler()
 	resp, err := ShouldGetResponse(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve response writer in transport: %w", err)
@@ -125,22 +124,27 @@ func (m *Middleware) Send(ctx context.Context, message *auth.AuthMessage) error 
 	switch message.MessageType {
 	case auth.MessageTypeInitialResponse, auth.MessageTypeCertificateResponse:
 		resp.Header().Set("Content-Type", "application/json")
+
 		body, err = json.Marshal(message)
 		if err != nil {
 			return fmt.Errorf("failed to encode message to JSON: %w", err)
 		}
+
 	case auth.MessageTypeGeneral:
 		req, err := ShouldGetRequest(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve request in transport: %w", err)
 		}
+
 		requestID := req.Header.Get(brc104.HeaderRequestID)
 		if requestID == "" {
 			return fmt.Errorf("missing request ID in general message request")
 		}
+
 		resp.Header().Set(brc104.HeaderRequestID, requestID)
 
 		log = log.With(logging.RequestID(requestID))
+
 	default:
 		return fmt.Errorf("message type %s is not supported in auth middleware Send method", message.MessageType)
 	}
@@ -231,6 +235,7 @@ func (m *Middleware) toHTTPError(err error) *httperror.Error {
 	case errors.Is(err, auth.ErrNotAuthenticated):
 		httpErr.StatusCode = http.StatusUnauthorized
 		httpErr.Message = "Authentication failed"
+
 	case errors.Is(err, auth.ErrMissingCertificate):
 		httpErr.StatusCode = http.StatusBadRequest
 		var certTypes utils.RequestedCertificateTypeIDAndFieldList
@@ -238,30 +243,39 @@ func (m *Middleware) toHTTPError(err error) *httperror.Error {
 			certTypes = m.peer.CertificatesToRequest.CertificateTypes
 		}
 		httpErr.Message = prepareMissingCertificateTypesErrorMsg(certTypes)
+
 	case errors.Is(err, auth.ErrInvalidNonce):
 		httpErr.StatusCode = http.StatusBadRequest
 		httpErr.Message = "Invalid nonce"
+
 	case errors.Is(err, auth.ErrInvalidMessage):
 		httpErr.StatusCode = http.StatusBadRequest
 		httpErr.Message = "Invalid message format"
+
 	case errors.Is(err, auth.ErrSessionNotFound):
 		httpErr.StatusCode = http.StatusUnauthorized
 		httpErr.Message = "Session not found"
+
 	case errors.Is(err, auth.ErrInvalidSignature):
 		httpErr.StatusCode = http.StatusBadRequest
 		httpErr.Message = "Invalid signature"
+
 	case errors.Is(err, ErrAuthenticationRequired):
 		httpErr.StatusCode = http.StatusUnauthorized
 		httpErr.Message = err.Error()
+
 	case errors.Is(err, ErrGeneralMessageInNonGeneralRequest):
 		httpErr.StatusCode = http.StatusBadRequest
 		httpErr.Message = err.Error()
+
 	case errors.Is(err, ErrInvalidNonGeneralRequest):
 		httpErr.StatusCode = http.StatusBadRequest
 		httpErr.Message = err.Error()
+
 	case errors.Is(err, ErrInvalidGeneralRequest):
 		httpErr.StatusCode = http.StatusBadRequest
 		httpErr.Message = err.Error()
+
 	default:
 		httpErr.StatusCode = http.StatusInternalServerError
 		httpErr.Message = "Internal Server Error: " + err.Error()
