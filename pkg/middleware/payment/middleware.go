@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -145,7 +144,7 @@ func processPayment(
 	}
 
 	if !valid {
-		return nil, errors.New("invalid derivation prefix")
+		return nil, fmt.Errorf("invalid derivation prefix")
 	}
 
 	derivationPrefix, err := base64.StdEncoding.DecodeString(paymentData.DerivationPrefix)

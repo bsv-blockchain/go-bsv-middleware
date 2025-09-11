@@ -17,7 +17,6 @@ import (
 	"github.com/bsv-blockchain/go-sdk/auth/brc104"
 	"github.com/bsv-blockchain/go-sdk/auth/utils"
 	"github.com/bsv-blockchain/go-sdk/wallet"
-	"github.com/go-softwarelab/common/pkg/optional"
 	"github.com/go-softwarelab/common/pkg/slogx"
 	"github.com/go-softwarelab/common/pkg/to"
 )
@@ -69,6 +68,7 @@ func NewMiddleware(next http.Handler, wallet wallet.Interface, opts ...func(*Con
 		Transport:             m,
 		SessionManager:        m.sessionManager,
 		CertificatesToRequest: cfg.CertificatesToRequest,
+		Logger:                logger,
 	}
 
 	m.peer = auth.NewPeer(peerCfg)
@@ -87,7 +87,7 @@ func NewMiddleware(next http.Handler, wallet wallet.Interface, opts ...func(*Con
 }
 
 func (m *Middleware) ServeHTTP(response http.ResponseWriter, request *http.Request) {
-	ctx := optional.OfValue(request.Context()).OrElseGet(context.Background)
+	ctx := request.Context()
 	ctx = WithRequest(ctx, request)
 	ctx = WithResponse(ctx, response)
 	request = request.WithContext(ctx)
@@ -178,9 +178,10 @@ func (m *Middleware) Send(ctx context.Context, message *auth.AuthMessage) error 
 }
 
 // OnData implementation of auth.Transport.
+// It is meant to be called by Peer to register a callback on received data by the transport.
 func (m *Middleware) OnData(callback func(ctx context.Context, message *auth.AuthMessage) error) error {
 	if callback == nil {
-		return errors.New("callback cannot be nil")
+		return fmt.Errorf("callback cannot be nil")
 	}
 
 	if m.onDataCallback != nil {
@@ -195,29 +196,26 @@ func (m *Middleware) OnData(callback func(ctx context.Context, message *auth.Aut
 // GetRegisteredOnData implementation of auth.Transport
 func (m *Middleware) GetRegisteredOnData() (func(context.Context, *auth.AuthMessage) error, error) {
 	if m.onDataCallback == nil {
-		return nil, errors.New("no callback registered")
+		return nil, fmt.Errorf("no callback registered")
 	}
 
 	return m.onDataCallback, nil
 }
 
 func (m *Middleware) requestHandler(request *http.Request, log *slog.Logger) AuthRequestHandler {
-	var handler AuthRequestHandler
 	if isNonGeneralRequest(request) {
-		handler = &NonGeneralRequestHandler{
+		return &NonGeneralRequestHandler{
 			log:                   log.With(slog.String("requestType", "non-general")),
 			handleMessageWithPeer: m.onDataCallback,
 		}
-	} else {
-		handler = &GeneralRequestHandler{
-			log:                   log.With(slog.String("requestType", "general")),
-			handleMessageWithPeer: m.onDataCallback,
-			peer:                  m.peer,
-			nextHandler:           m.nextHandler,
-			allowUnauthenticated:  m.allowUnauthenticated,
-		}
 	}
-	return handler
+	return &GeneralRequestHandler{
+		log:                   log.With(slog.String("requestType", "general")),
+		handleMessageWithPeer: m.onDataCallback,
+		peer:                  m.peer,
+		nextHandler:           m.nextHandler,
+		allowUnauthenticated:  m.allowUnauthenticated,
+	}
 }
 
 func isNonGeneralRequest(request *http.Request) bool {

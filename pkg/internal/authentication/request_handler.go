@@ -13,6 +13,8 @@ import (
 	"github.com/go-softwarelab/common/pkg/slogx"
 )
 
+const maxToPeerWaitTime = 30000
+
 var ErrInvalidNonGeneralRequest = fmt.Errorf("bad request")
 var ErrInvalidGeneralRequest = fmt.Errorf("invalid authentication")
 var ErrProcessingMessageByPeer = fmt.Errorf("error while processing message by peer")
@@ -104,7 +106,7 @@ func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.Re
 	}
 
 	h.log.DebugContext(ctx, "sending response to peer")
-	err = h.peer.ToPeer(ctx, responsePayload, authMessage.IdentityKey, 30000)
+	err = h.peer.ToPeer(ctx, responsePayload, authMessage.IdentityKey, maxToPeerWaitTime)
 	if err != nil {
 		return fmt.Errorf("failed to send response to peer: %w", err)
 	}
