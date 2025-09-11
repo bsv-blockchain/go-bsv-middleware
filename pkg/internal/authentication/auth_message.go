@@ -64,18 +64,21 @@ func extractGeneralAuthMessage(req *http.Request) (*AuthMessageWithRequestID, er
 	if identityKey == "" {
 		return nil, fmt.Errorf("missing identity key header")
 	}
+
 	pubKey, err := primitives.PublicKeyFromString(identityKey)
 	if err != nil {
 		return nil, fmt.Errorf("invalid identity key format: %w", err)
 	}
 
 	signature := req.Header.Get(brc104.HeaderSignature)
+
 	sigBytes, err := hex.DecodeString(signature)
 	if err != nil {
 		return nil, fmt.Errorf("invalid signature format: %w", err)
 	}
 
 	nonce := req.Header.Get(brc104.HeaderNonce)
+
 	yourNonce := req.Header.Get(brc104.HeaderYourNonce)
 
 	msgPayload, err := authpayload.FromHTTPRequest(requestIDBytes, req)
@@ -126,11 +129,15 @@ func identityKeyFromHeader(req *http.Request) (*primitives.PublicKey, error) {
 	return pubKey, nil
 }
 
+var ErrInvalidRequestIDFormat = fmt.Errorf("invalid request ID format")
+
 func requestIDFromHeader(req *http.Request) (string, []byte, error) {
 	requestID := req.Header.Get(brc104.HeaderRequestID)
+
 	requestIDBytes, err := base64.StdEncoding.DecodeString(requestID)
 	if err != nil {
-		return "", nil, fmt.Errorf("invalid request ID format: %w", err)
+		return "", nil, errors.Join(ErrInvalidRequestIDFormat, err)
 	}
+
 	return requestID, requestIDBytes, nil
 }
