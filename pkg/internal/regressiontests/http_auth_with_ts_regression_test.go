@@ -1,3 +1,4 @@
+//goland:noinspection DuplicatedCode // intentionally those tests look very similar to regression tests.
 package regressiontests
 
 import (
@@ -61,11 +62,18 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 		"options request": {
 			method: http.MethodOptions,
 		},
+		// FIXME(Issue: #145): uncomment and implement this test when empty response body will be fixed.
+		// "server responding with no content": {
+		// 	serverRespondingWithNoContent: true,
+		// },
 	}
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
 			// given:
 			given, then := testabilities.New(t, testabilities.WithBeforeAll(givenBeforeAll))
+
+			// and:
+			alice := testusers.NewAlice(t)
 
 			// and:
 			authMiddleware := given.Middleware().NewAuth()
@@ -78,18 +86,14 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 						HasPath(test.path).
 						HasQueryMatching(url.PathEscape(test.query)).
 						HasHeadersContaining(test.headers).
-						HasBody(test.body)
-
-					// TODO check identity key
+						HasBody(test.body).
+						HasIdentityOfUser(alice)
 
 					_, err := w.Write([]byte("Pong!"))
 					require.NoError(t, err)
 				}).
 				Started()
 			defer cleanup()
-
-			// and:
-			alice := testusers.NewAlice(t)
 
 			// and:
 			httpClient, cleanup := given.Client().ForUser(alice)
@@ -112,7 +116,7 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 
 			// and:
 			then.Response(response).
-				HasStatus(200).
+				HasStatus(http.StatusOK).
 				HasHeader("x-bsv-auth-identity-key").
 				HasBody("Pong!")
 		})
@@ -137,6 +141,7 @@ func TestAuthMiddlewareAuthenticatesSubsequentTypescriptClientCalls(t *testing.T
 		// and:
 		cleanup := given.Server().WithMiddleware(authMiddleware).
 			WithRoute("/", func(w http.ResponseWriter, r *http.Request) {
+				// FIXME(Issue: #145): unify with integration tests when empty response body will be fixed
 				_, err := w.Write([]byte("Pong!"))
 				require.NoError(t, err)
 			}).
@@ -156,7 +161,7 @@ func TestAuthMiddlewareAuthenticatesSubsequentTypescriptClientCalls(t *testing.T
 		// then:
 		require.NoError(t, err, "first request should succeed")
 		require.NotNil(t, response, "first response should not be nil")
-		require.Equal(t, 200, response.StatusCode, "first response status code should be 200")
+		require.Equal(t, http.StatusOK, response.StatusCode, "first response status code should be 200")
 
 		// when:
 		response, err = httpClient.Fetch(t.Context(), given.Server().URL().String(), &clients.SimplifiedFetchRequestOptions{})
@@ -164,7 +169,7 @@ func TestAuthMiddlewareAuthenticatesSubsequentTypescriptClientCalls(t *testing.T
 		// then:
 		require.NoError(t, err, "second request should succeed")
 		require.NotNil(t, response, "second response should not be nil")
-		require.Equal(t, 200, response.StatusCode, "second response status code should be 200")
+		require.Equal(t, http.StatusOK, response.StatusCode, "second response status code should be 200")
 	})
 
 	t.Run("make multiple requests with different clients for the same user", func(t *testing.T) {
@@ -177,6 +182,7 @@ func TestAuthMiddlewareAuthenticatesSubsequentTypescriptClientCalls(t *testing.T
 		// and:
 		cleanup := given.Server().WithMiddleware(authMiddleware).
 			WithRoute("/", func(w http.ResponseWriter, r *http.Request) {
+				// FIXME(Issue: #145): unify with integration tests when empty response body will be fixed
 				_, err := w.Write([]byte("Pong!"))
 				require.NoError(t, err)
 			}).
@@ -196,7 +202,7 @@ func TestAuthMiddlewareAuthenticatesSubsequentTypescriptClientCalls(t *testing.T
 		// then:
 		require.NoError(t, err, "first request should succeed")
 		require.NotNil(t, response, "first response should not be nil")
-		require.Equal(t, 200, response.StatusCode, "first response status code should be 200")
+		require.Equal(t, http.StatusOK, response.StatusCode, "first response status code should be 200")
 
 		// when:
 		newHttpClient, newClientCleanup := given.Client().ForUser(alice)
@@ -208,6 +214,6 @@ func TestAuthMiddlewareAuthenticatesSubsequentTypescriptClientCalls(t *testing.T
 		// then:
 		require.NoError(t, err, "second request should succeed")
 		require.NotNil(t, response, "second response should not be nil")
-		require.Equal(t, 200, response.StatusCode, "second response status code should be 200")
+		require.Equal(t, http.StatusOK, response.StatusCode, "second response status code should be 200")
 	})
 }

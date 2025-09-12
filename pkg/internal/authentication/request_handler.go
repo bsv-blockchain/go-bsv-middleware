@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/authctx"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/auth/authpayload"
@@ -73,7 +74,7 @@ func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.Re
 		return errors.Join(ErrInvalidGeneralRequest, err)
 	}
 
-	request = request.WithContext(context.WithValue(request.Context(), IdentityKey, authMessage.IdentityKey))
+	ctx = authctx.WithIdentity(ctx, authMessage.IdentityKey)
 
 	log = log.With(logging.RequestID(authMessage.RequestID), logging.AuthMessage(authMessage.AuthMessage))
 
@@ -88,7 +89,7 @@ func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.Re
 
 	response := WrapResponseWriter(httpResponse)
 
-	ctx = WithResponse(ctx, response)
+	ctx = authctx.WithResponse(ctx, response)
 	request = request.WithContext(ctx)
 
 	h.nextHandler.ServeHTTP(response, request)
@@ -124,8 +125,9 @@ func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.Re
 
 func (h *GeneralRequestHandler) handleUnauthenticated(ctx context.Context, httpResponse http.ResponseWriter, request *http.Request) error {
 	if h.allowUnauthenticated {
+		ctx = authctx.WithUnknownIdentity(ctx)
 		h.log.DebugContext(ctx, "Allowing unauthenticated request to pass through")
-		request = request.WithContext(context.WithValue(request.Context(), IdentityKey, UnknownParty))
+		request = request.WithContext(ctx)
 		h.nextHandler.ServeHTTP(httpResponse, request)
 		return nil
 	}

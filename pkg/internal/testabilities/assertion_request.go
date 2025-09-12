@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/testabilities/testusers"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,8 +19,7 @@ type RequestAssertion interface {
 	HasBodyMatching(map[string]string) RequestAssertion
 	HasBody(string) RequestAssertion
 	HasPath(path string) RequestAssertion
-	// TODO
-	// IsAuthenticatedFor(identityKey ???) RequestAssertion
+	HasIdentityOfUser(user *testusers.UserWithWallet) RequestAssertion
 }
 
 type requestAssertion struct {
@@ -92,6 +93,16 @@ func (a *requestAssertion) HasBody(expectedBody string) RequestAssertion {
 		assert.Empty(a, bodyBytes, "request body should be empty")
 	} else {
 		assert.Equal(a, expectedBody, string(bodyBytes), "request body should match")
+	}
+	return a
+}
+
+func (a *requestAssertion) HasIdentityOfUser(user *testusers.UserWithWallet) RequestAssertion {
+	a.Helper()
+
+	identity, err := middleware.ShouldGetAuthenticatedIdentity(a.request.Context())
+	if assert.NoError(a, err, "cannot get authenticated identity from context") {
+		assert.Equalf(a, user.PublicKey(a).ToDERHex(), identity.ToDERHex(), "identity from request should match %s identity", user.Name)
 	}
 	return a
 }
