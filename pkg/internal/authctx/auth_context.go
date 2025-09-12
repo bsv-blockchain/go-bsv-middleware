@@ -10,7 +10,7 @@ import (
 )
 
 var unknownIdentityValue ec.PublicKey
-var UnknownIdentity *ec.PublicKey
+var unknownIdentity *ec.PublicKey
 
 type contextKey string
 
@@ -32,7 +32,7 @@ func WithResponse(ctx context.Context, response http.ResponseWriter) context.Con
 }
 
 func WithUnknownIdentity(ctx context.Context) context.Context {
-	return WithIdentity(ctx, UnknownIdentity)
+	return WithIdentity(ctx, unknownIdentity)
 }
 
 func WithIdentity(ctx context.Context, identity *ec.PublicKey) context.Context {
@@ -81,7 +81,7 @@ func ShouldGetIdentity(ctx context.Context) (*ec.PublicKey, error) {
 	}
 
 	if identity == unknownIdentityValue {
-		return UnknownIdentity, nil
+		return unknownIdentity, nil
 	}
 
 	return &identity, nil

@@ -10,8 +10,6 @@ import (
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )
 
-var ErrUnknownIdentity = errors.New("unknown identity")
-
 // ShouldGetIdentity returns the identity from the context.
 //
 // Returns ErrUnknownIdentity when the auth middleware is set to allow unauthenticated
@@ -28,6 +26,9 @@ func ShouldGetIdentity(ctx context.Context) (*ec.PublicKey, error) {
 
 	return identity, nil
 }
+
+// ErrUnknownIdentity is returned from ShouldGetAuthenticatedIdentity when the identity is unknown.
+var ErrUnknownIdentity = errors.New("unknown identity")
 
 // ShouldGetAuthenticatedIdentity returns the identity from the context.
 //

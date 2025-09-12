@@ -1,4 +1,4 @@
-//goland:noinspection DuplicatedCode // intentionally those tests looks the very similar to regression tests.
+//goland:noinspection DuplicatedCode // intentionally those tests look very similar to regression tests.
 package middleware_test
 
 import (
@@ -198,7 +198,7 @@ func TestAuthMiddlewareAndAuthFetchIntegration(t *testing.T) {
 
 			// and:
 			then.Response(response).
-				HasStatus(200).
+				HasStatus(http.StatusOK).
 				HasHeader("x-bsv-auth-identity-key").
 				HasBody("Pong!")
 		})
@@ -216,7 +216,7 @@ func TestAuthMiddlewareHandleSubsequentRequests(t *testing.T) {
 		// and:
 		cleanup := given.Server().WithMiddleware(authMiddleware).
 			WithRoute("/", func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(204)
+				w.WriteHeader(http.StatusNoContent)
 			}).
 			Started()
 		defer cleanup()
@@ -234,7 +234,7 @@ func TestAuthMiddlewareHandleSubsequentRequests(t *testing.T) {
 		// then:
 		require.NoError(t, err, "first request should succeed")
 		require.NotNil(t, response, "first response should not be nil")
-		require.Equal(t, 204, response.StatusCode, "first response status code should be 200")
+		require.Equal(t, http.StatusNoContent, response.StatusCode, "first response status code should be 200")
 
 		// when:
 		response, err = httpClient.Fetch(t.Context(), given.Server().URL().String(), &clients.SimplifiedFetchRequestOptions{})
@@ -242,7 +242,7 @@ func TestAuthMiddlewareHandleSubsequentRequests(t *testing.T) {
 		// then:
 		require.NoError(t, err, "second request should succeed")
 		require.NotNil(t, response, "second response should not be nil")
-		require.Equal(t, 204, response.StatusCode, "second response status code should be 200")
+		require.Equal(t, http.StatusNoContent, response.StatusCode, "second response status code should be 200")
 	})
 
 	t.Run("multiple requests with different clients for the same user", func(t *testing.T) {
@@ -255,7 +255,7 @@ func TestAuthMiddlewareHandleSubsequentRequests(t *testing.T) {
 		// and:
 		cleanup := given.Server().WithMiddleware(authMiddleware).
 			WithRoute("/", func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(204)
+				w.WriteHeader(http.StatusNoContent)
 			}).
 			Started()
 		defer cleanup()
@@ -273,7 +273,7 @@ func TestAuthMiddlewareHandleSubsequentRequests(t *testing.T) {
 		// then:
 		require.NoError(t, err, "first request should succeed")
 		require.NotNil(t, response, "first response should not be nil")
-		require.Equal(t, 204, response.StatusCode, "first response status code should be 200")
+		require.Equal(t, http.StatusNoContent, response.StatusCode, "first response status code should be 200")
 
 		// when:
 		newHttpClient, newClientCleanup := given.Client().ForUser(alice)
@@ -285,7 +285,7 @@ func TestAuthMiddlewareHandleSubsequentRequests(t *testing.T) {
 		// then:
 		require.NoError(t, err, "second request should succeed")
 		require.NotNil(t, response, "second response should not be nil")
-		require.Equal(t, 204, response.StatusCode, "second response status code should be 200")
+		require.Equal(t, http.StatusNoContent, response.StatusCode, "second response status code should be 200")
 	})
 
 }
@@ -316,7 +316,7 @@ func TestHandlingUnauthenticatedRequests(t *testing.T) {
 		assert.NoError(t, err)
 
 		// and:
-		then.Response(response).HasStatus(401)
+		then.Response(response).HasStatus(http.StatusUnauthorized)
 	})
 
 	t.Run("pass the unauthenticated requests when they are allowed", func(t *testing.T) {
@@ -334,7 +334,7 @@ func TestHandlingUnauthenticatedRequests(t *testing.T) {
 
 				assert.True(t, middleware.IsUnknownIdentity(identity), "unexpected authenticated identity in unauthenticated request")
 
-				w.WriteHeader(204)
+				w.WriteHeader(http.StatusNoContent)
 			}).
 			Started()
 		defer cleanup()
@@ -349,6 +349,6 @@ func TestHandlingUnauthenticatedRequests(t *testing.T) {
 		assert.NoError(t, err)
 
 		// and:
-		then.Response(response).HasStatus(204)
+		then.Response(response).HasStatus(http.StatusNoContent)
 	})
 }
