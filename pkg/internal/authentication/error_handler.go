@@ -17,7 +17,7 @@ func DefaultErrorHandler(ctx context.Context, log *slog.Logger, httpErr *httperr
 	acceptType := req.Header.Get("Accept")
 	mediaType, _, err := mime.ParseMediaType(acceptType)
 	if err != nil {
-		log.WarnContext(ctx, "Failed to parse Accept header value", slogx.Error(err))
+		log.DebugContext(ctx, "Failed to parse Accept header value, will default to json response", slogx.Error(err))
 	}
 
 	var body string

@@ -98,7 +98,6 @@ func (m *Middleware) ServeHTTP(response http.ResponseWriter, request *http.Reque
 
 	err := handler.Handle(ctx, response, request)
 	if err != nil {
-		log.ErrorContext(ctx, "Failed to handle request", slogx.Error(err))
 		httpErr := m.toHTTPError(err)
 		m.errorHandler(ctx, log, httpErr, response, request)
 	}
