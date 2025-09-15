@@ -6,11 +6,11 @@ toolchain go1.24.4
 
 require (
 	github.com/bsv-blockchain/go-sdk v1.2.9
-	github.com/go-softwarelab/common v1.7.2
+	github.com/go-softwarelab/common v1.8.0
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.38.0
 	google.golang.org/grpc v1.75.0
-	google.golang.org/protobuf v1.36.8
+	google.golang.org/protobuf v1.36.9
 )
 
 require (
