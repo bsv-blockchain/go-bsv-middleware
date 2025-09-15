@@ -30,10 +30,15 @@ type NonGeneralRequestHandler struct {
 	handleMessageWithPeer func(context.Context, *auth.AuthMessage) error
 }
 
-func (h *NonGeneralRequestHandler) Handle(ctx context.Context, _ http.ResponseWriter, request *http.Request) error {
+func (h *NonGeneralRequestHandler) Handle(ctx context.Context, _ http.ResponseWriter, request *http.Request) (err error) {
 	log := h.log
 
 	log.DebugContext(ctx, "handling non-general request")
+	defer func() {
+		if err != nil {
+			log.WarnContext(ctx, "Failed to handle non-general request", slogx.Error(err))
+		}
+	}()
 
 	authMessage, err := extractNonGeneralAuthMessage(h.log, request)
 	if err != nil {
@@ -61,10 +66,15 @@ type GeneralRequestHandler struct {
 	allowUnauthenticated  bool
 }
 
-func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.ResponseWriter, request *http.Request) error {
+func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.ResponseWriter, request *http.Request) (err error) {
 	log := h.log
 
-	log.DebugContext(ctx, "handling general request")
+	log.DebugContext(ctx, "Handling general request")
+	defer func() {
+		if err != nil {
+			log.WarnContext(ctx, "Failed to handle request", slogx.Error(err))
+		}
+	}()
 
 	authMessage, err := extractGeneralAuthMessage(request)
 	if err != nil {
@@ -78,14 +88,14 @@ func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.Re
 
 	log = log.With(logging.RequestID(authMessage.RequestID), logging.AuthMessage(authMessage.AuthMessage))
 
-	log.DebugContext(ctx, "auth message extracted from request")
+	log.DebugContext(ctx, "Auth message extracted from request")
 
 	if err := h.handleMessageWithPeer(ctx, authMessage.AuthMessage); err != nil {
 		return errors.Join(ErrProcessingMessageByPeer, err)
 	}
-	h.log.DebugContext(ctx, "message successfully processed with peer")
+	h.log.DebugContext(ctx, "Message successfully processed with peer")
 
-	h.log.DebugContext(ctx, "passing request to next handler")
+	h.log.DebugContext(ctx, "Passing request to next handler")
 
 	response := WrapResponseWriter(httpResponse)
 
@@ -94,7 +104,7 @@ func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.Re
 
 	h.nextHandler.ServeHTTP(response, request)
 
-	h.log.DebugContext(ctx, "preparing payload from response for signing")
+	h.log.DebugContext(ctx, "Preparing payload from response for signing")
 	responsePayload, err := authpayload.FromResponse(
 		authMessage.RequestIDBytes,
 		authpayload.SimplifiedHttpResponse{
@@ -106,13 +116,13 @@ func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.Re
 		return fmt.Errorf("failed to create response payload: %w", err)
 	}
 
-	h.log.DebugContext(ctx, "sending response to peer")
+	h.log.DebugContext(ctx, "Sending response to peer")
 	err = h.peer.ToPeer(ctx, responsePayload, authMessage.IdentityKey, maxToPeerWaitTime)
 	if err != nil {
 		return fmt.Errorf("failed to send response to peer: %w", err)
 	}
 
-	h.log.DebugContext(ctx, "writing http response")
+	h.log.DebugContext(ctx, "Writing http response")
 	err = response.Flush()
 	if err != nil {
 		h.log.Error("Failed to write http response", slogx.Error(err))
@@ -131,6 +141,6 @@ func (h *GeneralRequestHandler) handleUnauthenticated(ctx context.Context, httpR
 		h.nextHandler.ServeHTTP(httpResponse, request)
 		return nil
 	}
-	h.log.WarnContext(ctx, "Rejecting unauthenticated request")
+	h.log.DebugContext(ctx, "Rejecting unauthenticated request")
 	return ErrAuthenticationRequired
 }
