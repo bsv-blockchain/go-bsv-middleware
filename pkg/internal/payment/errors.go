@@ -59,7 +59,7 @@ var (
 	ErrInvalidDerivationPrefix = ErrorResponse{
 		StatusCode:  http.StatusBadRequest,
 		Code:        ErrCodeInvalidPrefix,
-		Description: "The X-BSV-Payment header Derivation Prefix is not valid. Must be the same as the one provided one.",
+		Description: "The X-BSV-Payment header Derivation Prefix is not valid.",
 	}
 	ErrInvalidDerivationSuffix = ErrorResponse{
 		StatusCode:  http.StatusBadRequest,

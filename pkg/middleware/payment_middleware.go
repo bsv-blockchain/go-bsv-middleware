@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	// HeaderPaymentPaid is the name of the header with confirmation of the payed amount.
+	// HeaderPaymentPaid is the name of the header with confirmation of the paid amount.
 	HeaderPaymentPaid = payment.HeaderSatoshisPaid
 )
 
@@ -29,7 +29,7 @@ func WithPaymentLogger(logger *slog.Logger) func(*PaymentMiddlewareConfig) {
 	}
 }
 
-// WithRequestPriceCalculator sets a custom function to calculate the price of a request in satoshis for a payment middleware.
+// WithRequestPriceCalculator sets a custom function to calculate the price of a request in satoshis for payment middleware.
 func WithRequestPriceCalculator(calculator func(r *http.Request) (int, error)) func(*PaymentMiddlewareConfig) {
 	if calculator == nil {
 		panic("calculator must be provided")
