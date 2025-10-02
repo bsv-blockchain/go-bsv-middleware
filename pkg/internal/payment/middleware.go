@@ -110,7 +110,6 @@ func (m *Middleware) respondWith(w http.ResponseWriter, resp Response) {
 	err := json.NewEncoder(w).Encode(resp)
 	if err != nil {
 		m.log.Error("Error writing response body", slog.Any("response", resp), slogx.Error(err))
-		return
 	}
 }
 
