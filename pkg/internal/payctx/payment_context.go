@@ -7,7 +7,7 @@ import (
 )
 
 // Payment holds information about a processed payment stored in the request context
-type Payment struct { //nolint: revive // Ignore that struct starts with package name
+type Payment struct {
 	// SatoshisPaid is the amount paid in satoshis
 	SatoshisPaid int
 	// Accepted indicates whether the payment was accepted
