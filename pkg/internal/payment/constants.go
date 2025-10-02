@@ -5,8 +5,7 @@ const (
 	// PaymentVersion is the version of the DPP protocol implementation
 	PaymentVersion = "1.0"
 
-	// NetworkBSV is the identifier for the Bitcoin SV network
-	NetworkBSV = "bitcoin-sv"
+	PaymentOriginator = "paymentMiddleware"
 )
 
 // HTTP Header constants
@@ -44,9 +43,9 @@ const (
 	// ErrCodeInvalidPrefix indicates an invalid derivation prefix
 	ErrCodeInvalidPrefix = "ERR_INVALID_DERIVATION_PREFIX"
 
+	// ErrCodeInvalidSuffix indicates an invalid derivation suffix
+	ErrCodeInvalidSuffix = "ERR_INVALID_DERIVATION_SUFFIX"
+
 	// ErrCodePaymentFailed indicates a payment processing failure
 	ErrCodePaymentFailed = "ERR_PAYMENT_FAILED"
-
-	// ErrCodePaymentNotFound indicates a payment identifier was not found
-	ErrCodePaymentNotFound = "ERR_PAYMENT_NOT_FOUND"
 )

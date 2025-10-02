@@ -23,6 +23,7 @@ func WithMiddlewareLogger(logger *slog.Logger) func(options *MiddlewareFixtureOp
 
 type MiddlewareFixture interface {
 	NewAuth(opts ...func(*middleware.AuthMiddlewareConfig)) *middleware.AuthMiddlewareFactory
+	NewPayment(opts ...func(*middleware.PaymentMiddlewareConfig)) *middleware.PaymentMiddlewareFactory
 }
 
 type middlewareFixture struct {
@@ -41,6 +42,7 @@ func NewMiddlewareFixture(t testing.TB, opts ...func(*MiddlewareFixtureOptions))
 	}, opts...)
 
 	f.wallet = wallet.NewTestWallet(t, fixture.ServerIdentity.PrivateKey, wallet.WithTestWalletLogger(options.logger))
+	f.wallet.OnInternalizeAction().Return(&wallet.InternalizeActionResult{Accepted: true}, nil)
 	f.logger = options.logger
 
 	return f
@@ -49,4 +51,9 @@ func NewMiddlewareFixture(t testing.TB, opts ...func(*MiddlewareFixtureOptions))
 func (f *middlewareFixture) NewAuth(opts ...func(*middleware.AuthMiddlewareConfig)) *middleware.AuthMiddlewareFactory {
 	opts = append(opts, middleware.WithAuthLogger(f.logger))
 	return middleware.NewAuth(f.wallet, opts...)
+}
+
+func (f *middlewareFixture) NewPayment(opts ...func(*middleware.PaymentMiddlewareConfig)) *middleware.PaymentMiddlewareFactory {
+	opts = append(opts, middleware.WithPaymentLogger(f.logger))
+	return middleware.NewPayment(f.wallet, opts...)
 }
