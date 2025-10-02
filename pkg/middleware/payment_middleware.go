@@ -3,6 +3,7 @@ package middleware
 import (
 	"log/slog"
 	"net/http"
+	"slices"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/payment"
 	"github.com/bsv-blockchain/go-sdk/wallet"
@@ -66,7 +67,7 @@ func (f *PaymentMiddlewareFactory) HTTPHandler(next http.Handler) http.Handler {
 // This method can be useful when we have factory with default configuration for middleware,
 // but we want to customize it for a specific handler (for example use different payment calculator).
 func (f *PaymentMiddlewareFactory) HTTPHandlerWithOptions(next http.Handler, opts ...func(*PaymentMiddlewareConfig)) http.Handler {
-	opts = append(f.options[:], opts...)
+	opts = append(slices.Clone(f.options), opts...)
 
 	if f.wallet == nil {
 		// In case if someone would create a factory just by calling &middleware.PaymentMiddlewareFactory{}
