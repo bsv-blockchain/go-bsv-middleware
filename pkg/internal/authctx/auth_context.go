@@ -9,8 +9,10 @@ import (
 	"github.com/go-softwarelab/common/pkg/to"
 )
 
-var unknownIdentityValue ec.PublicKey
-var unknownIdentity *ec.PublicKey
+var (
+	unknownIdentityValue ec.PublicKey
+	unknownIdentity      *ec.PublicKey
+)
 
 type contextKey string
 

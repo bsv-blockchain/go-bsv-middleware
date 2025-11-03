@@ -7,7 +7,6 @@
 - name: "[task]"
   color: "FBCA04"
   description: "Specific technical actions needed to complete a feature"
-
 - name: "feature"
   color: "0e8a16"
   description: "Any new significant addition"
@@ -44,7 +43,6 @@
 - name: "performance"
   color: "F1F53A"
   description: "Changes related to performance"
-
 - name: "idea"
   color: "cccccc"
   description: "Any idea, suggestion or opinion"

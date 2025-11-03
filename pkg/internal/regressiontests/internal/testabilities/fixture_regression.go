@@ -41,8 +41,10 @@ const serverMinPort int = 55000
 // although 200 ports seems more than enough to me.
 var regressionTestServerPorts = seq.Collect(seq.Range(serverMinPort, serverMinPort+200))
 
-type ServerFixture = testabilities.ServerFixture
-type MiddlewareFixture = testabilities.MiddlewareFixture
+type (
+	ServerFixture     = testabilities.ServerFixture
+	MiddlewareFixture = testabilities.MiddlewareFixture
+)
 
 type creationOptions struct {
 	parentGiven *regressionTestFixture

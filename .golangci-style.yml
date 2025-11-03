@@ -1,15 +1,12 @@
 # Indicates that this is a v2 config (required for v2-compatible versions)
 version: "2"
-
 # options for analysis running
 run:
   # Same as in v1: exit code 1 if issues are found
   issues-exit-code: 1
-
   # Analyze *_test.go files
   tests: true
-
-    # by default isn't set. If set we pass it to "go list -mod={option}". From "go help modules":
+  # by default isn't set. If set we pass it to "go list -mod={option}". From "go help modules":
   # If invoked with -mod=readonly, the go command is disallowed from the implicit
   # automatic updating of go.mod described above. Instead, it fails when any changes
   # to go.mod are needed. This setting is most useful to check that go.mod does
@@ -23,7 +20,6 @@ run:
   # If false (default) - golangci-lint acquires file lock on start.
   # Prevent multiple instances from running simultaneously
   allow-parallel-runners: false
-
 # output configuration options
 output:
   # formats is now a mapping by format type (e.g., "text") — not a list
@@ -31,24 +27,18 @@ output:
   formats:
     text:
       path: stdout
-
       # print lines of code with issue, default is true
       print-linter-name: true
-
       # print linter name in the end of issue text, default is true
       print-issued-lines: true
-
   # add a prefix to the output file references; default is no prefix
   path-prefix: ""
-
 linters:
   # "disable-all: true" → replaced with "default: none"
   default: none
-
   # Enabled linters — migrated as-is
   enable:
     - misspell
-
   # Linter-specific settings moved under `settings`
   # https://golangci-lint.run/usage/linters/#enabled-by-default
   settings:
@@ -58,7 +48,6 @@ linters:
         - bsv
         - bitcoin
         - serialise
-
   # Merged `exclude-files` + `exclude-dirs` under one exclusions block
   exclusions:
     generated: lax
@@ -71,7 +60,6 @@ linters:
       - third_party$
       - builtin$
       - examples$
-
 issues:
   # Maximum issues count per one linter. Set to 0 to disable. Default is 50.
   max-issues-per-linter: 0
@@ -79,7 +67,6 @@ issues:
   max-same-issues: 0
   # Show only new issues created after git revision `REV`
   new-from-rev: ""
-
 severity:
   # CHANGED in v2:
   # "default-severity" becomes just "default"
@@ -92,25 +79,21 @@ severity:
   # -   Checkstyle: https://checkstyle.sourceforge.io/property_types.html#severity
   # -       Github: https://help.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-error-message
   default: error
-
   # Migrated rule to mark `dupl` linter output as "info"
   rules:
     - linters:
         - dupl
       severity: info
-
 formatters:
   # `gci` was previously a linter, now can also be applied as a formatter
   enable:
     - gci
-
   settings:
     gci:
       sections:
         - standard
         - default
         - prefix(bitcoin-sv/spv-wallet)
-
   # Mapped from old `issues.exclude-files` and `exclude-dirs`
   exclusions:
     generated: lax

@@ -7,8 +7,10 @@ import (
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/testabilities"
 )
 
-type RequestAssertion = testabilities.RequestAssertion
-type ResponseAssertion = testabilities.ResponseAssertion
+type (
+	RequestAssertion  = testabilities.RequestAssertion
+	ResponseAssertion = testabilities.ResponseAssertion
+)
 
 type RegressionTestAssertion interface {
 	Request(*http.Request) RequestAssertion

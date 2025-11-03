@@ -1,32 +1,32 @@
 {
-  "name": "grpc-bsv-typescript-server",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Minimal Node.js + TypeScript gRPC server exposing an async fetch method.",
-  "main": "dist/server.js",
-  "scripts": {
-    "clean": "rimraf dist src/gen",
-    "proto:gen": "mkdir -p src/gen && protoc --plugin=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=src/gen --ts_proto_opt=outputServices=grpc-js,env=node,esModuleInterop=true,useExactTypes=false -I ./proto ./proto/*.proto",
-    "build": "npm run clean && npm run proto:gen && tsc",
-    "start": "npm run build && node dist/server.js",
-    "dev": "npm run proto:gen && ts-node-dev --respawn --transpile-only src/server.ts",
-    "client": "npm run proto:gen && ts-node-dev --respawn --transpile-only src/client/client.ts --url http://localhost:8888/ping"
-  },
-  "license": "MIT",
-  "engines": {
-    "node": ">=18"
-  },
-  "dependencies": {
-    "@bsv/sdk": "^1.7.3",
-    "@grpc/grpc-js": "^1.11.1",
-    "minimist": "^1.2.8"
-  },
-  "devDependencies": {
-    "@types/minimist": "^1.2.5",
-    "@types/node": "^20.12.7",
-    "rimraf": "^6.0.1",
-    "ts-node-dev": "^2.0.0",
-    "ts-proto": "^1.180.0",
-    "typescript": "^5.4.5"
-  }
+    "dependencies": {
+        "@bsv/sdk": "^1.7.3",
+        "@grpc/grpc-js": "^1.11.1",
+        "minimist": "^1.2.8"
+    },
+    "description": "Minimal Node.js + TypeScript gRPC server exposing an async fetch method.",
+    "devDependencies": {
+        "@types/minimist": "^1.2.5",
+        "@types/node": "^20.12.7",
+        "rimraf": "^6.0.1",
+        "ts-node-dev": "^2.0.0",
+        "ts-proto": "^1.180.0",
+        "typescript": "^5.4.5"
+    },
+    "engines": {
+        "node": ">=18"
+    },
+    "license": "MIT",
+    "main": "dist/server.js",
+    "name": "grpc-bsv-typescript-server",
+    "private": true,
+    "scripts": {
+        "build": "npm run clean && npm run proto:gen && tsc",
+        "clean": "rimraf dist src/gen",
+        "client": "npm run proto:gen && ts-node-dev --respawn --transpile-only src/client/client.ts --url http://localhost:8888/ping",
+        "dev": "npm run proto:gen && ts-node-dev --respawn --transpile-only src/server.ts",
+        "proto:gen": "mkdir -p src/gen && protoc --plugin=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=src/gen --ts_proto_opt=outputServices=grpc-js,env=node,esModuleInterop=true,useExactTypes=false -I ./proto ./proto/*.proto",
+        "start": "npm run build && node dist/server.js"
+    },
+    "version": "0.1.0"
 }

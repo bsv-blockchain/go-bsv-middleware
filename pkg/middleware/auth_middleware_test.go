@@ -287,7 +287,6 @@ func TestAuthMiddlewareHandleSubsequentRequests(t *testing.T) {
 		require.NotNil(t, response, "second response should not be nil")
 		require.Equal(t, http.StatusNoContent, response.StatusCode, "second response status code should be 200")
 	})
-
 }
 
 func TestHandlingUnauthenticatedRequests(t *testing.T) {

@@ -1,13 +1,10 @@
 version: "2"
-
 # options for analysis running
 run:
   # exit code when at least one issue was found, default is 1
   issues-exit-code: 1
-
   # include test files or not, default is true
   tests: true
-
   # by default isn't set. If set we pass it to "go list -mod={option}". From "go help modules":
   # If invoked with -mod=readonly, the go command is disallowed from the implicit
   # automatic updating of go.mod described above. Instead, it fails when any changes
@@ -21,7 +18,6 @@ run:
   # Allow multiple parallel golangci-lint instances running.
   # If false (default) - golangci-lint acquires file lock on start.
   allow-parallel-runners: false
-
 # output configuration options
 output:
   # formats is now a mapping by format type (e.g., "text") — not a list
@@ -33,7 +29,6 @@ output:
       print-linter-name: true
       # print linter name in the end of issue text, default is true
       print-issued-lines: true
-
   # add a prefix to the output file references; default is no prefix
   path-prefix: ""
 linters:
@@ -110,10 +105,8 @@ linters:
 issues:
   # Maximum issues count per one linter. Set to 0 to disable. Default is 50.
   max-issues-per-linter: 0
-
   # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.
   max-same-issues: 0
-
   # Show only new issues created after git revision `REV`
   new-from-rev: ""
 severity:

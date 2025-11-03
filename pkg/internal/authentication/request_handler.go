@@ -16,10 +16,12 @@ import (
 
 const maxToPeerWaitTime = 30000
 
-var ErrInvalidNonGeneralRequest = fmt.Errorf("bad request")
-var ErrInvalidGeneralRequest = fmt.Errorf("invalid authentication")
-var ErrProcessingMessageByPeer = fmt.Errorf("error while processing message by peer")
-var ErrAuthenticationRequired = fmt.Errorf("authentication required")
+var (
+	ErrInvalidNonGeneralRequest = fmt.Errorf("bad request")
+	ErrInvalidGeneralRequest    = fmt.Errorf("invalid authentication")
+	ErrProcessingMessageByPeer  = fmt.Errorf("error while processing message by peer")
+	ErrAuthenticationRequired   = fmt.Errorf("authentication required")
+)
 
 type AuthRequestHandler interface {
 	Handle(ctx context.Context, response http.ResponseWriter, request *http.Request) error

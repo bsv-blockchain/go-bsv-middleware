@@ -113,8 +113,10 @@ func extractGeneralAuthMessage(req *http.Request) (*AuthMessageWithRequestID, er
 	return msg, nil
 }
 
-var ErrInvalidIdentityKeyFormat = fmt.Errorf("invalid identity key format")
-var ErrMissingIdentityKey = fmt.Errorf("missing identity key")
+var (
+	ErrInvalidIdentityKeyFormat = fmt.Errorf("invalid identity key format")
+	ErrMissingIdentityKey       = fmt.Errorf("missing identity key")
+)
 
 func identityKeyFromHeader(req *http.Request) (*primitives.PublicKey, error) {
 	identityKeyHeader := req.Header.Get(brc104.HeaderIdentityKey)

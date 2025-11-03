@@ -16,7 +16,6 @@ updates:
           - "minor"
           - "patch"
           - "major"
-
   # Maintain dependencies for GitHub Actions
   - package-ecosystem: "github-actions"
     target-branch: "main"
