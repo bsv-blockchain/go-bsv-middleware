@@ -54,7 +54,7 @@ func main() {
 	go func() {
 		fmt.Println("Press Enter to shutdown the server... ")
 		// ignoring the errors, because we want to just hang and wait for any input
-		fmt.Scanln()
+		_, _ = fmt.Scanln()
 		userInput <- struct{}{}
 	}()
 
