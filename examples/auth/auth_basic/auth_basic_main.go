@@ -14,8 +14,10 @@ import (
 	clients "github.com/bsv-blockchain/go-sdk/auth/clients/authhttp"
 )
 
+// EXAMPLE_CREDENTIALS - These are test/example credentials for demonstration purposes only
+// nosemgrep: hardcoded-credential
 const (
-	serverWIF     = "L1cReZseWmqcYra3vrqj9TPBGHhvDQFD2jYuu1RUj5rrfpVLiKHs"
+	serverWIF     = "L1cReZseWmqcYra3vrqj9TPBGHhvDQFD2jYuu1RUj5rrfpVLiKHs" // gitleaks:allow
 	clientPrivHex = "143ab18a84d3b25e1a13cefa90038411e5d2014590a2a4a57263d1593c8dee1c"
 )
 

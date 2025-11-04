@@ -17,7 +17,9 @@ import (
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware"
 )
 
-const serverWIF = "L1cReZseWmqcYra3vrqj9TPBGHhvDQFD2jYuu1RUj5rrfpVLiKHs"
+// EXAMPLE_CREDENTIAL - This is a test/example WIF for demonstration purposes only
+// nosemgrep: hardcoded-credential
+const serverWIF = "L1cReZseWmqcYra3vrqj9TPBGHhvDQFD2jYuu1RUj5rrfpVLiKHs" // gitleaks:allow
 
 func main() {
 	// The wallet here is tweaked for example purposes.

@@ -6,7 +6,9 @@ import (
 	primitives "github.com/bsv-blockchain/go-sdk/primitives/ec"
 )
 
-const WIF = "L1cReZseWmqcYra3vrqj9TPBGHhvDQFD2jYuu1RUj5rrfpVLiKHs"
+// WIF is a test fixture credential for internal testing purposes only
+// nosemgrep: hardcoded-credential
+const WIF = "L1cReZseWmqcYra3vrqj9TPBGHhvDQFD2jYuu1RUj5rrfpVLiKHs" // gitleaks:allow
 
 type identity struct {
 	WIF        string
