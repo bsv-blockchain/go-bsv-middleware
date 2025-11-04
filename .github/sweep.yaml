@@ -1,5 +1,5 @@
 gha_enabled: true
-branch: main
+branch: master
 blocked_dirs: []
 draft: false
 description: |
