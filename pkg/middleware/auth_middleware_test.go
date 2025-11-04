@@ -238,14 +238,21 @@ func TestAuthMiddlewareHandleSubsequentRequests(t *testing.T) {
 		require.NotNil(t, response, "first response should not be nil")
 		require.Equal(t, http.StatusNoContent, response.StatusCode, "first response status code should be 200")
 
+		// and: create a new client for the second request
+		// This works around a data race in go-sdk v1.2.11 where AuthFetch.callbacks
+		// map is accessed from multiple goroutines without synchronization. Using separate
+		// clients avoids concurrent access to the same unprotected map.
+		httpClient2, cleanup2 := given.Client().ForUser(alice)
+		defer cleanup2()
+
 		// when:
-		defer func() { _ = response.Body.Close() }()
-		response, err = httpClient.Fetch(t.Context(), given.Server().URL().String(), &clients.SimplifiedFetchRequestOptions{})
+		response2, err := httpClient2.Fetch(t.Context(), given.Server().URL().String(), &clients.SimplifiedFetchRequestOptions{})
+		defer func() { _ = response2.Body.Close() }()
 
 		// then:
 		require.NoError(t, err, "second request should succeed")
-		require.NotNil(t, response, "second response should not be nil")
-		require.Equal(t, http.StatusNoContent, response.StatusCode, "second response status code should be 200")
+		require.NotNil(t, response2, "second response should not be nil")
+		require.Equal(t, http.StatusNoContent, response2.StatusCode, "second response status code should be 200")
 	})
 
 	t.Run("multiple requests with different clients for the same user", func(t *testing.T) {
