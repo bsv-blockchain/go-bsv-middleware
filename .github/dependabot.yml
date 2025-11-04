@@ -56,36 +56,7 @@ updates:
       include: "scope"
 
   # ──────────────────────────────────────────────────────────────
-  # 2. Go Modules (go.mod / go.sum)
-  # ──────────────────────────────────────────────────────────────
-  - package-ecosystem: "gomod"
-    directory: "/examples/"
-    target-branch: "main"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "America/New_York"
-    allow:
-      - dependency-type: "direct"
-    groups:
-      security-deps:
-        patterns:
-          - "*crypto*"
-          - "*security*"
-          - "*auth*"
-          - "*jwt*"
-          - "*oauth*"
-        update-types: ["minor", "patch"]
-    open-pull-requests-limit: 10
-    assignees: ["mrz1836"]
-    labels: ["chore", "dependencies", "gomod"]
-    commit-message:
-      prefix: "chore"
-      include: "scope"
-
-  # ──────────────────────────────────────────────────────────────
-  # 3. GitHub Actions Workflows
+  # 2. GitHub Actions Workflows
   # ──────────────────────────────────────────────────────────────
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -108,7 +79,7 @@ updates:
       include: "scope"
 
   # ──────────────────────────────────────────────────────────────
-  # 4. DevContainer (devcontainer.json : base image + features)
+  # 3. DevContainer (devcontainer.json : base image + features)
   # ──────────────────────────────────────────────────────────────
   - package-ecosystem: "devcontainers"
     directory: "/"
