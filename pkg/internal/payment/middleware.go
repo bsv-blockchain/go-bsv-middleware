@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -16,6 +17,11 @@ import (
 	"github.com/bsv-blockchain/go-sdk/wallet"
 	"github.com/go-softwarelab/common/pkg/slogx"
 	"github.com/go-softwarelab/common/pkg/to"
+)
+
+var (
+	ErrDerivationPrefixIsInvalidNonce = errors.New("derivation prefix is invalid nonce")
+	ErrNoPaymentProvided              = errors.New("no payment provided")
 )
 
 type Config struct {
@@ -77,18 +83,17 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	paymentData, err := m.extractPaymentData(r)
 	if err != nil {
+		if errors.Is(err, ErrNoPaymentProvided) {
+			log.DebugContext(ctx, "Requesting payment", slog.Int("price", price))
+			err = m.requestPayment(w, r, price)
+			if err != nil {
+				log.ErrorContext(ctx, "Failed to prepare payment request", slogx.Error(err))
+				m.respondWith(w, ErrPaymentInternal)
+			}
+			return
+		}
 		log.ErrorContext(ctx, "Failed to extract payment data", slogx.Error(err))
 		m.respondWith(w, ErrMalformedPayment)
-		return
-	}
-
-	if paymentData == nil {
-		log.DebugContext(ctx, "Requesting payment", slog.Int("price", price))
-		err = m.requestPayment(w, r, price)
-		if err != nil {
-			log.ErrorContext(ctx, "Failed to prepare payment request", slogx.Error(err))
-			m.respondWith(w, ErrPaymentInternal)
-		}
 		return
 	}
 
@@ -121,7 +126,7 @@ func (m *Middleware) proceedWithoutPayment(w http.ResponseWriter, r *http.Reques
 func (m *Middleware) extractPaymentData(r *http.Request) (*Payment, error) {
 	paymentHeader := r.Header.Get(HeaderPayment)
 	if paymentHeader == "" {
-		return nil, nil
+		return nil, ErrNoPaymentProvided
 	}
 
 	var payment Payment
@@ -169,7 +174,7 @@ func (m *Middleware) processPayment(
 		return nil, NewProcessingError(ErrInvalidDerivationPrefix, fmt.Errorf("error verifying derivation prefix as nonce: %w", err))
 	}
 	if !valid {
-		return nil, NewProcessingError(ErrInvalidDerivationPrefix, fmt.Errorf("derivation prefix is invalid nonce"))
+		return nil, NewProcessingError(ErrInvalidDerivationPrefix, ErrDerivationPrefixIsInvalidNonce)
 	}
 
 	derivationSuffix, err := base64.StdEncoding.DecodeString(paymentData.DerivationSuffix)

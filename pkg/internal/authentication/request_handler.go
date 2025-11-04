@@ -16,10 +16,12 @@ import (
 
 const maxToPeerWaitTime = 30000
 
-var ErrInvalidNonGeneralRequest = fmt.Errorf("bad request")
-var ErrInvalidGeneralRequest = fmt.Errorf("invalid authentication")
-var ErrProcessingMessageByPeer = fmt.Errorf("error while processing message by peer")
-var ErrAuthenticationRequired = fmt.Errorf("authentication required")
+var (
+	ErrInvalidNonGeneralRequest = fmt.Errorf("bad request")
+	ErrInvalidGeneralRequest    = fmt.Errorf("invalid authentication")
+	ErrProcessingMessageByPeer  = fmt.Errorf("error while processing message by peer")
+	ErrAuthenticationRequired   = fmt.Errorf("authentication required")
+)
 
 type AuthRequestHandler interface {
 	Handle(ctx context.Context, response http.ResponseWriter, request *http.Request) error
@@ -90,8 +92,8 @@ func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.Re
 
 	log.DebugContext(ctx, "Auth message extracted from request")
 
-	if err := h.handleMessageWithPeer(ctx, authMessage.AuthMessage); err != nil {
-		return errors.Join(ErrProcessingMessageByPeer, err)
+	if peerErr := h.handleMessageWithPeer(ctx, authMessage.AuthMessage); peerErr != nil {
+		return errors.Join(ErrProcessingMessageByPeer, peerErr)
 	}
 	h.log.DebugContext(ctx, "Message successfully processed with peer")
 

@@ -1,12 +1,16 @@
 package testmode
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"os"
 	"testing"
 
 	"github.com/go-softwarelab/common/pkg/to"
 )
+
+var ErrFailedToDetermineGrpcServerMode = errors.New("failed to determine grpc server mode based on env")
 
 const (
 	grpcModeEnvVar                 = "TEST_GRPC_MODE"
@@ -196,5 +200,6 @@ func GetGrpcServerMode() Mode {
 		return mode
 	}
 
-	panic(fmt.Errorf("failed to determine grpc server mode based on env %s: %s", grpcModeEnvVar, os.Getenv(grpcModeEnvVar)))
+	log.Fatalf("%s: %s=%s", ErrFailedToDetermineGrpcServerMode, grpcModeEnvVar, os.Getenv(grpcModeEnvVar))
+	return nil
 }

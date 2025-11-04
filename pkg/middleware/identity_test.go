@@ -8,6 +8,7 @@ import (
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/testabilities/testusers"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestShouldGetIdentity(t *testing.T) {
@@ -19,7 +20,7 @@ func TestShouldGetIdentity(t *testing.T) {
 		identity, err := middleware.ShouldGetIdentity(ctx)
 
 		// then:
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, identity)
 	})
 
@@ -31,7 +32,7 @@ func TestShouldGetIdentity(t *testing.T) {
 		identity, err := middleware.ShouldGetIdentity(ctx)
 
 		// then:
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// and:
 		assert.Truef(t, middleware.IsUnknownIdentity(identity), "identity should be unknown")
@@ -46,7 +47,7 @@ func TestShouldGetIdentity(t *testing.T) {
 		identity, err := middleware.ShouldGetIdentity(ctx)
 
 		// then:
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, aliceIdentity, identity)
 
 		// and:
@@ -63,7 +64,7 @@ func TestShouldGetAuthenticatedIdentity(t *testing.T) {
 		identity, err := middleware.ShouldGetAuthenticatedIdentity(ctx)
 
 		// then:
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, identity)
 	})
 
@@ -75,7 +76,7 @@ func TestShouldGetAuthenticatedIdentity(t *testing.T) {
 		identity, err := middleware.ShouldGetAuthenticatedIdentity(ctx)
 
 		// then:
-		assert.ErrorIs(t, err, middleware.ErrUnknownIdentity)
+		require.ErrorIs(t, err, middleware.ErrUnknownIdentity)
 		assert.Nil(t, identity)
 	})
 
@@ -88,7 +89,7 @@ func TestShouldGetAuthenticatedIdentity(t *testing.T) {
 		identity, err := middleware.ShouldGetAuthenticatedIdentity(ctx)
 
 		// then:
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, aliceIdentity, identity)
 	})
 }

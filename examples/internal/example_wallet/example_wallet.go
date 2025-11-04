@@ -6,10 +6,12 @@ import (
 	"github.com/go-softwarelab/common/pkg/testingx"
 )
 
-type PrivateKeySource = wallet.PrivateKeySource
-type PrivHex = wallet.PrivHex
-type WIF = wallet.WIF
-type ExampleWallet = wallet.TestWallet
+type (
+	PrivateKeySource = wallet.PrivateKeySource
+	PrivHex          = wallet.PrivHex
+	WIF              = wallet.WIF
+	ExampleWallet    = wallet.TestWallet
+)
 
 func New[KeySource PrivateKeySource](keySource KeySource) *ExampleWallet {
 	return wallet.NewTestWallet(&testingx.E{Verbose: true}, keySource, wallet.WithTestWalletLogger(slogx.SilentLogger()))

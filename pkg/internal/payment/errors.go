@@ -21,6 +21,7 @@ func (e ErrorResponse) GetStatusCode() int {
 
 type SatoshisRequired struct {
 	ErrorResponse
+
 	SatoshisRequired int
 }
 
@@ -75,6 +76,7 @@ var (
 
 type ProcessingError struct {
 	ErrorResponse
+
 	Cause error `json:"-"`
 }
 

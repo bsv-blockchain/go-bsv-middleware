@@ -172,7 +172,7 @@ func TestAuthMiddlewareAndAuthFetchIntegration(t *testing.T) {
 						HasIdentityOfUser(alice)
 
 					_, err := w.Write([]byte("Pong!"))
-					require.NoError(t, err)
+					assert.NoError(t, err)
 				}).
 				Started()
 			defer cleanup()
@@ -195,6 +195,7 @@ func TestAuthMiddlewareAndAuthFetchIntegration(t *testing.T) {
 
 			// then:
 			require.NoError(t, err, "fetch should succeed")
+			defer func() { _ = response.Body.Close() }()
 
 			// and:
 			then.Response(response).
@@ -230,19 +231,28 @@ func TestAuthMiddlewareHandleSubsequentRequests(t *testing.T) {
 
 		// when:
 		response, err := httpClient.Fetch(t.Context(), given.Server().URL().String(), &clients.SimplifiedFetchRequestOptions{})
+		defer func() { _ = response.Body.Close() }()
 
 		// then:
 		require.NoError(t, err, "first request should succeed")
 		require.NotNil(t, response, "first response should not be nil")
 		require.Equal(t, http.StatusNoContent, response.StatusCode, "first response status code should be 200")
 
+		// and: create a new client for the second request
+		// This works around a data race in go-sdk v1.2.11 where AuthFetch.callbacks
+		// map is accessed from multiple goroutines without synchronization. Using separate
+		// clients avoids concurrent access to the same unprotected map.
+		httpClient2, cleanup2 := given.Client().ForUser(alice)
+		defer cleanup2()
+
 		// when:
-		response, err = httpClient.Fetch(t.Context(), given.Server().URL().String(), &clients.SimplifiedFetchRequestOptions{})
+		response2, err := httpClient2.Fetch(t.Context(), given.Server().URL().String(), &clients.SimplifiedFetchRequestOptions{})
+		defer func() { _ = response2.Body.Close() }()
 
 		// then:
 		require.NoError(t, err, "second request should succeed")
-		require.NotNil(t, response, "second response should not be nil")
-		require.Equal(t, http.StatusNoContent, response.StatusCode, "second response status code should be 200")
+		require.NotNil(t, response2, "second response should not be nil")
+		require.Equal(t, http.StatusNoContent, response2.StatusCode, "second response status code should be 200")
 	})
 
 	t.Run("multiple requests with different clients for the same user", func(t *testing.T) {
@@ -269,6 +279,7 @@ func TestAuthMiddlewareHandleSubsequentRequests(t *testing.T) {
 
 		// when:
 		response, err := httpClient.Fetch(t.Context(), given.Server().URL().String(), &clients.SimplifiedFetchRequestOptions{})
+		defer func() { _ = response.Body.Close() }()
 
 		// then:
 		require.NoError(t, err, "first request should succeed")
@@ -287,7 +298,6 @@ func TestAuthMiddlewareHandleSubsequentRequests(t *testing.T) {
 		require.NotNil(t, response, "second response should not be nil")
 		require.Equal(t, http.StatusNoContent, response.StatusCode, "second response status code should be 200")
 	})
-
 }
 
 func TestHandlingUnauthenticatedRequests(t *testing.T) {
@@ -301,7 +311,7 @@ func TestHandlingUnauthenticatedRequests(t *testing.T) {
 		// and:
 		cleanup := given.Server().WithMiddleware(authMiddleware).
 			WithRoute("/", func(w http.ResponseWriter, r *http.Request) {
-				require.Fail(t, "handler shouldn't be called when unauthenticated access is disallowed")
+				assert.Fail(t, "handler shouldn't be called when unauthenticated access is disallowed")
 			}).
 			Started()
 		defer cleanup()
@@ -310,10 +320,13 @@ func TestHandlingUnauthenticatedRequests(t *testing.T) {
 		unauthenticatedClient := &http.Client{}
 
 		// when:
-		response, err := unauthenticatedClient.Get(given.Server().URL().String())
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, given.Server().URL().String(), nil)
+		require.NoError(t, err)
+		response, err := unauthenticatedClient.Do(req)
 
 		// then:
-		assert.NoError(t, err)
+		require.NoError(t, err)
+		defer func() { _ = response.Body.Close() }()
 
 		// and:
 		then.Response(response).HasStatus(http.StatusUnauthorized)
@@ -343,10 +356,13 @@ func TestHandlingUnauthenticatedRequests(t *testing.T) {
 		unauthenticatedClient := &http.Client{}
 
 		// when:
-		response, err := unauthenticatedClient.Get(given.Server().URL().String())
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, given.Server().URL().String(), nil)
+		require.NoError(t, err)
+		response, err := unauthenticatedClient.Do(req)
 
 		// then:
-		assert.NoError(t, err)
+		require.NoError(t, err)
+		defer func() { _ = response.Body.Close() }()
 
 		// and:
 		then.Response(response).HasStatus(http.StatusNoContent)

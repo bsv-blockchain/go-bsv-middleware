@@ -17,8 +17,8 @@ type BSVMiddlewareTestsFixture interface {
 }
 
 type BSVMiddlewareTestsAssertion interface {
-	Request(*http.Request) RequestAssertion
-	Response(*http.Response) ResponseAssertion
+	Request(request *http.Request) RequestAssertion
+	Response(response *http.Response) ResponseAssertion
 }
 
 func New(t testing.TB, opts ...func(*Options)) (BSVMiddlewareTestsFixture, BSVMiddlewareTestsAssertion) {
@@ -51,6 +51,7 @@ func Then(t testing.TB) BSVMiddlewareTestsAssertion {
 
 type bsvMiddlewareTestsFixture struct {
 	testing.TB
+
 	serverFixture     ServerFixture
 	middlewareFixture MiddlewareFixture
 	logger            *slog.Logger

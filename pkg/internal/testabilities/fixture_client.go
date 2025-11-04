@@ -21,11 +21,12 @@ func WithClientLogger(logger *slog.Logger) func(options *ClientFixtureOptions) {
 }
 
 type ClientFixture interface {
-	ForUser(*testusers.UserWithWallet) (client *clients.AuthFetch, cleanup func())
+	ForUser(user *testusers.UserWithWallet) (client *clients.AuthFetch, cleanup func())
 }
 
 type clientFixture struct {
 	testing.TB
+
 	logger *slog.Logger
 }
 

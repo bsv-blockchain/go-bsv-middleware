@@ -2,6 +2,7 @@ package authctx
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -9,8 +10,15 @@ import (
 	"github.com/go-softwarelab/common/pkg/to"
 )
 
-var unknownIdentityValue ec.PublicKey
-var unknownIdentity *ec.PublicKey
+var (
+	unknownIdentityValue ec.PublicKey
+	unknownIdentity      *ec.PublicKey
+
+	// ErrNotFoundInContext is returned when a required value is not found in context
+	ErrNotFoundInContext = errors.New("not found in context")
+	// ErrUnexpectedTypeInContext is returned when a context value has an unexpected type
+	ErrUnexpectedTypeInContext = errors.New("unexpected type in context")
+)
 
 type contextKey string
 
@@ -44,12 +52,12 @@ func WithIdentity(ctx context.Context, identity *ec.PublicKey) context.Context {
 func ShouldGetResponse(ctx context.Context) (http.ResponseWriter, error) {
 	contextValue := ctx.Value(ResponseKey)
 	if contextValue == nil {
-		return nil, fmt.Errorf("%s not found in context", ResponseKey)
+		return nil, fmt.Errorf("%s %w", ResponseKey, ErrNotFoundInContext)
 	}
 
 	resp, ok := contextValue.(http.ResponseWriter)
 	if !ok {
-		return nil, fmt.Errorf("%s contains unexpected type %T", ResponseKey, contextValue)
+		return nil, fmt.Errorf("%s %w: got %T", ResponseKey, ErrUnexpectedTypeInContext, contextValue)
 	}
 
 	return resp, nil
@@ -58,12 +66,12 @@ func ShouldGetResponse(ctx context.Context) (http.ResponseWriter, error) {
 func ShouldGetRequest(ctx context.Context) (*http.Request, error) {
 	contextValue := ctx.Value(RequestKey)
 	if contextValue == nil {
-		return nil, fmt.Errorf("%s not found in context", RequestKey)
+		return nil, fmt.Errorf("%s %w", RequestKey, ErrNotFoundInContext)
 	}
 
 	req, ok := contextValue.(*http.Request)
 	if !ok {
-		return nil, fmt.Errorf("%s contains unexpected type %T", RequestKey, contextValue)
+		return nil, fmt.Errorf("%s %w: got %T", RequestKey, ErrUnexpectedTypeInContext, contextValue)
 	}
 
 	return req, nil
@@ -72,12 +80,12 @@ func ShouldGetRequest(ctx context.Context) (*http.Request, error) {
 func ShouldGetIdentity(ctx context.Context) (*ec.PublicKey, error) {
 	contextValue := ctx.Value(IdentityKey)
 	if contextValue == nil {
-		return nil, fmt.Errorf("%s not found in context", IdentityKey)
+		return nil, fmt.Errorf("%s %w", IdentityKey, ErrNotFoundInContext)
 	}
 
 	identity, ok := contextValue.(ec.PublicKey)
 	if !ok {
-		return nil, fmt.Errorf("%s contains unexpected type %T", IdentityKey, contextValue)
+		return nil, fmt.Errorf("%s %w: got %T", IdentityKey, ErrUnexpectedTypeInContext, contextValue)
 	}
 
 	if identity == unknownIdentityValue {

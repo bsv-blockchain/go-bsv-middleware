@@ -1,7 +1,6 @@
 package testabilities
 
 import (
-	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -41,8 +40,10 @@ const serverMinPort int = 55000
 // although 200 ports seems more than enough to me.
 var regressionTestServerPorts = seq.Collect(seq.Range(serverMinPort, serverMinPort+200))
 
-type ServerFixture = testabilities.ServerFixture
-type MiddlewareFixture = testabilities.MiddlewareFixture
+type (
+	ServerFixture     = testabilities.ServerFixture
+	MiddlewareFixture = testabilities.MiddlewareFixture
+)
 
 type creationOptions struct {
 	parentGiven *regressionTestFixture
@@ -66,7 +67,9 @@ type RegressionTestFixture interface {
 
 type regressionTestFixture struct {
 	testing.TB
+
 	testabilities.BSVMiddlewareTestsFixture
+
 	initialized bool
 	host        string
 	port        int
@@ -182,9 +185,9 @@ func (f *regressionTestFixture) startGrpcServerFromDocker(mode testmode.DockerGr
 func (f *regressionTestFixture) usingLocalGrpc(mode testmode.LocalGrpcMode) (cleanupGrpcServer func()) {
 	warningMsg := "USING LOCAL GRPC SERVER MODE - ENSURE TO START THE SERVER BEFORE RUNNING THE TESTS"
 
-	fmt.Println(strings.Repeat("!", len(warningMsg)))
-	fmt.Println(warningMsg)
-	fmt.Println(strings.Repeat("!", len(warningMsg)))
+	f.Log(strings.Repeat("!", len(warningMsg)))
+	f.Log(warningMsg)
+	f.Log(strings.Repeat("!", len(warningMsg)))
 
 	f.host = mode.Host
 	f.port = mode.Port

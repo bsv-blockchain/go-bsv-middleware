@@ -114,12 +114,12 @@ func (a *AuthFetch) Fetch(ctx context.Context, url string, config *clients.Simpl
 	}
 
 	result := &http.Response{
-		StatusCode: int(response.Status),
-		Body:       io.NopCloser(strings.NewReader(response.Body)),
+		StatusCode: int(response.GetStatus()),
+		Body:       io.NopCloser(strings.NewReader(response.GetBody())),
 		Header:     make(http.Header),
 	}
 
-	for key, value := range response.Headers {
+	for key, value := range response.GetHeaders() {
 		result.Header.Set(key, value)
 	}
 

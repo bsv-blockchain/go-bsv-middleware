@@ -36,11 +36,12 @@ func TestAuthFetchClientCallForDevelopmentPurposes(t *testing.T) {
 	}
 	resp, err := client.Fetch(t.Context(), url, config)
 	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
 
 	printCommunication(url, config, resp)
 
-	fmt.Println(strings.Repeat("~", 40))
-	fmt.Println("Second request with the same client")
+	t.Log(strings.Repeat("~", 40))
+	t.Log("Second request with the same client")
 	url = "http://localhost:8888/get"
 	config = &clients.SimplifiedFetchRequestOptions{
 		Method: http.MethodGet,
@@ -50,10 +51,12 @@ func TestAuthFetchClientCallForDevelopmentPurposes(t *testing.T) {
 	}
 	resp, err = client.Fetch(t.Context(), url, config)
 	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
 
 	printCommunication(url, config, resp)
 }
 
+//nolint:forbidigo // development/debugging utility function
 func printCommunication(url string, config *clients.SimplifiedFetchRequestOptions, resp *http.Response) {
 	fmt.Println("=============== Request ===============")
 	fmt.Println()

@@ -28,6 +28,7 @@ func WithoutLogging() func(*UserWithWalletOptions) {
 
 type UserWithWallet struct {
 	User
+
 	wallet      *wallet.TestWallet
 	certManager *testcertificates.Manager
 }

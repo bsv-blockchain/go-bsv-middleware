@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/go-softwarelab/common/pkg/to"
 	"github.com/stretchr/testify/require"
@@ -17,16 +18,16 @@ type MiddlewareHTTPHandlerFactory interface {
 
 type ServerFixture interface {
 	WithRoute(pattern string, handler func(w http.ResponseWriter, r *http.Request)) ServerBuilder
-	WithMiddleware(MiddlewareHTTPHandlerFactory) ServerBuilder
-	WithMiddlewareFunc(func(next http.Handler) http.Handler) ServerBuilder
+	WithMiddleware(middleware MiddlewareHTTPHandlerFactory) ServerBuilder
+	WithMiddlewareFunc(middlewareFunc func(next http.Handler) http.Handler) ServerBuilder
 
 	URL() *url.URL
 }
 
 type ServerBuilder interface {
 	WithRoute(pattern string, handler func(w http.ResponseWriter, r *http.Request)) ServerBuilder
-	WithMiddleware(MiddlewareHTTPHandlerFactory) ServerBuilder
-	WithMiddlewareFunc(func(next http.Handler) http.Handler) ServerBuilder
+	WithMiddleware(middleware MiddlewareHTTPHandlerFactory) ServerBuilder
+	WithMiddlewareFunc(middlewareFunc func(next http.Handler) http.Handler) ServerBuilder
 	Started() (cleanup func())
 }
 
@@ -36,6 +37,7 @@ type ServerFixtureOptions struct {
 
 type serverFixture struct {
 	testing.TB
+
 	mux        *http.ServeMux
 	middleware []middlewareFunc
 	server     *httptest.Server
@@ -106,8 +108,9 @@ func (f *serverFixture) newServer() (server *httptest.Server, cleanup func()) {
 		f.Log("trying to find free port from ports list to start the server")
 		var listener net.Listener
 		var err error
+		lc := &net.ListenConfig{}
 		for _, port := range f.ports {
-			listener, err = net.Listen("tcp", "127.0.0.1:"+to.StringFromInteger(port))
+			listener, err = lc.Listen(f.Context(), "tcp", "127.0.0.1:"+to.StringFromInteger(port))
 			if err == nil && listener != nil {
 				f.Log("starting server on port:", port)
 				break
@@ -117,7 +120,10 @@ func (f *serverFixture) newServer() (server *httptest.Server, cleanup func()) {
 
 		server = &httptest.Server{
 			Listener: listener,
-			Config:   &http.Server{Handler: f.handler()},
+			Config: &http.Server{
+				Handler:           f.handler(),
+				ReadHeaderTimeout: 10 * time.Second,
+			},
 		}
 		server.Start()
 	}

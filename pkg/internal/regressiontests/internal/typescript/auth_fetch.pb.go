@@ -7,11 +7,12 @@
 package typescript
 
 import (
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -402,17 +403,20 @@ func file_auth_fetch_proto_rawDescGZIP() []byte {
 	return file_auth_fetch_proto_rawDescData
 }
 
-var file_auth_fetch_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
-var file_auth_fetch_proto_goTypes = []any{
-	(*Config)(nil),          // 0: typescript.Config
-	(*Options)(nil),         // 1: typescript.Options
-	(*FetchRequest)(nil),    // 2: typescript.FetchRequest
-	(*FetchResponse)(nil),   // 3: typescript.FetchResponse
-	(*CleanUpRequest)(nil),  // 4: typescript.CleanUpRequest
-	(*CleanUpResponse)(nil), // 5: typescript.CleanUpResponse
-	nil,                     // 6: typescript.Config.HeadersEntry
-	nil,                     // 7: typescript.FetchResponse.HeadersEntry
-}
+var (
+	file_auth_fetch_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+	file_auth_fetch_proto_goTypes  = []any{
+		(*Config)(nil),          // 0: typescript.Config
+		(*Options)(nil),         // 1: typescript.Options
+		(*FetchRequest)(nil),    // 2: typescript.FetchRequest
+		(*FetchResponse)(nil),   // 3: typescript.FetchResponse
+		(*CleanUpRequest)(nil),  // 4: typescript.CleanUpRequest
+		(*CleanUpResponse)(nil), // 5: typescript.CleanUpResponse
+		nil,                     // 6: typescript.Config.HeadersEntry
+		nil,                     // 7: typescript.FetchResponse.HeadersEntry
+	}
+)
+
 var file_auth_fetch_proto_depIdxs = []int32{
 	6, // 0: typescript.Config.headers:type_name -> typescript.Config.HeadersEntry
 	0, // 1: typescript.FetchRequest.config:type_name -> typescript.Config

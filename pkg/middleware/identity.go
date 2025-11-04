@@ -64,7 +64,7 @@ func IsNotAuthenticated(ctx context.Context) bool {
 // An unknown identity is used when the auth middleware is set to allow unauthenticated access,
 // and the client does not perform mutual authentication.
 //
-// NOTE: A nil identity is also considered unknown.
+// A nil identity is also considered unknown.
 func IsUnknownIdentity(identity *ec.PublicKey) bool {
 	return authctx.IsUnknownIdentity(identity)
 }

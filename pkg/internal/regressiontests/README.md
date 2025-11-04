@@ -1,6 +1,6 @@
 # Regression Tests
 
-This package contains regression tests designed to check the compatibility of the middleware with clients written in TypeScript. 
+This package contains regression tests designed to check the compatibility of the middleware with clients written in TypeScript.
 These tests ensure that the middleware correctly implements the BSV specifications and can interact with TypeScript clients.
 
 ## Purpose
@@ -32,5 +32,5 @@ The TypeScript code uses the `@bsv/sdk` package to implement the client-side of 
 
 ## Warning
 
-These tests require npm and will install dependencies and run TypeScript code during test execution. 
+These tests require npm and will install dependencies and run TypeScript code during test execution.
 Make sure you have Node.js and npm installed before running these tests.

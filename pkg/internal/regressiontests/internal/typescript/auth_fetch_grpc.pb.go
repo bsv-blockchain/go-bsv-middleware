@@ -8,6 +8,7 @@ package typescript
 
 import (
 	context "context"
+
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -78,6 +79,7 @@ type UnimplementedAuthFetchServer struct{}
 func (UnimplementedAuthFetchServer) Fetch(context.Context, *FetchRequest) (*FetchResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Fetch not implemented")
 }
+
 func (UnimplementedAuthFetchServer) CleanUp(context.Context, *CleanUpRequest) (*CleanUpResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CleanUp not implemented")
 }

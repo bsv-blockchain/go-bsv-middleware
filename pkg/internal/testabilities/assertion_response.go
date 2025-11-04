@@ -9,13 +9,14 @@ import (
 )
 
 type ResponseAssertion interface {
-	HasStatus(int) ResponseAssertion
-	HasHeader(string) ResponseAssertion
-	HasBody(string) ResponseAssertion
+	HasStatus(statusCode int) ResponseAssertion
+	HasHeader(headerName string) ResponseAssertion
+	HasBody(expectedBody string) ResponseAssertion
 }
 
 type httpResponseAssertion struct {
 	testing.TB
+
 	response *http.Response
 }
 

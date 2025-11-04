@@ -10,12 +10,13 @@ import (
 )
 
 type ClientFixture interface {
-	ForUser(*testusers.UserWithWallet) (client *typescript.AuthFetch, cleanup func())
+	ForUser(user *testusers.UserWithWallet) (client *typescript.AuthFetch, cleanup func())
 	ForKey(key string) (client *typescript.AuthFetch, cleanup func())
 }
 
 type clientFixture struct {
 	testing.TB
+
 	opts []func(*typescript.AuthFetchClientOptions)
 }
 

@@ -1,14 +1,18 @@
 package authentication
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 )
 
+var ErrResponseStatusCodeNotSet = errors.New("response status code is not set")
+
 // ResponseWriterWrapper is a custom http.ResponseWriter that records the response status code and body.
 type ResponseWriterWrapper struct {
 	http.ResponseWriter
+
 	headersWritten bool
 	statusCode     int
 	body           []byte
@@ -45,7 +49,7 @@ func (r *ResponseWriterWrapper) GetBody() []byte {
 // Flush writes the response header and body if they have not been headersWritten yet.
 func (r *ResponseWriterWrapper) Flush() error {
 	if r.statusCode < 100 {
-		return fmt.Errorf("response status code is not set")
+		return ErrResponseStatusCodeNotSet
 	}
 	r.ResponseWriter.WriteHeader(r.statusCode)
 	if len(r.body) > 0 {
