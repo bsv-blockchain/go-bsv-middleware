@@ -1,0 +1,28 @@
+# Gitleaks configuration for go-bsv-middleware
+# This file defines rules for secret scanning and allowlists for test/example credentials
+
+title = "gitleaks config for go-bsv-middleware"
+
+# Allowlist specific test/example credentials
+[[rules]]
+description = "Generic API Key"
+id = "generic-api-key"
+regex = '''(?i)(\bapi[_-]?key\b|\bsecret\b)'''
+[[rules.allowlist]]
+description = "Ignore test/example credentials with gitleaks:allow comment"
+regexTarget = "line"
+regex = '''gitleaks:allow'''
+
+# Allowlist specific test credential
+[[rules.allowlist]]
+description = "Test WIF credential used in examples and fixtures"
+regexTarget = "match"
+regex = '''L1cReZseWmqcYra3vrqj9TPBGHhvDQFD2jYuu1RUj5rrfpVLiKHs'''
+
+# Allowlist paths for test fixtures and examples
+[[rules.allowlist]]
+description = "Ignore credentials in test fixtures"
+paths = [
+    '''pkg/internal/testabilities/fixture/.*''',
+    '''examples/.*''',
+]
