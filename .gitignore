@@ -33,3 +33,6 @@ go.work.sum
 
 # OSX
 .DS_Store
+
+# Fuzz testing
+testdata/
