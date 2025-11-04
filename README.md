@@ -17,7 +17,7 @@
           <img src="https://img.shields.io/github/release-pre/bsv-blockchain/go-bsv-middleware?logo=github&style=flat" alt="Latest Release">
         </a><br/>
         <a href="https://github.com/bsv-blockchain/go-bsv-middleware/actions">
-          <img src="https://img.shields.io/github/actions/workflow/status/bsv-blockchain/go-bsv-middleware/fortress.yml?branch=master&logo=github&style=flat" alt="Build Status">
+          <img src="https://img.shields.io/github/actions/workflow/status/bsv-blockchain/go-bsv-middleware/fortress.yml?branch=main&logo=github&style=flat" alt="Build Status">
         </a><br/>
 		    <a href="https://github.com/bsv-blockchain/go-bsv-middleware/actions">
           <img src="https://github.com/bsv-blockchain/go-bsv-middleware/actions/workflows/codeql-analysis.yml/badge.svg?style=flat" alt="CodeQL">
@@ -30,8 +30,8 @@
         <a href="https://goreportcard.com/report/github.com/bsv-blockchain/go-bsv-middleware">
           <img src="https://goreportcard.com/badge/github.com/bsv-blockchain/go-bsv-middleware?style=flat" alt="Go Report Card">
         </a><br/>
-		    <a href="https://codecov.io/gh/bsv-blockchain/go-bsv-middleware/tree/master">
-          <img src="https://codecov.io/gh/bsv-blockchain/go-bsv-middleware/branch/master/graph/badge.svg?style=flat" alt="Code Coverage">
+		    <a href="https://codecov.io/gh/bsv-blockchain/go-bsv-middleware/tree/main">
+          <img src="https://codecov.io/gh/bsv-blockchain/go-bsv-middleware/branch/main/graph/badge.svg?style=flat" alt="Code Coverage">
         </a><br/>
 		    <a href="https://scorecard.dev/viewer/?uri=github.com/bsv-blockchain/go-bsv-middleware">
           <img src="https://api.scorecard.dev/projects/github.com/bsv-blockchain/go-bsv-middleware/badge?logo=springsecurity&logoColor=white" alt="OpenSSF Scorecard">
@@ -61,7 +61,7 @@
         <a href="https://github.com/bsv-blockchain/go-bsv-middleware/graphs/contributors">
           <img src="https://img.shields.io/github/contributors/bsv-blockchain/go-bsv-middleware?style=flat&logo=contentful&logoColor=white" alt="Contributors">
         </a><br/>
-        <a href="https://github.com/bsv-blockchain/go-bsv-middleware/commits/master">
+        <a href="https://github.com/bsv-blockchain/go-bsv-middleware/commits/main">
           <img src="https://img.shields.io/github/last-commit/bsv-blockchain/go-bsv-middleware?style=flat&logo=clockify&logoColor=white" alt="Last commit">
         </a><br/>
         <a href="https://github.com/sponsors/bsv-blockchain">
@@ -175,7 +175,7 @@ The release process is defined in the [.goreleaser.yml](.goreleaser.yml) configu
 Then create and push a new Git tag using:
 
 ```bash
-magex version:bump push=true bump=patch branch=master
+magex version:bump push=true bump=patch branch=main
 ```
 
 This process ensures consistent, repeatable releases with properly versioned artifacts and citation metadata.
