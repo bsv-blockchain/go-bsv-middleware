@@ -10,20 +10,22 @@ import (
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/testabilities/testusers"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type RequestAssertion interface {
-	HasMethod(string) RequestAssertion
-	HasHeadersContaining(map[string]string) RequestAssertion
-	HasQueryMatching(string) RequestAssertion
-	HasBodyMatching(map[string]string) RequestAssertion
-	HasBody(string) RequestAssertion
+	HasMethod(method string) RequestAssertion
+	HasHeadersContaining(headers map[string]string) RequestAssertion
+	HasQueryMatching(query string) RequestAssertion
+	HasBodyMatching(expectedBody map[string]string) RequestAssertion
+	HasBody(expectedBody string) RequestAssertion
 	HasPath(path string) RequestAssertion
 	HasIdentityOfUser(user *testusers.UserWithWallet) RequestAssertion
 }
 
 type requestAssertion struct {
 	testing.TB
+
 	request *http.Request
 }
 
@@ -110,7 +112,7 @@ func (a *requestAssertion) HasIdentityOfUser(user *testusers.UserWithWallet) Req
 func (a *requestAssertion) extractRequestBody() []byte {
 	a.Helper()
 	bodyBytes, err := io.ReadAll(a.request.Body)
-	assert.NoError(a, err, "failed to read request body: invalid test setup")
+	require.NoError(a, err, "failed to read request body: invalid test setup")
 	// ensure the body is not closed.
 	a.request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 	return bodyBytes

@@ -17,10 +17,23 @@ import (
 	"github.com/go-softwarelab/common/pkg/slogx"
 )
 
-var ErrGeneralMessageInNonGeneralRequest = fmt.Errorf("invalid message type")
+var (
+	ErrGeneralMessageInNonGeneralRequest  = errors.New("invalid message type")
+	ErrInvalidRequestBody                 = errors.New("invalid request body")
+	ErrMissingIdentityKeyInBodyAndHeader  = errors.New("missing identity key in both body and header")
+	ErrFailedToReadRequestID              = errors.New("failed to read request id")
+	ErrMissingIdentityKeyHeader           = errors.New("missing identity key header")
+	ErrInvalidIdentityKeyFormat           = errors.New("invalid identity key format")
+	ErrInvalidSignatureFormat             = errors.New("invalid signature format")
+	ErrFailedToBuildRequestPayload        = errors.New("failed to build request payload")
+	ErrInvalidRequestedCertificatesFormat = errors.New("invalid format of requested certificates in response")
+	ErrInvalidRequestIDFormat             = errors.New("invalid request ID format")
+	ErrMissingIdentityKey                 = errors.New("missing identity key")
+)
 
 type AuthMessageWithRequestID struct {
 	*auth.AuthMessage
+
 	RequestID      string
 	RequestIDBytes []byte
 }
@@ -28,7 +41,7 @@ type AuthMessageWithRequestID struct {
 func extractNonGeneralAuthMessage(log *slog.Logger, req *http.Request) (msg *auth.AuthMessage, err error) {
 	var message auth.AuthMessage
 	if err = json.NewDecoder(req.Body).Decode(&message); err != nil {
-		return nil, fmt.Errorf("invalid request body: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidRequestBody, err)
 	}
 	err = req.Body.Close()
 	if err != nil {
@@ -38,7 +51,7 @@ func extractNonGeneralAuthMessage(log *slog.Logger, req *http.Request) (msg *aut
 	if message.IdentityKey == nil {
 		message.IdentityKey, err = identityKeyFromHeader(req)
 		if err != nil {
-			return nil, fmt.Errorf("missing identity key in both body and header: %w", err)
+			return nil, fmt.Errorf("%w: %w", ErrMissingIdentityKeyInBodyAndHeader, err)
 		}
 	}
 
@@ -57,24 +70,24 @@ func extractGeneralAuthMessage(req *http.Request) (*AuthMessageWithRequestID, er
 
 	requestID, requestIDBytes, err := requestIDFromHeader(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read request id: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrFailedToReadRequestID, err)
 	}
 
 	identityKey := req.Header.Get(brc104.HeaderIdentityKey)
 	if identityKey == "" {
-		return nil, fmt.Errorf("missing identity key header")
+		return nil, ErrMissingIdentityKeyHeader
 	}
 
 	pubKey, err := primitives.PublicKeyFromString(identityKey)
 	if err != nil {
-		return nil, fmt.Errorf("invalid identity key format: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidIdentityKeyFormat, err)
 	}
 
 	signature := req.Header.Get(brc104.HeaderSignature)
 
 	sigBytes, err := hex.DecodeString(signature)
 	if err != nil {
-		return nil, fmt.Errorf("invalid signature format: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidSignatureFormat, err)
 	}
 
 	nonce := req.Header.Get(brc104.HeaderNonce)
@@ -83,7 +96,7 @@ func extractGeneralAuthMessage(req *http.Request) (*AuthMessageWithRequestID, er
 
 	msgPayload, err := authpayload.FromHTTPRequest(requestIDBytes, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build request payload: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrFailedToBuildRequestPayload, err)
 	}
 
 	requestedCertificatesJson := req.Header.Get(brc104.HeaderRequestedCertificates)
@@ -92,7 +105,7 @@ func extractGeneralAuthMessage(req *http.Request) (*AuthMessageWithRequestID, er
 	if requestedCertificatesJson != "" {
 		err = json.Unmarshal([]byte(requestedCertificatesJson), &requestedCertificates)
 		if err != nil {
-			return nil, fmt.Errorf("invalid format of requested certificates in response: %w", err)
+			return nil, fmt.Errorf("%w: %w", ErrInvalidRequestedCertificatesFormat, err)
 		}
 	}
 
@@ -113,11 +126,6 @@ func extractGeneralAuthMessage(req *http.Request) (*AuthMessageWithRequestID, er
 	return msg, nil
 }
 
-var (
-	ErrInvalidIdentityKeyFormat = fmt.Errorf("invalid identity key format")
-	ErrMissingIdentityKey       = fmt.Errorf("missing identity key")
-)
-
 func identityKeyFromHeader(req *http.Request) (*primitives.PublicKey, error) {
 	identityKeyHeader := req.Header.Get(brc104.HeaderIdentityKey)
 	if identityKeyHeader == "" {
@@ -130,8 +138,6 @@ func identityKeyFromHeader(req *http.Request) (*primitives.PublicKey, error) {
 	}
 	return pubKey, nil
 }
-
-var ErrInvalidRequestIDFormat = fmt.Errorf("invalid request ID format")
 
 func requestIDFromHeader(req *http.Request) (string, []byte, error) {
 	requestID := req.Header.Get(brc104.HeaderRequestID)

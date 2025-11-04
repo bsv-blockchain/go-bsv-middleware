@@ -14,6 +14,7 @@ import (
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/testmode"
 	clients "github.com/bsv-blockchain/go-sdk/auth/clients/authhttp"
 	"github.com/go-softwarelab/common/pkg/to"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 )
@@ -101,7 +102,7 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 						HasIdentityOfUser(alice)
 
 					_, err := w.Write([]byte("Pong!"))
-					require.NoError(t, err)
+					assert.NoError(t, err)
 				}).
 				Started()
 			defer cleanup()
@@ -124,6 +125,7 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 
 			// then:
 			require.NoError(t, err, "fetch should succeed")
+			defer func() { _ = response.Body.Close() }()
 
 			// and:
 			then.Response(response).
@@ -159,7 +161,7 @@ func TestAuthMiddlewareAuthenticatesSubsequentTypescriptClientCalls(t *testing.T
 			WithRoute("/", func(w http.ResponseWriter, r *http.Request) {
 				// FIXME(Issue: #145): unify with integration tests when empty response body will be fixed
 				_, err := w.Write([]byte("Pong!"))
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}).
 			Started()
 		defer cleanup()
@@ -176,6 +178,7 @@ func TestAuthMiddlewareAuthenticatesSubsequentTypescriptClientCalls(t *testing.T
 
 		// then:
 		require.NoError(t, err, "first request should succeed")
+		defer func() { _ = response.Body.Close() }()
 		require.NotNil(t, response, "first response should not be nil")
 		require.Equal(t, http.StatusOK, response.StatusCode, "first response status code should be 200")
 
@@ -184,6 +187,7 @@ func TestAuthMiddlewareAuthenticatesSubsequentTypescriptClientCalls(t *testing.T
 
 		// then:
 		require.NoError(t, err, "second request should succeed")
+		defer func() { _ = response.Body.Close() }()
 		require.NotNil(t, response, "second response should not be nil")
 		require.Equal(t, http.StatusOK, response.StatusCode, "second response status code should be 200")
 	})
@@ -200,7 +204,7 @@ func TestAuthMiddlewareAuthenticatesSubsequentTypescriptClientCalls(t *testing.T
 			WithRoute("/", func(w http.ResponseWriter, r *http.Request) {
 				// FIXME(Issue: #145): unify with integration tests when empty response body will be fixed
 				_, err := w.Write([]byte("Pong!"))
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}).
 			Started()
 		defer cleanup()
@@ -217,6 +221,7 @@ func TestAuthMiddlewareAuthenticatesSubsequentTypescriptClientCalls(t *testing.T
 
 		// then:
 		require.NoError(t, err, "first request should succeed")
+		defer func() { _ = response.Body.Close() }()
 		require.NotNil(t, response, "first response should not be nil")
 		require.Equal(t, http.StatusOK, response.StatusCode, "first response status code should be 200")
 
@@ -229,6 +234,7 @@ func TestAuthMiddlewareAuthenticatesSubsequentTypescriptClientCalls(t *testing.T
 
 		// then:
 		require.NoError(t, err, "second request should succeed")
+		defer func() { _ = response.Body.Close() }()
 		require.NotNil(t, response, "second response should not be nil")
 		require.Equal(t, http.StatusOK, response.StatusCode, "second response status code should be 200")
 	})

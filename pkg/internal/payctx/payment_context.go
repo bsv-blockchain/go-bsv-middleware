@@ -2,8 +2,14 @@ package payctx
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
+)
+
+var (
+	ErrPaymentNotFoundInContext       = errors.New("payment not found in context")
+	ErrPaymentUnexpectedTypeInContext = errors.New("payment contains unexpected type in context")
 )
 
 // Payment holds information about a processed payment stored in the request context
@@ -40,12 +46,12 @@ func WithoutPayment(ctx context.Context) context.Context {
 func ShouldGetPayment(ctx context.Context) (*Payment, error) {
 	contextValue := ctx.Value(paymentKey)
 	if contextValue == nil {
-		return nil, fmt.Errorf("%s not found in context", paymentKey)
+		return nil, fmt.Errorf("%s %w", paymentKey, ErrPaymentNotFoundInContext)
 	}
 
 	payment, ok := contextValue.(Payment)
 	if !ok {
-		return nil, fmt.Errorf("%s contains unexpected type %T", paymentKey, contextValue)
+		return nil, fmt.Errorf("%s %w: got %T", paymentKey, ErrPaymentUnexpectedTypeInContext, contextValue)
 	}
 
 	return &payment, nil

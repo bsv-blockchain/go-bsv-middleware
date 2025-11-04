@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/authctx"
@@ -23,6 +24,14 @@ import (
 )
 
 const WellKnownAuthPath = "/.well-known/auth"
+
+var (
+	ErrPeerSendingMessageWithoutIdentityKey = errors.New("peer is trying to send message without identity key")
+	ErrMissingRequestIDInGeneralMessage     = errors.New("missing request ID in general message request")
+	ErrUnsupportedMessageTypeInSend         = errors.New("message type is not supported in auth middleware Send method")
+	ErrCallbackCannotBeNil                  = errors.New("callback cannot be nil")
+	ErrNoCallbackRegistered                 = errors.New("no callback registered")
+)
 
 type Config struct {
 	AllowUnauthenticated   bool
@@ -76,7 +85,9 @@ func NewMiddleware(next http.Handler, wallet wallet.Interface, opts ...func(*Con
 	// auth.NewPeer should call OnData on transport,
 	// that's why here we check for not nil and later we can assume that onDataCallback is not nil.
 	if m.onDataCallback == nil {
-		panic("peer didn't register OnData callback, this is unexpected behavior of go-sdk auth.Peer")
+		logger.Error("peer didn't register OnData callback, this is unexpected behavior of go-sdk auth.Peer")
+		// This is a critical error that indicates a programming error or incompatible SDK version
+		os.Exit(1)
 	}
 
 	if cfg.OnCertificatesReceived != nil {
@@ -110,7 +121,7 @@ func (m *Middleware) Send(ctx context.Context, message *auth.AuthMessage) error 
 	log.DebugContext(ctx, "Preparing response based on auth message")
 
 	if message.IdentityKey == nil {
-		return fmt.Errorf("peer is trying to send message without identity key")
+		return ErrPeerSendingMessageWithoutIdentityKey
 	}
 
 	resp, err := authctx.ShouldGetResponse(ctx)
@@ -130,14 +141,14 @@ func (m *Middleware) Send(ctx context.Context, message *auth.AuthMessage) error 
 		}
 
 	case auth.MessageTypeGeneral:
-		req, err := authctx.ShouldGetRequest(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to retrieve request in transport: %w", err)
+		req, reqErr := authctx.ShouldGetRequest(ctx)
+		if reqErr != nil {
+			return fmt.Errorf("failed to retrieve request in transport: %w", reqErr)
 		}
 
 		requestID := req.Header.Get(brc104.HeaderRequestID)
 		if requestID == "" {
-			return fmt.Errorf("missing request ID in general message request")
+			return ErrMissingRequestIDInGeneralMessage
 		}
 
 		resp.Header().Set(brc104.HeaderRequestID, requestID)
@@ -145,7 +156,7 @@ func (m *Middleware) Send(ctx context.Context, message *auth.AuthMessage) error 
 		log = log.With(logging.RequestID(requestID))
 
 	default:
-		return fmt.Errorf("message type %s is not supported in auth middleware Send method", message.MessageType)
+		return fmt.Errorf("%w: %s", ErrUnsupportedMessageTypeInSend, message.MessageType)
 	}
 
 	resp.Header().Set(brc104.HeaderVersion, message.Version)
@@ -180,7 +191,7 @@ func (m *Middleware) Send(ctx context.Context, message *auth.AuthMessage) error 
 // It is meant to be called by Peer to register a callback on received data by the transport.
 func (m *Middleware) OnData(callback func(ctx context.Context, message *auth.AuthMessage) error) error {
 	if callback == nil {
-		return fmt.Errorf("callback cannot be nil")
+		return ErrCallbackCannotBeNil
 	}
 
 	if m.onDataCallback != nil {
@@ -195,7 +206,7 @@ func (m *Middleware) OnData(callback func(ctx context.Context, message *auth.Aut
 // GetRegisteredOnData implementation of auth.Transport
 func (m *Middleware) GetRegisteredOnData() (func(context.Context, *auth.AuthMessage) error, error) {
 	if m.onDataCallback == nil {
-		return nil, fmt.Errorf("no callback registered")
+		return nil, ErrNoCallbackRegistered
 	}
 
 	return m.onDataCallback, nil

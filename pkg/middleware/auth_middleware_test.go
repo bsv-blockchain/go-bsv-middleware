@@ -172,7 +172,7 @@ func TestAuthMiddlewareAndAuthFetchIntegration(t *testing.T) {
 						HasIdentityOfUser(alice)
 
 					_, err := w.Write([]byte("Pong!"))
-					require.NoError(t, err)
+					assert.NoError(t, err)
 				}).
 				Started()
 			defer cleanup()
@@ -195,6 +195,7 @@ func TestAuthMiddlewareAndAuthFetchIntegration(t *testing.T) {
 
 			// then:
 			require.NoError(t, err, "fetch should succeed")
+			defer func() { _ = response.Body.Close() }()
 
 			// and:
 			then.Response(response).
@@ -230,6 +231,7 @@ func TestAuthMiddlewareHandleSubsequentRequests(t *testing.T) {
 
 		// when:
 		response, err := httpClient.Fetch(t.Context(), given.Server().URL().String(), &clients.SimplifiedFetchRequestOptions{})
+		defer func() { _ = response.Body.Close() }()
 
 		// then:
 		require.NoError(t, err, "first request should succeed")
@@ -237,6 +239,7 @@ func TestAuthMiddlewareHandleSubsequentRequests(t *testing.T) {
 		require.Equal(t, http.StatusNoContent, response.StatusCode, "first response status code should be 200")
 
 		// when:
+		defer func() { _ = response.Body.Close() }()
 		response, err = httpClient.Fetch(t.Context(), given.Server().URL().String(), &clients.SimplifiedFetchRequestOptions{})
 
 		// then:
@@ -269,6 +272,7 @@ func TestAuthMiddlewareHandleSubsequentRequests(t *testing.T) {
 
 		// when:
 		response, err := httpClient.Fetch(t.Context(), given.Server().URL().String(), &clients.SimplifiedFetchRequestOptions{})
+		defer func() { _ = response.Body.Close() }()
 
 		// then:
 		require.NoError(t, err, "first request should succeed")
@@ -300,7 +304,7 @@ func TestHandlingUnauthenticatedRequests(t *testing.T) {
 		// and:
 		cleanup := given.Server().WithMiddleware(authMiddleware).
 			WithRoute("/", func(w http.ResponseWriter, r *http.Request) {
-				require.Fail(t, "handler shouldn't be called when unauthenticated access is disallowed")
+				assert.Fail(t, "handler shouldn't be called when unauthenticated access is disallowed")
 			}).
 			Started()
 		defer cleanup()
@@ -309,10 +313,13 @@ func TestHandlingUnauthenticatedRequests(t *testing.T) {
 		unauthenticatedClient := &http.Client{}
 
 		// when:
-		response, err := unauthenticatedClient.Get(given.Server().URL().String())
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, given.Server().URL().String(), nil)
+		require.NoError(t, err)
+		response, err := unauthenticatedClient.Do(req)
 
 		// then:
-		assert.NoError(t, err)
+		require.NoError(t, err)
+		defer func() { _ = response.Body.Close() }()
 
 		// and:
 		then.Response(response).HasStatus(http.StatusUnauthorized)
@@ -342,10 +349,13 @@ func TestHandlingUnauthenticatedRequests(t *testing.T) {
 		unauthenticatedClient := &http.Client{}
 
 		// when:
-		response, err := unauthenticatedClient.Get(given.Server().URL().String())
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, given.Server().URL().String(), nil)
+		require.NoError(t, err)
+		response, err := unauthenticatedClient.Do(req)
 
 		// then:
-		assert.NoError(t, err)
+		require.NoError(t, err)
+		defer func() { _ = response.Body.Close() }()
 
 		// and:
 		then.Response(response).HasStatus(http.StatusNoContent)

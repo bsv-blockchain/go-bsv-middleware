@@ -1,7 +1,6 @@
 package testabilities
 
 import (
-	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -68,7 +67,9 @@ type RegressionTestFixture interface {
 
 type regressionTestFixture struct {
 	testing.TB
+
 	testabilities.BSVMiddlewareTestsFixture
+
 	initialized bool
 	host        string
 	port        int
@@ -184,9 +185,9 @@ func (f *regressionTestFixture) startGrpcServerFromDocker(mode testmode.DockerGr
 func (f *regressionTestFixture) usingLocalGrpc(mode testmode.LocalGrpcMode) (cleanupGrpcServer func()) {
 	warningMsg := "USING LOCAL GRPC SERVER MODE - ENSURE TO START THE SERVER BEFORE RUNNING THE TESTS"
 
-	fmt.Println(strings.Repeat("!", len(warningMsg)))
-	fmt.Println(warningMsg)
-	fmt.Println(strings.Repeat("!", len(warningMsg)))
+	f.Log(strings.Repeat("!", len(warningMsg)))
+	f.Log(warningMsg)
+	f.Log(strings.Repeat("!", len(warningMsg)))
 
 	f.host = mode.Host
 	f.port = mode.Port

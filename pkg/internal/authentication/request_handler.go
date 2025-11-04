@@ -92,8 +92,8 @@ func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.Re
 
 	log.DebugContext(ctx, "Auth message extracted from request")
 
-	if err := h.handleMessageWithPeer(ctx, authMessage.AuthMessage); err != nil {
-		return errors.Join(ErrProcessingMessageByPeer, err)
+	if peerErr := h.handleMessageWithPeer(ctx, authMessage.AuthMessage); peerErr != nil {
+		return errors.Join(ErrProcessingMessageByPeer, peerErr)
 	}
 	h.log.DebugContext(ctx, "Message successfully processed with peer")
 

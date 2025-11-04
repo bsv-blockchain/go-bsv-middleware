@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/examples/internal/example_wallet"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware"
@@ -36,6 +37,7 @@ func main() {
 		Handler: &AllowAllCORSHandler{
 			Next: authMiddleware.HTTPHandler(mux),
 		},
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	go func() {
@@ -52,9 +54,10 @@ func main() {
 	// Create channel for user input
 	userInput := make(chan struct{})
 	go func() {
-		fmt.Println("Press Enter to shutdown the server... ")
+		slog.Info("Press Enter to shutdown the server... ")
 		// ignoring the errors, because we want to just hang and wait for any input
-		_, _ = fmt.Scanln()
+		var input string
+		_, _ = fmt.Fscanln(os.Stdin, &input)
 		userInput <- struct{}{}
 	}()
 
@@ -87,7 +90,9 @@ func handlerEchoingRequest() func(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for hKey, hValue := range r.Header {
-			response[hKey] = hValue[0]
+			if len(hValue) > 0 {
+				response[hKey] = hValue[0]
+			}
 		}
 
 		responseBody, err := json.Marshal(response)

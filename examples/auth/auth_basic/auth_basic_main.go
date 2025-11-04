@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
+	"log"
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/examples/internal/example_wallet"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware"
@@ -36,13 +37,14 @@ func main() {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write([]byte("Pong!"))
 		if err != nil {
-			panic(err)
+			slog.Error("Failed to write response", "error", err)
 		}
 	})
 
 	server := http.Server{
-		Addr:    ":8888",
-		Handler: authMiddleware.HTTPHandler(mux),
+		Addr:              ":8888",
+		Handler:           authMiddleware.HTTPHandler(mux),
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	go func() {
@@ -62,16 +64,17 @@ func main() {
 
 	response, err := fetch.Fetch(context.Background(), "http://localhost:8888", nil)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
+	defer func() { _ = response.Body.Close() }()
 
-	fmt.Println("=============== Response ==========================")
+	slog.Info("=============== Response ==========================")
 	err = response.Write(os.Stdout)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
-	fmt.Println()
-	fmt.Println("==================================================")
+	slog.Info("")
+	slog.Info("==================================================")
 
 	// Graceful shutdown
 	if err := server.Shutdown(context.Background()); err != nil {

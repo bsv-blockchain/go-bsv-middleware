@@ -25,7 +25,7 @@ func TestPaymentMiddlewareErrors(t *testing.T) {
 		cleanup := given.Server().
 			WithMiddleware(paymentMiddleware).
 			WithRoute("/", func(w http.ResponseWriter, r *http.Request) {
-				require.Fail(t, "handler shouldn't be called when auth middleware is missing")
+				assert.Fail(t, "handler shouldn't be called when auth middleware is missing")
 			}).
 			Started()
 		defer cleanup()
@@ -34,10 +34,13 @@ func TestPaymentMiddlewareErrors(t *testing.T) {
 		unauthenticatedClient := &http.Client{}
 
 		// when:
-		response, err := unauthenticatedClient.Get(given.Server().URL().String())
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, given.Server().URL().String(), nil)
+		require.NoError(t, err)
+		response, err := unauthenticatedClient.Do(req)
 
 		// then:
-		assert.NoError(t, err)
+		require.NoError(t, err)
+		defer func() { _ = response.Body.Close() }()
 		then.Response(response).HasStatus(http.StatusInternalServerError)
 	})
 }
@@ -74,7 +77,7 @@ func TestPaymentMiddlewareSuccess(t *testing.T) {
 				assert.Equal(t, 0, info.SatoshisPaid, "payment info should have 0 satoshis paid")
 
 				_, err = w.Write([]byte("Pong!"))
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}).
 			Started()
 		defer cleanup()
@@ -91,6 +94,7 @@ func TestPaymentMiddlewareSuccess(t *testing.T) {
 
 		// then:
 		require.NoError(t, err, "fetch should succeed")
+		defer func() { _ = response.Body.Close() }()
 
 		// and:
 		then.Response(response).
@@ -133,7 +137,7 @@ func TestPaymentMiddlewareSuccess(t *testing.T) {
 				assert.Equal(t, price, info.SatoshisPaid, "payment info should have calculated price")
 
 				_, err = w.Write([]byte("Pong!"))
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}).
 			Started()
 		defer cleanup()
@@ -148,7 +152,8 @@ func TestPaymentMiddlewareSuccess(t *testing.T) {
 		})
 
 		// then:
-		assert.NoError(t, err)
+		require.NoError(t, err)
+		defer func() { _ = response.Body.Close() }()
 
 		// and:
 		then.Response(response).HasStatus(http.StatusOK).HasBody("Pong!").HasHeader(middleware.HeaderPaymentPaid)

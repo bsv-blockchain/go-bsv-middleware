@@ -28,6 +28,7 @@ type MiddlewareFixture interface {
 
 type middlewareFixture struct {
 	testing.TB
+
 	logger *slog.Logger
 	wallet *wallet.TestWallet
 }
