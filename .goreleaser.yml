@@ -7,11 +7,13 @@ version: 2
 before:
   hooks:
     - |
-      sh -c "if [ \"${SKIP_GORELEASER_TESTS}\" = \"true\" ]; then
-        echo 'Skipping tests (SKIP_GORELEASER_TESTS=true)'
-      else
-        magex test
-      fi"
+      sh -c '
+        if [ "$SKIP_GORELEASER_TESTS" = "true" ]; then
+          echo "Skipping tests (SKIP_GORELEASER_TESTS=true)"
+        else
+          magex test
+        fi
+      '
 changelog:
   sort: asc
   filters:
@@ -23,23 +25,13 @@ changelog:
 # Builder
 # ---------------------------
 builds:
-  - id: go-bsv-middleware
-    main: ./cmd/go-bsv-middleware
-    binary: go-bsv-middleware
-    env:
+  - env:
       - CGO_ENABLED=0
     goos:
       - linux
-      - darwin
       - windows
-    goarch:
-      - amd64
-      - arm64
-    ldflags:
-      - -s -w
-      - -X main.version={{.Version}}
-      - -X main.commit={{.Commit}}
-      - -X main.buildDate={{.Date}}
+      - darwin
+    skip: true
 
 # ---------------------------
 # Archives
