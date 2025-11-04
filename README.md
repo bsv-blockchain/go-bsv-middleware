@@ -1,5 +1,5 @@
 # ⬅️➡️ go-bsv-middleware
-> A powerful Go middleware enabling secure mutual authentication and seamless payments for the BSV ecosystem.
+> Go middleware enabling secure authentication and seamless BSV payments.
 
 <table>
   <thead>
