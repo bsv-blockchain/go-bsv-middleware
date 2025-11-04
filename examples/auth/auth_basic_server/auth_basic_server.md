@@ -8,7 +8,7 @@ The flow:
 1. Initialize an example wallet and create the Auth middleware.
 2. Build an http.ServeMux and register the root handler that echoes request info.
 3. Wrap the mux with a CORS handler and the Auth middleware.
-   - Notice: Handler chain: AllowAllCORSHandler -> Auth middleware -> ServeMux.  
+   - Notice: Handler chain: AllowAllCORSHandler -> Auth middleware -> ServeMux.
 4. Start the server on :8888 and wait until the user presses Enter or sends a termination signal.
 
 This demonstrates where the Auth middleware fits in a real server, handling BRC-103/104 authentication for incoming requests.
