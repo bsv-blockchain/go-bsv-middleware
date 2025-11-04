@@ -1,4 +1,4 @@
-FROM node:24-alpine@sha256:f36fed0b2129a8492535e2853c64fbdbd24d9dc1219ee32170723ca48aebd378 AS base
+FROM node:24.11.0-alpine@sha256:eb7e57db68d1b59e87cb22ae943d2826aa6b0d3a4175a23ca965f49526a1a664 AS base
 WORKDIR /app
 
 RUN apk update && apk add --no-cache protoc protobuf-dev
@@ -15,7 +15,7 @@ COPY src ./src
 RUN npm run build
 
 
-FROM node:24-alpine@sha256:f36fed0b2129a8492535e2853c64fbdbd24d9dc1219ee32170723ca48aebd378
+FROM node:24.11.0-alpine@sha256:eb7e57db68d1b59e87cb22ae943d2826aa6b0d3a4175a23ca965f49526a1a664
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=base /app/package.json ./package.json
