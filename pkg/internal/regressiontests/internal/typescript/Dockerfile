@@ -1,10 +1,10 @@
-FROM node:24-alpine AS base
+FROM node:24-alpine@sha256:f36fed0b2129a8492535e2853c64fbdbd24d9dc1219ee32170723ca48aebd3787 AS base
 WORKDIR /app
 
 RUN apk update && apk add --no-cache protoc protobuf-dev
 
-COPY package.json package-lock.json* ./
-RUN npm ci || npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 
 # Copy sources
 COPY tsconfig.json ./
@@ -15,7 +15,7 @@ COPY src ./src
 RUN npm run build
 
 
-FROM node:24-alpine
+FROM node:24-alpine@sha256:f36fed0b2129a8492535e2853c64fbdbd24d9dc1219ee32170723ca48aebd3787
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=base /app/package.json ./package.json
