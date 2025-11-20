@@ -9,7 +9,7 @@ description = "Generic API Key"
 id = "generic-api-key"
 regex = '''(?i)(\bapi[_-]?key\b|\bsecret\b)'''
 [rules.allowlist]
-description = "Allowlist for test credentials and fixtures"
+description = "Allowlist for test credentials, fixtures, and GitHub Actions workflows"
 regexes = [
     '''gitleaks:allow''',
     '''L1cReZseWmqcYra3vrqj9TPBGHhvDQFD2jYuu1RUj5rrfpVLiKHs''',
@@ -21,4 +21,6 @@ paths = [
     '''pkg/internal/testabilities/fixture/.*''',
     '''pkg/internal/regressiontests/.*''',
     '''examples/.*''',
+    '''\.github/workflows/.*\.yml''',
+    '''\.gitleaksignore''',
 ]
