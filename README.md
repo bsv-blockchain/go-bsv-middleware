@@ -1,90 +1,99 @@
-# ⬅️➡️ go-bsv-middleware
-> Go middleware enabling secure authentication and seamless BSV payments.
+<div align="center">
 
-<table>
-  <thead>
-    <tr>
-      <th>CI&nbsp;/&nbsp;CD</th>
-      <th>Quality&nbsp;&amp;&nbsp;Security</th>
-      <th>Docs&nbsp;&amp;&nbsp;Meta</th>
-      <th>Community</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td valign="top" align="left">
-        <a href="https://github.com/bsv-blockchain/go-bsv-middleware/releases">
-          <img src="https://img.shields.io/github/release-pre/bsv-blockchain/go-bsv-middleware?logo=github&style=flat" alt="Latest Release">
-        </a><br/>
-        <a href="https://github.com/bsv-blockchain/go-bsv-middleware/actions">
-          <img src="https://img.shields.io/github/actions/workflow/status/bsv-blockchain/go-bsv-middleware/fortress.yml?branch=main&logo=github&style=flat" alt="Build Status">
-        </a><br/>
-		    <a href="https://github.com/bsv-blockchain/go-bsv-middleware/actions">
-          <img src="https://github.com/bsv-blockchain/go-bsv-middleware/actions/workflows/codeql-analysis.yml/badge.svg?style=flat" alt="CodeQL">
-        </a><br/>
-		    <a href="https://sonarcloud.io/project/overview?id=bsv-blockchain_go-bsv-middleware">
-          <img src="https://sonarcloud.io/api/project_badges/measure?project=bsv-blockchain_go-bsv-middleware&metric=alert_status&style-flat" alt="SonarCloud">
-        </a>
-      </td>
-      <td valign="top" align="left">
-        <a href="https://goreportcard.com/report/github.com/bsv-blockchain/go-bsv-middleware">
-          <img src="https://goreportcard.com/badge/github.com/bsv-blockchain/go-bsv-middleware?style=flat" alt="Go Report Card">
-        </a><br/>
-		    <a href="https://codecov.io/gh/bsv-blockchain/go-bsv-middleware/tree/main">
-          <img src="https://codecov.io/gh/bsv-blockchain/go-bsv-middleware/branch/main/graph/badge.svg?style=flat" alt="Code Coverage">
-        </a><br/>
-		    <a href="https://scorecard.dev/viewer/?uri=github.com/bsv-blockchain/go-bsv-middleware">
-          <img src="https://api.scorecard.dev/projects/github.com/bsv-blockchain/go-bsv-middleware/badge?logo=springsecurity&logoColor=white" alt="OpenSSF Scorecard">
-        </a><br/>
-		    <a href=".github/SECURITY.md">
-          <img src="https://img.shields.io/badge/security-policy-blue?style=flat&logo=springsecurity&logoColor=white" alt="Security policy">
-        </a>
-      </td>
-      <td valign="top" align="left">
-        <a href="https://golang.org/">
-          <img src="https://img.shields.io/github/go-mod/go-version/bsv-blockchain/go-bsv-middleware?style=flat" alt="Go version">
-        </a><br/>
-        <a href="https://pkg.go.dev/github.com/bsv-blockchain/go-bsv-middleware?tab=doc">
-          <img src="https://pkg.go.dev/badge/github.com/bsv-blockchain/go-bsv-middleware.svg?style=flat" alt="Go docs">
-        </a><br/>
-        <a href=".github/AGENTS.md">
-          <img src="https://img.shields.io/badge/AGENTS.md-found-40b814?style=flat&logo=openai" alt="AGENTS.md rules">
-        </a><br/>
-        <a href="https://magefile.org/">
-          <img src="https://img.shields.io/badge/mage-powered-brightgreen?style=flat&logo=probot&logoColor=white" alt="Mage Powered">
-        </a><br/>
-		    <a href=".github/dependabot.yml">
-          <img src="https://img.shields.io/badge/dependencies-automatic-blue?logo=dependabot&style=flat" alt="Dependabot">
-        </a>
-      </td>
-      <td valign="top" align="left">
-        <a href="https://github.com/bsv-blockchain/go-bsv-middleware/graphs/contributors">
-          <img src="https://img.shields.io/github/contributors/bsv-blockchain/go-bsv-middleware?style=flat&logo=contentful&logoColor=white" alt="Contributors">
-        </a><br/>
-        <a href="https://github.com/bsv-blockchain/go-bsv-middleware/commits/main">
-          <img src="https://img.shields.io/github/last-commit/bsv-blockchain/go-bsv-middleware?style=flat&logo=clockify&logoColor=white" alt="Last commit">
-        </a><br/>
-        <a href="https://github.com/sponsors/bsv-blockchain">
-          <img src="https://img.shields.io/badge/sponsor-BSV-181717.svg?logo=github&style=flat" alt="Sponsor">
-        </a><br/>
-      </td>
-    </tr>
-  </tbody>
-</table>
+# ⬅️➡️&nbsp;&nbsp;go-bsv-middleware
+
+**Go middleware enabling secure authentication and seamless BSV payments.**
 
 <br/>
 
-## 🗂️ Table of Contents
-* [Installation](#-installation)
-* [Documentation](#-documentation)
-* [Examples & Tests](#-examples--tests)
-* [Benchmarks](#-benchmarks)
-* [Code Standards](#-code-standards)
-* [AI Compliance](#-ai-compliance)
-* [Maintainers](#-maintainers)
-* [Contributing](#-contributing)
-* [License](#-license)
+<a href="https://github.com/bsv-blockchain/go-bsv-middleware/releases"><img src="https://img.shields.io/github/release-pre/bsv-blockchain/go-bsv-middleware?include_prereleases&style=flat-square&logo=github&color=black" alt="Release"></a>
+<a href="https://golang.org/"><img src="https://img.shields.io/github/go-mod/go-version/bsv-blockchain/go-bsv-middleware?style=flat-square&logo=go&color=00ADD8" alt="Go Version"></a>
+<a href="https://github.com/bsv-blockchain/go-bsv-middleware/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-OpenBSV-blue?style=flat-square" alt="License"></a>
 
+<br/>
+
+<table align="center" border="0">
+  <tr>
+    <td align="right">
+       <code>CI / CD</code> &nbsp;&nbsp;
+    </td>
+    <td align="left">
+       <a href="https://github.com/bsv-blockchain/go-bsv-middleware/actions"><img src="https://img.shields.io/github/actions/workflow/status/bsv-blockchain/go-bsv-middleware/fortress.yml?branch=main&label=build&logo=github&style=flat-square" alt="Build"></a>
+       <a href="https://github.com/bsv-blockchain/go-bsv-middleware/actions"><img src="https://img.shields.io/github/last-commit/bsv-blockchain/go-bsv-middleware?style=flat-square&logo=git&logoColor=white&label=last%20update" alt="Last Commit"></a>
+    </td>
+    <td align="right">
+       &nbsp;&nbsp;&nbsp;&nbsp; <code>Quality</code> &nbsp;&nbsp;
+    </td>
+    <td align="left">
+       <a href="https://goreportcard.com/report/github.com/bsv-blockchain/go-bsv-middleware"><img src="https://goreportcard.com/badge/github.com/bsv-blockchain/go-bsv-middleware?style=flat-square" alt="Go Report"></a>
+       <a href="https://codecov.io/gh/bsv-blockchain/go-bsv-middleware"><img src="https://codecov.io/gh/bsv-blockchain/go-bsv-middleware/branch/main/graph/badge.svg?style=flat-square" alt="Coverage"></a>
+    </td>
+  </tr>
+
+  <tr>
+    <td align="right">
+       <code>Security</code> &nbsp;&nbsp;
+    </td>
+    <td align="left">
+       <a href="https://scorecard.dev/viewer/?uri=github.com/bsv-blockchain/go-bsv-middleware"><img src="https://api.scorecard.dev/projects/github.com/bsv-blockchain/go-bsv-middleware/badge?style=flat-square" alt="Scorecard"></a>
+       <a href=".github/SECURITY.md"><img src="https://img.shields.io/badge/policy-active-success?style=flat-square&logo=security&logoColor=white" alt="Security"></a>
+    </td>
+    <td align="right">
+       &nbsp;&nbsp;&nbsp;&nbsp; <code>Community</code> &nbsp;&nbsp;
+    </td>
+    <td align="left">
+       <a href="https://github.com/bsv-blockchain/go-bsv-middleware/graphs/contributors"><img src="https://img.shields.io/github/contributors/bsv-blockchain/go-bsv-middleware?style=flat-square&color=orange" alt="Contributors"></a>
+       <a href="https://github.com/sponsors/bsv-blockchain"><img src="https://img.shields.io/badge/sponsor-BSV-181717.svg?logo=github&style=flat-square" alt="Sponsor"></a>
+    </td>
+  </tr>
+</table>
+
+</div>
+
+<br/>
+<br/>
+
+<div align="center">
+
+### <code>Project Navigation</code>
+
+</div>
+
+<table align="center">
+  <tr>
+    <td align="center" width="33%">
+       📦&nbsp;<a href="#-installation"><code>Installation</code></a>
+    </td>
+    <td align="center" width="33%">
+       🧪&nbsp;<a href="#-examples--tests"><code>Examples&nbsp;&&nbsp;Tests</code></a>
+    </td>
+    <td align="center" width="33%">
+       📚&nbsp;<a href="#-documentation"><code>Documentation</code></a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+       🤝&nbsp;<a href="#-contributing"><code>Contributing</code></a>
+    </td>
+    <td align="center">
+      🛠️&nbsp;<a href="#-code-standards"><code>Code&nbsp;Standards</code></a>
+    </td>
+    <td align="center">
+      ⚡&nbsp;<a href="#-benchmarks"><code>Benchmarks</code></a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      🤖&nbsp;<a href="#-ai-compliance"><code>AI&nbsp;Compliance</code></a>
+    </td>
+    <td align="center">
+       ⚖️&nbsp;<a href="#-license"><code>License</code></a>
+    </td>
+    <td align="center">
+       👥&nbsp;<a href="#-maintainers"><code>Maintainers</code></a>
+    </td>
+  </tr>
+</table>
 <br/>
 
 ## 📦 Installation
