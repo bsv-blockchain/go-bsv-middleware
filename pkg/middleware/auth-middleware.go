@@ -5,10 +5,11 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/authentication"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/auth/utils"
 	"github.com/bsv-blockchain/go-sdk/wallet"
+
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/authentication"
 )
 
 // AuthMiddlewareConfig configures the auth middleware

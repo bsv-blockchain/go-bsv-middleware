@@ -4,11 +4,12 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/authctx"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/testabilities/testusers"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestShouldGetIdentity(t *testing.T) {

@@ -7,8 +7,9 @@ import (
 	"mime"
 	"net/http"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/httperror"
 	"github.com/go-softwarelab/common/pkg/slogx"
+
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/httperror"
 )
 
 func DefaultErrorHandler(ctx context.Context, log *slog.Logger, httpErr *httperror.Error, res http.ResponseWriter, req *http.Request) {

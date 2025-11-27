@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/authctx"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
+
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/authctx"
 )
 
 // ShouldGetIdentity returns the identity from the context.

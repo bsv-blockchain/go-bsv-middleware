@@ -12,15 +12,16 @@ import (
 	"os"
 	"strings"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/authctx"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/httperror"
 	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/auth/brc104"
 	"github.com/bsv-blockchain/go-sdk/auth/utils"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 	"github.com/go-softwarelab/common/pkg/slogx"
 	"github.com/go-softwarelab/common/pkg/to"
+
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/authctx"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware/httperror"
 )
 
 const WellKnownAuthPath = "/.well-known/auth"

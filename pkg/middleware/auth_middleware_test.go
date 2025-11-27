@@ -6,13 +6,14 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/testabilities"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/testabilities/testusers"
-	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware"
 	clients "github.com/bsv-blockchain/go-sdk/auth/clients/authhttp"
 	"github.com/go-softwarelab/common/pkg/to"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/testabilities"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/testabilities/testusers"
+	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware"
 )
 
 func TestAuthMiddlewareAndAuthFetchIntegration(t *testing.T) {

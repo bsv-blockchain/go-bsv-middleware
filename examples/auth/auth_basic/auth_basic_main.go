@@ -9,9 +9,10 @@ import (
 	"os"
 	"time"
 
+	clients "github.com/bsv-blockchain/go-sdk/auth/clients/authhttp"
+
 	"github.com/bsv-blockchain/go-bsv-middleware/examples/internal/example_wallet"
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/middleware"
-	clients "github.com/bsv-blockchain/go-sdk/auth/clients/authhttp"
 )
 
 // EXAMPLE_CREDENTIALS - These are test/example credentials for demonstration purposes only
