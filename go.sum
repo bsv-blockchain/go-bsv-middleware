@@ -6,8 +6,8 @@ github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c h1:udKWzYgxTojEK
 github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c/go.mod h1:xomTg63KZ2rFqZQzSB4Vz2SUXa1BpHTVz9L5PTmPC4E=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
-github.com/bsv-blockchain/go-sdk v1.2.12 h1:t/50ONqCTgumJH82YbQ8iqdo30ezIACyuFgvyHbkX9A=
-github.com/bsv-blockchain/go-sdk v1.2.12/go.mod h1:1FWCWH+x6xc1kH9r6tuyRQqUomfrLBOQfdPesJZK/1k=
+github.com/bsv-blockchain/go-sdk v1.2.13 h1:jcIff1WWAchtgxHJO80Y57LbxmwUG0rS48pmY6SvgnM=
+github.com/bsv-blockchain/go-sdk v1.2.13/go.mod h1:HugEqK6K46nUAN0Xr9xq0HW8QHtpJmAg05NmcxPc1Lk=
 github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK343L8=
 github.com/cenkalti/backoff/v4 v4.3.0/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
 github.com/containerd/errdefs v1.0.0 h1:tg5yIfIlQIrxYtu9ajqY42W3lpS19XqdxRQeEwYG8PI=
