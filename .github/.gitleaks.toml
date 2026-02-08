@@ -22,5 +22,7 @@ paths = [
     '''pkg/internal/regressiontests/.*''',
     '''examples/.*''',
     '''\.github/workflows/.*\.yml''',
+    '''\.github/docs/.*''',
+    '''\.github/env/.*''',
     '''\.gitleaksignore''',
 ]
