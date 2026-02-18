@@ -1,6 +1,6 @@
 {
     "dependencies": {
-        "@bsv/sdk": "^1.7.3",
+        "@bsv/sdk": "^2.0.0",
         "@grpc/grpc-js": "^1.11.1",
         "minimist": "^1.2.8"
     },
