@@ -37,7 +37,7 @@ func TestPaymentMiddlewareErrors(t *testing.T) {
 		// when:
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, given.Server().URL().String(), nil)
 		require.NoError(t, err)
-		response, err := unauthenticatedClient.Do(req)
+		response, err := unauthenticatedClient.Do(req) //nolint:gosec // G704: test client hitting local test server
 
 		// then:
 		require.NoError(t, err)

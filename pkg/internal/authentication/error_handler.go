@@ -33,7 +33,7 @@ func DefaultErrorHandler(ctx context.Context, log *slog.Logger, httpErr *httperr
 	res.Header().Set("X-Content-Type-Options", "nosniff")
 
 	res.WriteHeader(httpErr.StatusCode)
-	_, err = res.Write([]byte(body))
+	_, err = res.Write([]byte(body)) //nolint:gosec // G705: body is either plain text or %q-quoted JSON, Content-Type is set to prevent XSS
 	if err != nil {
 		log.ErrorContext(ctx, "Failed to write error body", slogx.Error(err), slog.String("body", body))
 	}
