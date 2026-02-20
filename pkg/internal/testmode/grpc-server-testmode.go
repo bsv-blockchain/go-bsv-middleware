@@ -200,6 +200,6 @@ func GetGrpcServerMode() Mode {
 		return mode
 	}
 
-	log.Fatalf("%s: %s=%s", ErrFailedToDetermineGrpcServerMode, grpcModeEnvVar, os.Getenv(grpcModeEnvVar))
+	log.Fatalf("%s: %s=%s", ErrFailedToDetermineGrpcServerMode, grpcModeEnvVar, os.Getenv(grpcModeEnvVar)) //nolint:gosec // G706: internal fatal log for configuration error, not user-controlled input
 	return nil
 }
