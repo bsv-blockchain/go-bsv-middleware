@@ -53,7 +53,7 @@ func (r *ResponseWriterWrapper) Flush() error {
 	}
 	r.ResponseWriter.WriteHeader(r.statusCode)
 	if len(r.body) > 0 {
-		_, err := r.ResponseWriter.Write(r.body)
+		_, err := r.ResponseWriter.Write(r.body) //nolint:gosec // G705: body is buffered from internal writes, not directly from user input
 		if err != nil {
 			return fmt.Errorf("error while writing response: %w", err)
 		}
