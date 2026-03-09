@@ -33,6 +33,7 @@ func (f *clientFixture) ForUser(user *testusers.UserWithWallet) (client *typescr
 }
 
 func (f *clientFixture) ForKey(key string) (client *typescript.AuthFetch, cleanup func()) {
-	opts := []func(*typescript.AuthFetchClientOptions){typescript.WithLogger(slogx.NewTestLogger(f))}
+	opts := make([]func(*typescript.AuthFetchClientOptions), 0, 1+len(f.opts))
+	opts = append(opts, typescript.WithLogger(slogx.NewTestLogger(f)))
 	return typescript.NewAuthFetch(wallet.PrivHex(key), append(opts, f.opts...)...)
 }
