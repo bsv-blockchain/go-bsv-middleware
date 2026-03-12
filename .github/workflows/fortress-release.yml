@@ -61,7 +61,7 @@ jobs:
       # Checkout code and set up Go environment
       # --------------------------------------------------------------------
       - name: 📥 Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0 # Required for changelog generation
           token: ${{ secrets.github-token }}
@@ -91,6 +91,7 @@ jobs:
           go-secondary-version: ${{ inputs.go-primary-version }}
           go-sum-file: ${{ inputs.go-sum-file }}
           enable-multi-module: ${{ env.ENABLE_MULTI_MODULE_TESTING }}
+          github-token: ${{ secrets.github-token }}
 
       # --------------------------------------------------------------------
       # Validate version tag format
@@ -173,7 +174,7 @@ jobs:
       # --------------------------------------------------------------------
       - name: 💾 Cache golangci-lint analysis
         id: cache-golangci-lint
-        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: ${{ env.GOLANGCI_LINT_CACHE }}
           key: ${{ inputs.primary-runner }}-golangci-lint-analysis-${{ hashFiles('.golangci.json', env.GO_SUM_FILE) }}-${{ inputs.golangci-lint-version }}
@@ -197,6 +198,7 @@ jobs:
             else
               echo "❌ GoReleaser configuration is invalid" >&2
               echo "goreleaser_config_status=invalid" >> $GITHUB_OUTPUT
+              echo "::error title=Release Config Invalid::GoReleaser configuration validation failed - see job summary for details"
               exit 1
             fi
           else
@@ -207,6 +209,7 @@ jobs:
             else
               echo "❌ GoReleaser configuration is invalid" >&2
               echo "goreleaser_config_status=invalid" >> $GITHUB_OUTPUT
+              echo "::error title=Release Config Invalid::GoReleaser configuration validation failed - see job summary for details"
               exit 1
             fi
           fi
@@ -319,6 +322,7 @@ jobs:
                 echo "❌ GoReleaser with godocs via MAGE-X encountered issues" >&2
                 echo "goreleaser_status=failure" >> $GITHUB_OUTPUT
                 echo "godocs_published=false" >> $GITHUB_OUTPUT
+                echo "::error title=Release Failed::GoReleaser with godocs failed - see job summary for details"
                 exit 1
               fi
             else
@@ -331,6 +335,7 @@ jobs:
                 echo "❌ GoReleaser with godocs via MAGE-X encountered issues" >&2
                 echo "goreleaser_status=failure" >> $GITHUB_OUTPUT
                 echo "godocs_published=false" >> $GITHUB_OUTPUT
+                echo "::error title=Release Failed::GoReleaser with godocs failed - see job summary for details"
                 exit 1
               fi
             fi
@@ -346,6 +351,7 @@ jobs:
                 echo "❌ GoReleaser via MAGE-X encountered issues" >&2
                 echo "goreleaser_status=failure" >> $GITHUB_OUTPUT
                 echo "godocs_published=skipped" >> $GITHUB_OUTPUT
+                echo "::error title=Release Failed::GoReleaser failed - see job summary for details"
                 exit 1
               fi
             else
@@ -358,6 +364,7 @@ jobs:
                 echo "❌ GoReleaser via MAGE-X encountered issues" >&2
                 echo "goreleaser_status=failure" >> $GITHUB_OUTPUT
                 echo "godocs_published=skipped" >> $GITHUB_OUTPUT
+                echo "::error title=Release Failed::GoReleaser failed - see job summary for details"
                 exit 1
               fi
             fi

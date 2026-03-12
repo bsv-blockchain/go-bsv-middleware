@@ -44,6 +44,10 @@ on:
         description: "Path to go.sum file for dependency verification"
         required: true
         type: string
+    secrets:
+      github-token:
+        description: "GitHub token for private module authentication (optional, only needed when GOPRIVATE is set)"
+        required: false
 
 # Security: Restrict default permissions (jobs must explicitly request what they need)
 permissions: {}
@@ -65,7 +69,7 @@ jobs:
       # Checkout code (required for local actions)
       # --------------------------------------------------------------------
       - name: 📥 Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       # --------------------------------------------------------------------
       # Parse environment variables
@@ -88,6 +92,7 @@ jobs:
           go-secondary-version: ${{ inputs.go-secondary-version }}
           go-sum-file: ${{ inputs.go-sum-file }}
           enable-multi-module: ${{ env.ENABLE_MULTI_MODULE_TESTING }}
+          github-token: ${{ secrets.github-token }}
 
       # --------------------------------------------------------------------
       # Extract Go module directory from GO_SUM_FILE path
@@ -222,27 +227,6 @@ jobs:
           fi
 
       # --------------------------------------------------------------------
-      # Generate fuzz test statistics using composite action
-      # --------------------------------------------------------------------
-      - name: 📊 Calculate fuzz test statistics
-        id: fuzz-summary
-        if: always()
-        uses: ./.github/actions/test-statistics
-        with:
-          matrix-name: "Fuzz Tests (${{ inputs.primary-runner }})"
-          matrix-os: ${{ inputs.primary-runner }}
-          matrix-go-version: ${{ inputs.go-primary-version }}
-          test-exit-code: ${{ steps.run-fuzz-tests.outputs.fuzz-exit-code || '0' }}
-          output-mode: "FULL"
-          job-status: ${{ job.status }}
-          test-start-time: ${{ steps.fuzz-timer.outputs.fuzz-start || '0' }}
-          race-detection-enabled: "false"
-          code-coverage-enabled: "false"
-          fuzz-run: "true"
-          failures-file: "fuzz-failures.txt"
-          output-file: "fuzz-output.log"
-
-      # --------------------------------------------------------------------
       # Collect performance cache statistics
       # --------------------------------------------------------------------
       - name: 📊 Collect performance cache statistics
@@ -272,11 +256,11 @@ jobs:
       # --------------------------------------------------------------------
       - name: 📤 Upload fuzz test outputs
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: ./.github/actions/upload-artifact-resilient
         with:
-          name: test-results-fuzz-${{ inputs.primary-runner }}-${{ inputs.go-primary-version }}
-          path: |
+          artifact-name: test-results-fuzz-${{ inputs.primary-runner }}-${{ inputs.go-primary-version }}
+          artifact-path: |
             .mage-x/ci-results-fuzz.jsonl
             fuzz-output.log
-          retention-days: 1
+          retention-days: "7"
           if-no-files-found: ignore

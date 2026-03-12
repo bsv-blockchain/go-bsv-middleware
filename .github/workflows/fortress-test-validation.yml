@@ -55,7 +55,7 @@ jobs:
       # Checkout code (required for local actions)
       # --------------------------------------------------------------------
       - name: 📥 Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       # --------------------------------------------------------------------
       # Parse environment variables
@@ -412,9 +412,9 @@ jobs:
       # --------------------------------------------------------------------
       - name: 📤 Upload validation summary
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: ./.github/actions/upload-artifact-resilient
         with:
-          name: validation-summary
-          path: ci-results/
-          retention-days: 1
+          artifact-name: validation-summary
+          artifact-path: ci-results/
+          retention-days: "7"
           if-no-files-found: ignore

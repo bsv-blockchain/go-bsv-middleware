@@ -65,7 +65,7 @@ jobs:
       # Checkout repository for local actions
       # --------------------------------------------------------------------
       - name: 📥 Checkout Repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       # --------------------------------------------------------------------
       # Parse environment variables
@@ -538,6 +538,12 @@ jobs:
           LOC_OUTPUT=$(magex metrics:loc json 2>&1 || true)
           LOC_FOUND=false
 
+          # Save raw JSON for loc-stats artifact (consumed by go-broadcast analytics)
+          if [[ -n "$LOC_OUTPUT" ]] && echo "$LOC_OUTPUT" | jq empty 2>/dev/null; then
+            echo "$LOC_OUTPUT" > loc-stats.json
+            echo "📦 Saved loc-stats.json for artifact upload"
+          fi
+
           if [[ -n "$LOC_OUTPUT" ]]; then
             echo "📋 magex metrics:loc json output:"
             echo "$LOC_OUTPUT"
@@ -677,6 +683,14 @@ jobs:
       # --------------------------------------------------------------------
       # Upload statistics section
       # --------------------------------------------------------------------
+      - name: 📤 Upload LOC Stats JSON
+        if: always() && hashFiles('loc-stats.json') != ''
+        uses: ./.github/actions/upload-artifact-resilient
+        with:
+          artifact-name: loc-stats
+          artifact-path: loc-stats.json
+          retention-days: "7"
+
       - name: 📤 Upload Statistics Section
         id: upload-section
         if: always()
@@ -697,7 +711,7 @@ jobs:
         with:
           artifact-name: "statistics-section"
           artifact-path: "statistics-section.md"
-          retention-days: "1"
+          retention-days: "7"
           if-no-files-found: "warn"
 
       - name: 📋 Set Output Content

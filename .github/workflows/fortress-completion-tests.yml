@@ -61,7 +61,7 @@ jobs:
       # Checkout repository for local actions
       # --------------------------------------------------------------------
       - name: 📥 Checkout Repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       # --------------------------------------------------------------------
       # Parse environment variables
@@ -333,7 +333,7 @@ jobs:
               if [[ "${{ env.ENABLE_GO_TESTS }}" == "false" ]]; then
                 echo "| **Test Suite** | ❌ Disabled - Set ENABLE_GO_TESTS=true to enable |"
                 echo "| **Reason** | Tests are disabled via configuration flag |"
-                echo "| **Note** | Enable ENABLE_GO_TESTS in .env.custom or .env.base to run tests |"
+                echo "| **Note** | Enable ENABLE_GO_TESTS in .github/env/00-core.env to run tests |"
               else
                 echo "| **Test Suite** | ⚠️ Skipped - No test statistics available |"
                 echo "| **Reason** | Tests may have been skipped for fork PR security restrictions |"
@@ -465,7 +465,7 @@ jobs:
         with:
           artifact-name: "tests-section"
           artifact-path: "tests-section.md"
-          retention-days: "1"
+          retention-days: "7"
           if-no-files-found: "warn"
 
       - name: 📋 Set Output Content

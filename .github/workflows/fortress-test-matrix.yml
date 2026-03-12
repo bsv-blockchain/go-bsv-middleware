@@ -97,6 +97,10 @@ on:
         description: "Path to go.sum file for dependency verification"
         required: true
         type: string
+    secrets:
+      github-token:
+        description: "GitHub token for private module authentication (optional, only needed when GOPRIVATE is set)"
+        required: false
 
 # Security: Restrict default permissions (jobs must explicitly request what they need)
 permissions: {}
@@ -128,7 +132,7 @@ jobs:
       # Checkout code (required for local actions)
       # --------------------------------------------------------------------
       - name: 📥 Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       # --------------------------------------------------------------------
       # Parse environment variables
@@ -151,6 +155,7 @@ jobs:
           go-secondary-version: ${{ inputs.go-secondary-version }}
           go-sum-file: ${{ inputs.go-sum-file }}
           enable-multi-module: ${{ env.ENABLE_MULTI_MODULE_TESTING }}
+          github-token: ${{ secrets.github-token }}
 
       # --------------------------------------------------------------------
       # Extract Go module directory from GO_SUM_FILE path
@@ -248,8 +253,8 @@ jobs:
             echo "🏁 Running tests with race detection (timeout: $TEST_TIMEOUT)..."
           else
             TEST_TIMEOUT="${TEST_TIMEOUT_UNIT:-20m}"
-            TEST_TYPE="unit"
-            echo "🏁 Running tests without coverage or race detection (timeout: $TEST_TIMEOUT)..."
+            TEST_TYPE="short"
+            echo "🏁 Running short tests (skipping integration tests) (timeout: $TEST_TIMEOUT)..."
           fi
 
           # magex CI mode auto-detects GitHub Actions and produces structured output
@@ -279,6 +284,11 @@ jobs:
           # Set outputs
           echo "test-exit-code=$TEST_EXIT_CODE" >> $GITHUB_OUTPUT
           echo "🏁 Test execution completed with exit code: $TEST_EXIT_CODE"
+
+          # Emit GitHub annotation for test failures (surfaces at top of Actions UI)
+          if [[ "$TEST_EXIT_CODE" != "0" ]]; then
+            echo "::error title=Test Suite Failed (${{ matrix.name }})::Tests failed on ${{ matrix.os }} with Go ${{ matrix.go-version }} - see job summary for details"
+          fi
 
           # Calculate duration
           TEST_END=$(date +%s)
@@ -396,13 +406,13 @@ jobs:
       # --------------------------------------------------------------------
       - name: 📤 Upload CI results
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: ./.github/actions/upload-artifact-resilient
         with:
-          name: ci-results-${{ matrix.os }}-${{ matrix.go-version }}
-          path: |
+          artifact-name: ci-results-${{ matrix.os }}-${{ matrix.go-version }}
+          artifact-path: |
             .mage-x/ci-results.jsonl
             test-output.log
-          retention-days: 1
+          retention-days: "7"
           if-no-files-found: ignore
 
       # --------------------------------------------------------------------
@@ -437,8 +447,9 @@ jobs:
       # --------------------------------------------------------------------
       - name: 📤 Upload coverage data
         if: inputs.code-coverage-enabled == 'true' && hashFiles('coverage.txt') != '' && matrix.os == inputs.primary-runner && matrix.go-version == inputs.go-primary-version
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: ./.github/actions/upload-artifact-resilient
         with:
-          name: coverage-data
-          path: coverage.txt
-          retention-days: 1
+          artifact-name: coverage-data
+          artifact-path: coverage.txt
+          retention-days: "7"
+          continue-on-error: "false"
