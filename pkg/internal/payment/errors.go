@@ -5,7 +5,7 @@ import "net/http"
 type ErrorStatus string
 
 func (s ErrorStatus) MarshalJSON() ([]byte, error) {
-	return []byte("error"), nil
+	return []byte(`"error"`), nil
 }
 
 type ErrorResponse struct {
