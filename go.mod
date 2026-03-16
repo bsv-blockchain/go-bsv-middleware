@@ -1,11 +1,9 @@
 module github.com/bsv-blockchain/go-bsv-middleware
 
-go 1.24.3
-
-toolchain go1.24.4
+go 1.25.0
 
 require (
-	github.com/bsv-blockchain/go-sdk v1.2.18
+	github.com/bsv-blockchain/go-sdk v1.2.19
 	github.com/go-softwarelab/common v1.8.0
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.40.0
@@ -63,10 +61,10 @@ require (
 	go.opentelemetry.io/otel/metric v1.40.0 // indirect
 	go.opentelemetry.io/otel/trace v1.40.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.8.0 // indirect
-	golang.org/x/crypto v0.47.0 // indirect
-	golang.org/x/net v0.49.0 // indirect
+	golang.org/x/crypto v0.48.0 // indirect
+	golang.org/x/net v0.51.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
-	golang.org/x/text v0.33.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260203192932-546029d2fa20 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
