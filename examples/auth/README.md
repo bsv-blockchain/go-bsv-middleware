@@ -11,7 +11,7 @@ The examples showcase different authentication scenarios using the `go-bsv-middl
 
 ## Requirements
 
-- Go 1.24 or higher
+- Go 1.25 or higher
 - The `go-bsv-middleware` package and its dependencies
 
 ## Run examples
