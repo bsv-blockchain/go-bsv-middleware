@@ -171,7 +171,7 @@ func (f *regressionTestFixture) startGrpcServerFromDocker(mode testmode.DockerGr
 	}
 
 	f.host = "localhost"
-	f.port = port.Int()
+	f.port = int(port.Num())
 	f.initialized = true
 
 	return func() {
