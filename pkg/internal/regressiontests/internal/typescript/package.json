@@ -1,7 +1,7 @@
 {
     "dependencies": {
         "@bsv/sdk": "^2.0.0",
-        "@grpc/grpc-js": "^1.11.1",
+        "@grpc/grpc-js": "^1.13.5",
         "minimist": "^1.2.8"
     },
     "description": "Minimal Node.js + TypeScript gRPC server exposing an async fetch method.",
