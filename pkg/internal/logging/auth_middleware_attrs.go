@@ -9,7 +9,8 @@ import (
 
 // AuthMessage returns a logger attribute for the given auth message.
 func AuthMessage(message *auth.AuthMessage) slog.Attr {
-	return slog.Group("authMsg",
+	return slog.Group(
+		"authMsg",
 		slogx.String("type", message.MessageType),
 		slog.String("identityKey", message.IdentityKey.ToDERHex()),
 		slog.String("initialNonce", message.InitialNonce),
