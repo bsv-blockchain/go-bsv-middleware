@@ -114,7 +114,8 @@ func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.Re
 			StatusCode: response.GetStatusCode(),
 			Header:     response.Header(),
 			Body:       response.GetBody(),
-		})
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create response payload: %w", err)
 	}
