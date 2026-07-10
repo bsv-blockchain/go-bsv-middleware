@@ -183,21 +183,22 @@ func (m *Middleware) processPayment(
 		return nil, NewProcessingError(ErrInvalidDerivationSuffix, fmt.Errorf("invalid derivation suffix: must be base64: %w", err))
 	}
 
-	result, err := m.wallet.InternalizeAction(ctx, wallet.InternalizeActionArgs{
-		Tx: paymentData.Transaction,
-		Outputs: []wallet.InternalizeOutput{
-			{
-				OutputIndex: 0,
-				Protocol:    wallet.InternalizeProtocolWalletPayment,
-				PaymentRemittance: &wallet.Payment{
-					DerivationPrefix:  derivationPrefix,
-					DerivationSuffix:  derivationSuffix,
-					SenderIdentityKey: identityKey,
+	result, err := m.wallet.InternalizeAction(
+		ctx, wallet.InternalizeActionArgs{
+			Tx: paymentData.Transaction,
+			Outputs: []wallet.InternalizeOutput{
+				{
+					OutputIndex: 0,
+					Protocol:    wallet.InternalizeProtocolWalletPayment,
+					PaymentRemittance: &wallet.Payment{
+						DerivationPrefix:  derivationPrefix,
+						DerivationSuffix:  derivationSuffix,
+						SenderIdentityKey: identityKey,
+					},
 				},
 			},
+			Description: "Payment for request",
 		},
-		Description: "Payment for request",
-	},
 		PaymentOriginator,
 	)
 	if err != nil {
