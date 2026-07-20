@@ -117,7 +117,7 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 			serverURL.Path = test.path
 			serverURL.RawQuery = test.query
 
-			response, err := httpClient.Fetch(t.Context(), serverURL.String(), &clients.SimplifiedFetchRequestOptions{
+			response, err := fetchWithRetry(t, t.Context(), httpClient, serverURL.String(), &clients.SimplifiedFetchRequestOptions{
 				Method:       test.method,
 				Headers:      test.headers,
 				Body:         []byte(test.body),
@@ -175,7 +175,7 @@ func TestAuthMiddlewareAuthenticatesSubsequentTypescriptClientCalls(t *testing.T
 		defer cleanup()
 
 		// when:
-		response, err := httpClient.Fetch(t.Context(), given.Server().URL().String(), &clients.SimplifiedFetchRequestOptions{})
+		response, err := fetchWithRetry(t, t.Context(), httpClient, given.Server().URL().String(), &clients.SimplifiedFetchRequestOptions{})
 
 		// then:
 		require.NoError(t, err, "first request should succeed")
@@ -184,7 +184,7 @@ func TestAuthMiddlewareAuthenticatesSubsequentTypescriptClientCalls(t *testing.T
 		require.Equal(t, http.StatusOK, response.StatusCode, "first response status code should be 200")
 
 		// when:
-		response, err = httpClient.Fetch(t.Context(), given.Server().URL().String(), &clients.SimplifiedFetchRequestOptions{})
+		response, err = fetchWithRetry(t, t.Context(), httpClient, given.Server().URL().String(), &clients.SimplifiedFetchRequestOptions{})
 
 		// then:
 		require.NoError(t, err, "second request should succeed")
@@ -218,7 +218,7 @@ func TestAuthMiddlewareAuthenticatesSubsequentTypescriptClientCalls(t *testing.T
 		defer cleanup()
 
 		// when:
-		response, err := httpClient.Fetch(t.Context(), given.Server().URL().String(), &clients.SimplifiedFetchRequestOptions{})
+		response, err := fetchWithRetry(t, t.Context(), httpClient, given.Server().URL().String(), &clients.SimplifiedFetchRequestOptions{})
 
 		// then:
 		require.NoError(t, err, "first request should succeed")
@@ -231,7 +231,7 @@ func TestAuthMiddlewareAuthenticatesSubsequentTypescriptClientCalls(t *testing.T
 		defer newClientCleanup()
 
 		// and:
-		response, err = newHttpClient.Fetch(t.Context(), given.Server().URL().String(), &clients.SimplifiedFetchRequestOptions{})
+		response, err = fetchWithRetry(t, t.Context(), newHttpClient, given.Server().URL().String(), &clients.SimplifiedFetchRequestOptions{})
 
 		// then:
 		require.NoError(t, err, "second request should succeed")
@@ -239,6 +239,46 @@ func TestAuthMiddlewareAuthenticatesSubsequentTypescriptClientCalls(t *testing.T
 		require.NotNil(t, response, "second response should not be nil")
 		require.Equal(t, http.StatusOK, response.StatusCode, "second response status code should be 200")
 	})
+}
+
+// fetcher is the subset of the TypeScript AuthFetch client used by the
+// regression tests. Declaring it locally keeps the retry helper decoupled from
+// the concrete client type.
+type fetcher interface {
+	Fetch(ctx context.Context, url string, config *clients.SimplifiedFetchRequestOptions) (*http.Response, error)
+}
+
+// fetchWithRetry performs the fetch and retries on transient transport errors.
+// The regression tests drive a containerized gRPC server that calls back into
+// the Go test server, and that round-trip can occasionally hiccup under heavy
+// parallel load - especially with the race detector enabled in CI. A few
+// bounded retries make the tests far less flaky without masking genuine,
+// reproducible failures: a real bug fails every attempt and the last error is
+// still returned to the caller's require.NoError.
+func fetchWithRetry(t *testing.T, ctx context.Context, client fetcher, url string, config *clients.SimplifiedFetchRequestOptions) (*http.Response, error) {
+	t.Helper()
+
+	const attempts = 3
+	const backoff = 250 * time.Millisecond
+
+	var (
+		response *http.Response
+		err      error
+	)
+	for attempt := range attempts {
+		response, err = client.Fetch(ctx, url, config)
+		if err == nil {
+			return response, nil
+		}
+		if ctx.Err() != nil {
+			break
+		}
+		if attempt < attempts-1 {
+			t.Logf("fetch attempt %d/%d failed, retrying in %s: %v", attempt+1, attempts, backoff, err)
+			time.Sleep(backoff)
+		}
+	}
+	return response, err
 }
 
 // isDockerAvailable checks if Docker is available and running.

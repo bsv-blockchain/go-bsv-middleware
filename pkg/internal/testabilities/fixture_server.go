@@ -1,6 +1,7 @@
 package testabilities
 
 import (
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,15 @@ import (
 	"github.com/go-softwarelab/common/pkg/to"
 	"github.com/stretchr/testify/require"
 )
+
+// portScanAttempts is the number of times we scan the whole port list looking
+// for a free port before giving up. A single scan almost always succeeds; the
+// extra attempts only cover the rare case where every candidate port is
+// momentarily busy under heavy parallel load.
+const portScanAttempts = 3
+
+// portScanBackoff is how long we wait between full scans of the port list.
+const portScanBackoff = 50 * time.Millisecond
 
 type MiddlewareHTTPHandlerFactory interface {
 	HTTPHandler(next http.Handler) http.Handler
@@ -105,18 +115,7 @@ func (f *serverFixture) newServer() (server *httptest.Server, cleanup func()) {
 	if len(f.ports) == 0 {
 		server = httptest.NewServer(f.handler())
 	} else {
-		f.Log("trying to find free port from ports list to start the server")
-		var listener net.Listener
-		var err error
-		lc := &net.ListenConfig{}
-		for _, port := range f.ports {
-			listener, err = lc.Listen(f.Context(), "tcp", "127.0.0.1:"+to.StringFromInteger(port))
-			if err == nil && listener != nil {
-				f.Log("starting server on port:", port)
-				break
-			}
-		}
-		require.NotNilf(f, listener, "failed to find free port from ports list %v", f.ports)
+		listener := f.listenOnFreePort()
 
 		server = &httptest.Server{
 			Listener: listener,
@@ -132,4 +131,45 @@ func (f *serverFixture) newServer() (server *httptest.Server, cleanup func()) {
 		server.Close()
 	}
 	return server, cleanup
+}
+
+// listenOnFreePort binds to the first free port from the configured list and
+// returns the listener. To avoid many parallel tests contending on the same
+// low ports (which wastes bind syscalls and makes port acquisition flaky under
+// load), the scan starts at a random offset and wraps around the whole list.
+// The full list is scanned up to portScanAttempts times with a short backoff
+// so a transient burst of busy ports does not fail the test outright.
+func (f *serverFixture) listenOnFreePort() net.Listener {
+	f.Helper()
+	f.Log("trying to find free port from ports list to start the server")
+
+	lc := &net.ListenConfig{}
+	ports := len(f.ports)
+
+	for attempt := range portScanAttempts {
+		if err := f.Context().Err(); err != nil {
+			break
+		}
+
+		// Non-cryptographic use: the random start only spreads concurrent tests
+		// across the port list to reduce bind contention.
+		start := rand.IntN(ports) //nolint:gosec // test-only port spreading, not security sensitive
+		for i := range ports {
+			port := f.ports[(start+i)%ports]
+			listener, err := lc.Listen(f.Context(), "tcp", "127.0.0.1:"+to.StringFromInteger(port))
+			if err == nil && listener != nil {
+				f.Log("starting server on port:", port)
+				return listener
+			}
+		}
+
+		if attempt < portScanAttempts-1 {
+			f.Log("no free port found in ports list, retrying after backoff")
+			time.Sleep(portScanBackoff)
+		}
+	}
+
+	require.FailNowf(f, "failed to find free port",
+		"no free port available in ports list %v after %d attempts", f.ports, portScanAttempts)
+	return nil
 }
