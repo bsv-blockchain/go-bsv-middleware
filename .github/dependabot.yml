@@ -93,3 +93,28 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
+
+  # ──────────────────────────────────────────────────────────────
+  # 4. npm (TypeScript regression-test gRPC client/server)
+  # ──────────────────────────────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/pkg/internal/regressiontests/internal/typescript"
+    target-branch: "main"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "11:45"
+      timezone: "America/New_York"
+    allow:
+      - dependency-type: "direct"
+    groups:
+      npm-all:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    open-pull-requests-limit: 10
+    assignees: ["mrz1836"]
+    labels: ["chore", "dependencies", "npm"]
+    commit-message:
+      prefix: "chore"
+      include: "scope"
