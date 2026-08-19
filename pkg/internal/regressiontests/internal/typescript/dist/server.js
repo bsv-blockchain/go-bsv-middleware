@@ -1,13 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const grpc_js_1 = require("@grpc/grpc-js");
-const authFetch_1 = require("./authFetch");
+const grpc_auth_fetch_1 = require("./grpc-auth-fetch");
 const auth_fetch_1 = require("./gen/auth_fetch");
 function main() {
     const server = new grpc_js_1.Server();
+    const authFetchHandler = new grpc_auth_fetch_1.AuthFetchHandler();
     server.addService(auth_fetch_1.AuthFetchService, {
         // ts-proto uses camelCase method names for grpc-js services
-        fetch: authFetch_1.fetchHandler,
+        fetch: authFetchHandler.fetchHandler(),
+        cleanUp: authFetchHandler.cleanUpHandler(),
     });
     const port = process.env.PORT ?? "50050";
     const host = process.env.HOST ?? "0.0.0.0";
