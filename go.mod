@@ -67,4 +67,4 @@ require (
 
 replace google.golang.org/grpc => google.golang.org/grpc v1.83.1
 
-replace go.opentelemetry.io/otel/sdk => go.opentelemetry.io/otel/sdk v1.43.0
+replace go.opentelemetry.io/otel/sdk => go.opentelemetry.io/otel/sdk v1.46.0
