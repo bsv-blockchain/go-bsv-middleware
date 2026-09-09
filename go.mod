@@ -65,6 +65,6 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260908043556-f8649ddbbfe6 // indirect
 )
 
-replace google.golang.org/grpc => google.golang.org/grpc v1.83.1
+replace google.golang.org/grpc => google.golang.org/grpc v1.83.2
 
 replace go.opentelemetry.io/otel/sdk => go.opentelemetry.io/otel/sdk v1.46.0
