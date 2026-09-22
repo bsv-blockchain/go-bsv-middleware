@@ -3,7 +3,7 @@ module github.com/bsv-blockchain/go-bsv-middleware
 go 1.26.0
 
 require (
-	github.com/bsv-blockchain/go-sdk v1.5.1
+	github.com/bsv-blockchain/go-sdk v1.5.2
 	github.com/go-softwarelab/common v1.8.0
 	github.com/stretchr/testify v1.12.1
 	github.com/testcontainers/testcontainers-go v0.44.0
