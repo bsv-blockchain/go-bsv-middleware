@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"time"
 
 	"github.com/bsv-blockchain/go-sdk/auth"
 	"github.com/bsv-blockchain/go-sdk/auth/utils"
@@ -64,9 +65,28 @@ func WithAuthCertificatesToRequest(certificatesToRequest *utils.RequestedCertifi
 }
 
 // WithAuthCertificatesReceivedListener allows for providing custom listener for received certificates.
+//
+// When combined with WithAuthCertificatesToRequest for a certificate type the
+// server actually requires, the middleware will additionally hold a
+// protected general request open - instead of rejecting it immediately -
+// while a session's certificate exchange is still in flight, giving the
+// listener a chance to run and approve it. See WithAuthCertificateWaitTimeout
+// to bound how long it waits before failing with CERTIFICATE_TIMEOUT.
 func WithAuthCertificatesReceivedListener(listener auth.OnCertificateReceivedCallback) func(config *AuthMiddlewareConfig) {
 	return func(cfg *AuthMiddlewareConfig) {
 		cfg.OnCertificatesReceived = listener
+	}
+}
+
+// WithAuthCertificateWaitTimeout bounds how long a general request will wait
+// for an in-flight certificate exchange to complete before failing with
+// CERTIFICATE_TIMEOUT, when certificate-wait is active (see
+// WithAuthCertificatesReceivedListener). A non-positive value is ignored and
+// the middleware's default (authentication.DefaultCertificateWaitTimeout) is
+// used instead.
+func WithAuthCertificateWaitTimeout(timeout time.Duration) func(*AuthMiddlewareConfig) {
+	return func(cfg *AuthMiddlewareConfig) {
+		cfg.CertificateWaitTimeout = timeout
 	}
 }
 

@@ -20,6 +20,8 @@ regexes = [
 paths = [
     '''pkg/internal/testabilities/fixture/.*''',
     '''pkg/internal/regressiontests/.*''',
+    '''pkg/internal/conformance/testdata/.*''',
+    '''\.sonarcloud\.properties''',
     '''examples/.*''',
     '''\.github/workflows/.*\.yml''',
     '''\.github/docs/.*''',
