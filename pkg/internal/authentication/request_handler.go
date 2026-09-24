@@ -22,6 +22,16 @@ var (
 	ErrInvalidGeneralRequest    = fmt.Errorf("invalid authentication")
 	ErrProcessingMessageByPeer  = fmt.Errorf("error while processing message by peer")
 	ErrAuthenticationRequired   = fmt.Errorf("authentication required")
+	// ErrResponseSigningFailed is returned when the peer fails to sign and/or
+	// deliver the authenticated response payload (e.g. the wallet's signing
+	// operation errors), matching the TS reference's ERR_RESPONSE_SIGNING_FAILED.
+	ErrResponseSigningFailed = fmt.Errorf("failed to sign authenticated response")
+	// ErrCertificateTimeout is returned when a general request arrives on a
+	// session whose required certificate exchange has not completed, and it
+	// still hasn't completed by the time certificateWaitGate gives up.
+	// Matching the TS reference's CERTIFICATE_TIMEOUT (auth-express-middleware's
+	// ExpressTransport#scheduleNextOrCertificateWait).
+	ErrCertificateTimeout = fmt.Errorf("certificate approval timed out")
 )
 
 type AuthRequestHandler interface {
@@ -67,6 +77,11 @@ type GeneralRequestHandler struct {
 	nextHandler           http.Handler
 	peer                  *auth.Peer
 	allowUnauthenticated  bool
+	// certWaitGate is non-nil only when the server requires certificates and
+	// registered Config.OnCertificatesReceived (see Middleware.NewMiddleware).
+	// It is consulted only when handleMessageWithPeer reports
+	// auth.ErrNotAuthenticated - see handleCertificateWait.
+	certWaitGate *certificateWaitGate
 }
 
 func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.ResponseWriter, request *http.Request) (err error) {
@@ -93,7 +108,7 @@ func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.Re
 
 	log.DebugContext(ctx, "Auth message extracted from request")
 
-	if peerErr := h.handleMessageWithPeer(ctx, authMessage.AuthMessage); peerErr != nil {
+	if peerErr := h.processMessageWithCertificateWait(ctx, authMessage); peerErr != nil {
 		return errors.Join(ErrProcessingMessageByPeer, peerErr)
 	}
 	h.log.DebugContext(ctx, "Message successfully processed with peer")
@@ -123,7 +138,7 @@ func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.Re
 	h.log.DebugContext(ctx, "Sending response to peer")
 	err = h.peer.ToPeer(ctx, responsePayload, authMessage.IdentityKey, maxToPeerWaitTime)
 	if err != nil {
-		return fmt.Errorf("failed to send response to peer: %w", err)
+		return errors.Join(ErrResponseSigningFailed, err)
 	}
 
 	h.log.DebugContext(ctx, "Writing http response")
@@ -135,6 +150,43 @@ func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.Re
 	}
 
 	return nil
+}
+
+// processMessageWithCertificateWait delivers authMessage to go-sdk's Peer,
+// and - only when h.certWaitGate is configured (the server requires
+// certificates and registered Config.OnCertificatesReceived) - holds a
+// request that arrived before its session's certificate exchange completed
+// open until that exchange finishes or the gate's timeout elapses, instead
+// of failing it immediately. This mirrors the TS reference's
+// ExpressTransport#scheduleNextOrCertificateWait (auth-express-middleware).
+//
+// go-sdk's Peer reports this specific situation as auth.ErrNotAuthenticated
+// (see auth.Peer.handleGeneralMessage's `if !session.IsAuthenticated` check),
+// which it returns before verifying the message's signature or claiming its
+// nonce, so retrying with the very same authMessage once certificates are
+// approved is safe: nothing about this delivery attempt was consumed.
+func (h *GeneralRequestHandler) processMessageWithCertificateWait(ctx context.Context, authMessage *AuthMessageWithRequestID) error {
+	peerErr := h.handleMessageWithPeer(ctx, authMessage.AuthMessage)
+	if peerErr == nil || h.certWaitGate == nil || !errors.Is(peerErr, auth.ErrNotAuthenticated) {
+		return peerErr
+	}
+
+	identityKey := authMessage.IdentityKey.ToDERHex()
+	h.log.DebugContext(ctx, "Session not yet certificate-authenticated, waiting for certificate exchange", slog.String("identityKey", identityKey))
+
+	approved, waitErr := h.certWaitGate.wait(ctx, identityKey)
+	if waitErr != nil {
+		// The gate is at capacity (see certificateWaitGate.wait) - fail this
+		// request rather than parking it, instead of growing an unbounded
+		// number of concurrently waiting goroutines/connections.
+		return errors.Join(waitErr, peerErr)
+	}
+	if !approved {
+		return errors.Join(ErrCertificateTimeout, peerErr)
+	}
+
+	h.log.DebugContext(ctx, "Certificate exchange completed, retrying message", slog.String("identityKey", identityKey))
+	return h.handleMessageWithPeer(ctx, authMessage.AuthMessage)
 }
 
 func (h *GeneralRequestHandler) handleUnauthenticated(ctx context.Context, httpResponse http.ResponseWriter, request *http.Request) error {
