@@ -36,3 +36,6 @@ go.work.sum
 
 # Fuzz testing
 testdata/
+
+# Pinned ts-stack conformance vectors
+!/pkg/internal/conformance/testdata/

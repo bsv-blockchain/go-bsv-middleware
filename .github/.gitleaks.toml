@@ -20,6 +20,7 @@ regexes = [
 paths = [
     '''pkg/internal/testabilities/fixture/.*''',
     '''pkg/internal/regressiontests/.*''',
+    '''pkg/internal/conformance/testdata/.*''',
     '''examples/.*''',
     '''\.github/workflows/.*\.yml''',
     '''\.github/docs/.*''',
