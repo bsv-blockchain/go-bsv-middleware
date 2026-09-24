@@ -72,6 +72,7 @@ func TestCertificateWaitGate_WaitReturnsFalseOnContextCancellation(t *testing.T)
 	gate := newCertificateWaitGate(time.Minute)
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	go func() {
 		time.Sleep(20 * time.Millisecond)
 		cancel()

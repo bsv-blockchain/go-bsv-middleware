@@ -390,31 +390,18 @@ func (m *Middleware) toHTTPError(err error) *httperror.Error {
 		httpErr.Code = "ERR_RESPONSE_SIGNING_FAILED"
 		httpErr.Message = "Failed to sign the authenticated response"
 
-	case errors.Is(err, ErrAuthenticationRequired):
-		httpErr.StatusCode = http.StatusUnauthorized
-		httpErr.Code = codeUnauthorized
-		httpErr.Message = err.Error()
-
 	case errors.Is(err, ErrGeneralMessageInNonGeneralRequest):
 		httpErr.StatusCode = http.StatusBadRequest
 		httpErr.Code = "ERR_AUTH_MALFORMED"
 		httpErr.Message = err.Error()
 
-	case errors.Is(err, ErrInvalidNonGeneralRequest):
-		// /.well-known/auth is exclusively a BRC-103 handshake endpoint: a body
-		// that can't be decoded as an AuthMessage (e.g. identityKey missing or
-		// not a valid public key, per auth.AuthMessage's own UnmarshalJSON) is
-		// an incomplete/invalid authentication attempt, not a generic bad
-		// request.
-		httpErr.StatusCode = http.StatusUnauthorized
-		httpErr.Code = codeUnauthorized
-		httpErr.Message = err.Error()
-
-	case errors.Is(err, ErrInvalidGeneralRequest):
-		// The request claimed to carry BRC-104 auth headers (it reached the
-		// general-message path at all) but they were missing/malformed, e.g.
-		// no signature or request-id header: an incomplete authentication
-		// attempt, not a generic bad request.
+	// An incomplete or invalid authentication attempt, not a generic bad
+	// request: /.well-known/auth only accepts a decodable BRC-103 AuthMessage,
+	// and a request on the general-message path claimed BRC-104 auth headers
+	// but they were missing or malformed (e.g. no signature or request id).
+	case errors.Is(err, ErrAuthenticationRequired),
+		errors.Is(err, ErrInvalidNonGeneralRequest),
+		errors.Is(err, ErrInvalidGeneralRequest):
 		httpErr.StatusCode = http.StatusUnauthorized
 		httpErr.Code = codeUnauthorized
 		httpErr.Message = err.Error()
