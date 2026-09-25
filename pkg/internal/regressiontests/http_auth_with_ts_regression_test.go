@@ -39,6 +39,8 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 		query   string
 		body    string
 		headers map[string]string
+		// noContent makes the handler write no response body at all.
+		noContent bool
 	}{
 		"default request": {},
 		"get request": {
@@ -75,10 +77,18 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 		"options request": {
 			method: http.MethodOptions,
 		},
-		// FIXME(Issue: #145): uncomment and implement this test when empty response body will be fixed.
-		// "server responding with no content": {
-		// 	serverRespondingWithNoContent: true,
-		// },
+		"server responding with no content": {
+			noContent: true,
+		},
+		"post request with no content response": {
+			method: http.MethodPost,
+			path:   "/ping",
+			body:   `{ "ping" : true }`,
+			headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			noContent: true,
+		},
 	}
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
@@ -102,6 +112,9 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 						HasBody(test.body).
 						HasIdentityOfUser(alice)
 
+					if test.noContent {
+						return
+					}
 					_, err := w.Write([]byte("Pong!"))
 					assert.NoError(t, err)
 				}).
@@ -129,10 +142,14 @@ func TestAuthMiddlewareAuthenticatesTypescriptClient(t *testing.T) {
 			defer func() { _ = response.Body.Close() }()
 
 			// and:
+			expectedBody := "Pong!"
+			if test.noContent {
+				expectedBody = ""
+			}
 			then.Response(response).
 				HasStatus(http.StatusOK).
 				HasHeader("x-bsv-auth-identity-key").
-				HasBody("Pong!")
+				HasBody(expectedBody)
 		})
 	}
 }
@@ -160,9 +177,8 @@ func TestAuthMiddlewareAuthenticatesSubsequentTypescriptClientCalls(t *testing.T
 		// and:
 		cleanup := given.Server().WithMiddleware(authMiddleware).
 			WithRoute("/", func(w http.ResponseWriter, r *http.Request) {
-				// FIXME(Issue: #145): unify with integration tests when empty response body will be fixed
-				_, err := w.Write([]byte("Pong!"))
-				assert.NoError(t, err)
+				// Responds with no body: an empty response must be signed as the
+				// 200 net/http sends (issue #145).
 			}).
 			Started()
 		defer cleanup()
@@ -203,9 +219,8 @@ func TestAuthMiddlewareAuthenticatesSubsequentTypescriptClientCalls(t *testing.T
 		// and:
 		cleanup := given.Server().WithMiddleware(authMiddleware).
 			WithRoute("/", func(w http.ResponseWriter, r *http.Request) {
-				// FIXME(Issue: #145): unify with integration tests when empty response body will be fixed
-				_, err := w.Write([]byte("Pong!"))
-				assert.NoError(t, err)
+				// Responds with no body: an empty response must be signed as the
+				// 200 net/http sends (issue #145).
 			}).
 			Started()
 		defer cleanup()
