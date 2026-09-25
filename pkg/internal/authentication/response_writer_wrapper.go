@@ -73,9 +73,14 @@ func (r *ResponseWriterWrapper) GetStatusCode() int {
 }
 
 // WrapResponseWriter wraps and tracks write status.
+//
+// The status starts at 200, which is what net/http sends when a handler
+// writes nothing. The response is signed with GetStatusCode before Flush, so
+// a handler that writes no body and sets no status must be signed as 200,
+// not 0, or the client rejects the signature (issue #145).
 func WrapResponseWriter(w http.ResponseWriter) *ResponseWriterWrapper {
 	return &ResponseWriterWrapper{
 		ResponseWriter: w,
-		statusCode:     0,
+		statusCode:     http.StatusOK,
 	}
 }
