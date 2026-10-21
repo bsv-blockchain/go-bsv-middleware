@@ -18,6 +18,9 @@
 #   • Force‑push and delete‑branch disabled via branch‑protection rules.
 #   • PR limit = 10 to avoid queue flooding.
 #   • All dependency PRs require passing CI checks before merging.
+#   • Cooldown on version updates – new releases wait 3 days (semver ecosystems:
+#     patch 3 / minor 7 / major 14 days); first‑party and trusted publishers are
+#     excluded, and security updates are never delayed.
 # ────────────────────────────────────────────────────────────────
 
 version: 2
@@ -47,6 +50,12 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
+    cooldown:
+      default-days: 3
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
+      exclude: ["github.com/bsv-blockchain/*"]
 
   # ──────────────────────────────────────────────────────────────
   # 2. GitHub Actions Workflows
@@ -70,6 +79,9 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
+    cooldown:
+      default-days: 3
+      exclude: ["actions/*", "github/*", "gitleaks/*", "ossf/*"]
 
   # ──────────────────────────────────────────────────────────────
   # 3. DevContainer (devcontainer.json : base image + features)
@@ -93,6 +105,9 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
+    cooldown:
+      default-days: 3
+      exclude: ["ghcr.io/devcontainers/features/*"]
 
   # ──────────────────────────────────────────────────────────────
   # 4. npm (TypeScript regression-test gRPC client/server)
@@ -118,3 +133,33 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
+    cooldown:
+      default-days: 3
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
+
+  # ──────────────────────────────────────────────────────────────
+  # 5. Docker (TypeScript regression-test Dockerfile base image)
+  # ──────────────────────────────────────────────────────────────
+  - package-ecosystem: "docker"
+    directory: "/pkg/internal/regressiontests/internal/typescript"
+    target-branch: "main"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "12:00"
+      timezone: "America/New_York"
+    allow:
+      - dependency-type: "direct"
+    groups:
+      docker-all:
+        patterns: ["*"]
+    open-pull-requests-limit: 5
+    assignees: ["mrz1836"]
+    labels: ["chore", "dependencies", "docker"]
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    cooldown:
+      default-days: 3
