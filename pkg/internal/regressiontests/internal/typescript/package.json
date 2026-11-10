@@ -9,7 +9,7 @@
     "devDependencies": {
         "@types/minimist": "^1.2.5",
         "@types/node": "^24.19.2",
-        "ts-proto": "^2.18.3",
+        "ts-proto": "^2.18.4",
         "tsx": "^4.23.15",
         "typescript": "^6.0.3"
     },
