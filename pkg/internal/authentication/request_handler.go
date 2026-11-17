@@ -136,7 +136,7 @@ func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.Re
 	}
 
 	h.log.DebugContext(ctx, "Sending response to peer")
-	err = h.peer.ToPeer(ctx, responsePayload, authMessage.IdentityKey, maxToPeerWaitTime)
+	err = h.sendResponse(ctx, responsePayload, authMessage)
 	if err != nil {
 		return errors.Join(ErrResponseSigningFailed, err)
 	}
@@ -150,6 +150,20 @@ func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.Re
 	}
 
 	return nil
+}
+
+// sendResponse signs and sends the response on the session the request came
+// in on: the request's YourNonce names it. Replying by identity key instead
+// picks that identity's most recently used session, and when two clients
+// share an identity (two devices, or two servers with one treasury key) the
+// reply can land on the other client's session, which the asking client
+// rejects with session-not-found although its request succeeded. A request
+// without YourNonce falls back to the identity key.
+func (h *GeneralRequestHandler) sendResponse(ctx context.Context, payload []byte, authMessage *AuthMessageWithRequestID) error {
+	if authMessage.YourNonce != "" {
+		return h.peer.ToPeerOnSession(ctx, payload, authMessage.YourNonce)
+	}
+	return h.peer.ToPeer(ctx, payload, authMessage.IdentityKey, maxToPeerWaitTime)
 }
 
 // processMessageWithCertificateWait delivers authMessage to go-sdk's Peer,

@@ -2,9 +2,11 @@
 package middleware_test
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 
 	clients "github.com/bsv-blockchain/go-sdk/auth/clients/authhttp"
 	"github.com/go-softwarelab/common/pkg/to"
@@ -298,6 +300,84 @@ func TestAuthMiddlewareHandleSubsequentRequests(t *testing.T) {
 		require.NoError(t, err, "second request should succeed")
 		require.NotNil(t, response, "second response should not be nil")
 		require.Equal(t, http.StatusNoContent, response.StatusCode, "second response status code should be 200")
+	})
+
+	t.Run("each client of a shared identity gets its reply on its own session", func(t *testing.T) {
+		// Two clients sharing one identity (WoC's two woc-api hosts with one
+		// treasury key) each hold a session with the server. The server must
+		// sign each reply on the session its request came in on. Picking the
+		// identity's most recently used session instead sent a reply to the
+		// older client on the newer client's session whenever the newer
+		// client was active while the older client's request was being
+		// handled, and the older client rejected it with session-not-found
+		// although its request had succeeded.
+
+		// given: a route that holds the older client's request until the
+		// newer client has been served
+		given := testabilities.Given(t)
+		authMiddleware := given.Middleware().NewAuth()
+		slowEntered := make(chan struct{})
+		release := make(chan struct{})
+		cleanup := given.Server().WithMiddleware(authMiddleware).
+			WithRoute("/", func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusNoContent)
+			}).
+			WithRoute("/slow", func(w http.ResponseWriter, r *http.Request) {
+				close(slowEntered)
+				<-release
+				w.WriteHeader(http.StatusNoContent)
+			}).
+			Started()
+		defer cleanup()
+
+		// and: two clients with the same identity, both authenticated
+		alice := testusers.NewAlice(t)
+		olderClient, olderCleanup := given.Client().ForUser(alice)
+		defer olderCleanup()
+		newerClient, newerCleanup := given.Client().ForUser(alice)
+		defer newerCleanup()
+
+		type fetcher interface {
+			Fetch(ctx context.Context, url string, config *clients.SimplifiedFetchRequestOptions) (*http.Response, error)
+		}
+		fetch := func(client fetcher, path string) (int, error) {
+			response, err := client.Fetch(t.Context(), given.Server().URL().String()+path, &clients.SimplifiedFetchRequestOptions{})
+			if err != nil {
+				return 0, err
+			}
+			defer func() { _ = response.Body.Close() }()
+			return response.StatusCode, nil
+		}
+		status, err := fetch(olderClient, "/")
+		require.NoError(t, err, "older client's first request")
+		require.Equal(t, http.StatusNoContent, status)
+		status, err = fetch(newerClient, "/")
+		require.NoError(t, err, "newer client's first request")
+		require.Equal(t, http.StatusNoContent, status)
+
+		// when: the older client's request is in flight while the newer
+		// client makes one, so the newer session is the most recently used
+		// one when the older request is answered
+		type result struct {
+			status int
+			err    error
+		}
+		older := make(chan result, 1)
+		go func() {
+			slowStatus, slowErr := fetch(olderClient, "/slow")
+			older <- result{slowStatus, slowErr}
+		}()
+		<-slowEntered
+		time.Sleep(5 * time.Millisecond) // session timestamps have millisecond resolution
+		status, err = fetch(newerClient, "/")
+		require.NoError(t, err, "newer client's request while the older one is in flight")
+		require.Equal(t, http.StatusNoContent, status)
+		close(release)
+
+		// then: the older client gets its own reply
+		got := <-older
+		require.NoError(t, got.err, "older client's in-flight request")
+		require.Equal(t, http.StatusNoContent, got.status)
 	})
 }
 
