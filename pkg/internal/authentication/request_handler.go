@@ -15,8 +15,6 @@ import (
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/logging"
 )
 
-const maxToPeerWaitTime = 30000
-
 var (
 	ErrInvalidNonGeneralRequest = fmt.Errorf("bad request")
 	ErrInvalidGeneralRequest    = fmt.Errorf("invalid authentication")
@@ -136,7 +134,13 @@ func (h *GeneralRequestHandler) Handle(ctx context.Context, httpResponse http.Re
 	}
 
 	h.log.DebugContext(ctx, "Sending response to peer")
-	err = h.peer.ToPeer(ctx, responsePayload, authMessage.IdentityKey, maxToPeerWaitTime)
+	// Reply on the session the request arrived on: its YourNonce is our nonce
+	// for that session, and the peer has already verified the request against
+	// it. ToPeer would pick the identity's most recently updated session, and
+	// when one identity holds several sessions at once (the same wallet on two
+	// hosts) that hands this caller another session's nonce: it drops the
+	// reply with session-not-found although the request was handled.
+	err = h.peer.ToPeerOnSession(ctx, responsePayload, authMessage.YourNonce)
 	if err != nil {
 		return errors.Join(ErrResponseSigningFailed, err)
 	}
