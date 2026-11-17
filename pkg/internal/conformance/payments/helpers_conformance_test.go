@@ -88,7 +88,7 @@ func getStringMap(m map[string]any, key string) map[string]string {
 // assertRequiredFields mirrors the TS reference's assertRequiredFields: for
 // every name listed in expected["required_fields"], value must carry that
 // key (a structural presence check, not a value check).
-func assertRequiredFields(t *testing.T, value map[string]any, expected map[string]any) {
+func assertRequiredFields(t *testing.T, value, expected map[string]any) {
 	t.Helper()
 	raw, ok := expected["required_fields"]
 	if !ok {

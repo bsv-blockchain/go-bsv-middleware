@@ -133,7 +133,7 @@ func asInt(t *testing.T, m map[string]any, key string) int {
 // body_shape spec: a value of "string"/"array"/"object" is a type
 // descriptor, anything else (e.g. a literal messageType/version) is the
 // exact expected value.
-func assertBodyShape(t *testing.T, body map[string]any, shape map[string]any) {
+func assertBodyShape(t *testing.T, body, shape map[string]any) {
 	t.Helper()
 	for key, spec := range shape {
 		val, ok := body[key]

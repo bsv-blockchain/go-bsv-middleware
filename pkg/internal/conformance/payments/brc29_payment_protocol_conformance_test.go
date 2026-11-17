@@ -6,10 +6,9 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/bsv-blockchain/go-sdk/wallet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/bsv-blockchain/go-sdk/wallet"
 
 	"github.com/bsv-blockchain/go-bsv-middleware/pkg/internal/conformance"
 )
