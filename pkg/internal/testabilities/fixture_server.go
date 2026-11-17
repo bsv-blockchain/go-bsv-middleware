@@ -156,6 +156,9 @@ func (f *serverFixture) listenOnFreePort() net.Listener {
 		start := rand.IntN(ports) //nolint:gosec // test-only port spreading, not security sensitive
 		for i := range ports {
 			port := f.ports[(start+i)%ports]
+			if !f.portFreeOnAllAddresses(lc, port) {
+				continue
+			}
 			listener, err := lc.Listen(f.Context(), "tcp", "127.0.0.1:"+to.StringFromInteger(port))
 			if err == nil && listener != nil {
 				f.Log("starting server on port:", port)
@@ -172,4 +175,24 @@ func (f *serverFixture) listenOnFreePort() net.Listener {
 	require.FailNowf(f, "failed to find free port",
 		"no free port available in ports list %v after %d attempts", f.ports, portScanAttempts)
 	return nil
+}
+
+// portFreeOnAllAddresses reports whether nothing else holds the port on any
+// local address. Binding 127.0.0.1 alone is not enough: on macOS (and other
+// BSDs) that bind succeeds even while another process listens on the wildcard
+// address for the same port, which is exactly what Docker does for published
+// container ports (0.0.0.0:P and [::]:P). The regression tests reach this
+// server through a testcontainers SSH tunnel that dials "localhost:P"; that
+// resolves to [::1] first and lands in the Docker container instead of this
+// server. A short-lived wildcard bind fails with "address already in use" in
+// that case, so the port is skipped. The probe is closed before the real
+// loopback listener is opened, so the server itself is never exposed beyond
+// loopback.
+func (f *serverFixture) portFreeOnAllAddresses(lc *net.ListenConfig, port int) bool {
+	probe, err := lc.Listen(f.Context(), "tcp", ":"+to.StringFromInteger(port))
+	if err != nil {
+		return false
+	}
+	_ = probe.Close()
+	return true
 }
