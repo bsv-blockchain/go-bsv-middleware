@@ -2,6 +2,7 @@ package testabilities
 
 import (
 	"io"
+	"net"
 	"net/http"
 	"strconv"
 	"testing"
@@ -74,6 +75,42 @@ func TestServerFixtureAvoidsPortContention(t *testing.T) {
 	}
 
 	require.Len(t, usedPorts, servers, "each concurrent server must get a unique port")
+}
+
+// TestServerFixtureSkipsPortHeldOnWildcardAddress reproduces how Docker
+// publishes container ports: it listens on the wildcard address (0.0.0.0:P and
+// [::]:P). On macOS a 127.0.0.1:P bind still succeeds next to that, so a
+// client dialing "localhost:P" (resolved to [::1]) reached the Docker container
+// instead of the test server. The fixture must treat such a port as taken.
+func TestServerFixtureSkipsPortHeldOnWildcardAddress(t *testing.T) {
+	const heldPort, freePort = 56200, 56201
+
+	lc := &net.ListenConfig{}
+	held, err := lc.Listen(t.Context(), "tcp", ":"+strconv.Itoa(heldPort))
+	require.NoError(t, err, "test setup: failed to hold port on the wildcard address")
+	defer func() { _ = held.Close() }()
+
+	ports := []int{heldPort, freePort}
+
+	// The scan starts at a random offset, so repeat enough times that a fixture
+	// ignoring the wildcard holder would almost certainly pick heldPort once.
+	for range 20 {
+		fixture := NewServerFixture(t, func(o *ServerFixtureOptions) {
+			o.serverPorts = ports
+		})
+
+		cleanup := fixture.
+			WithRoute("/", func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = w.Write([]byte("ok"))
+			}).
+			Started()
+
+		port := mustPort(t, fixture.URL().Port())
+		cleanup()
+
+		require.Equalf(t, freePort, port,
+			"server must not share port %d with a process listening on the wildcard address", heldPort)
+	}
 }
 
 func mustPort(t *testing.T, port string) int {
